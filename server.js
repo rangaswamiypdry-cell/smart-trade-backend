@@ -3,80 +3,54 @@ const { URL } = require("url");
 
 const PORT = process.env.PORT || 10000;
 
-// =====================================================
-// SMART TRADE INDIA BACKEND
-// Upstox OAuth + Live Market Data
-// =====================================================
-
 let upstoxAccessToken = null;
 let tokenCreatedAt = null;
 
-// -----------------------------------------------------
-// JSON response
-// -----------------------------------------------------
-function sendJson(res, status, data) {
-  res.writeHead(status, {
-    "Content-Type": "application/json",
+function headers() {
+  return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+  };
+}
+
+function sendJson(res, status, data) {
+  res.writeHead(status, {
+    ...headers(),
+    "Content-Type": "application/json"
   });
 
   res.end(JSON.stringify(data));
 }
 
-// -----------------------------------------------------
-// HTML response
-// -----------------------------------------------------
-function sendText(res, status, text) {
+function sendHtml(res, status, html) {
   res.writeHead(status, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Access-Control-Allow-Origin": "*"
+    ...headers(),
+    "Content-Type": "text/html; charset=utf-8"
   });
 
-  res.end(text);
+  res.end(html);
 }
 
-// -----------------------------------------------------
-// Read POST body
-// -----------------------------------------------------
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = "";
-
-    req.on("data", chunk => {
-      body += chunk;
-    });
-
-    req.on("end", () => {
-      resolve(body);
-    });
-
-    req.on("error", reject);
-  });
-}
-
-// -----------------------------------------------------
-// Get Upstox credentials from Render Environment
-// -----------------------------------------------------
-function getUpstoxConfig() {
+function getConfig() {
   return {
     clientId: process.env.UPSTOX_API_KEY,
     clientSecret: process.env.UPSTOX_API_SECRET,
-    redirectUri:
-      process.env.UPSTOX_REDIRECT_URI ||
-      "https://www.smartmarketsignal.in/ups"
+    redirectUri: process.env.UPSTOX_REDIRECT_URI
   };
 }
 
-// -----------------------------------------------------
-// Create Upstox Login URL
-// -----------------------------------------------------
-function getUpstoxLoginUrl() {
-  const { clientId, redirectUri } = getUpstoxConfig();
+// =====================================================
+// UPSTOX LOGIN
+// =====================================================
+
+function createLoginUrl() {
+  const { clientId, redirectUri } = getConfig();
 
   if (!clientId || !redirectUri) {
-    return null;
+    throw new Error(
+      "UPSTOX_API_KEY or UPSTOX_REDIRECT_URI is missing."
+    );
   }
 
   const loginUrl = new URL(
@@ -91,36 +65,41 @@ function getUpstoxLoginUrl() {
   return loginUrl.toString();
 }
 
-// -----------------------------------------------------
-// Exchange authorization code for access token
-// -----------------------------------------------------
-async function exchangeCodeForToken(code) {
-  const { clientId, clientSecret, redirectUri } =
-    getUpstoxConfig();
+// =====================================================
+// TOKEN EXCHANGE
+// =====================================================
+
+async function exchangeCode(code) {
+  const {
+    clientId,
+    clientSecret,
+    redirectUri
+  } = getConfig();
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error(
-      "Upstox credentials are not configured on Render."
+      "Upstox credentials are missing in Render."
     );
   }
 
-  const form = new URLSearchParams({
-    code,
-    client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: redirectUri,
-    grant_type: "authorization_code"
-  });
+  const body = new URLSearchParams();
+
+  body.set("code", code);
+  body.set("client_id", clientId);
+  body.set("client_secret", clientSecret);
+  body.set("redirect_uri", redirectUri);
+  body.set("grant_type", "authorization_code");
 
   const response = await fetch(
     "https://api.upstox.com/v2/login/authorization/token",
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json"
+        Accept: "application/json",
+        "Content-Type":
+          "application/x-www-form-urlencoded"
       },
-      body: form.toString()
+      body: body.toString()
     }
   );
 
@@ -135,58 +114,48 @@ async function exchangeCodeForToken(code) {
   }
 
   if (!result.access_token) {
-    throw new Error("Upstox did not return an access token.");
+    throw new Error(
+      "Upstox access token was not received."
+    );
   }
 
-  // Store token only in server memory.
-  // Never send it to the frontend.
   upstoxAccessToken = result.access_token;
   tokenCreatedAt = new Date().toISOString();
 
-  return true;
+  return result;
 }
 
-// -----------------------------------------------------
-// Get access token
-// -----------------------------------------------------
-function requireAccessToken(res) {
-  if (!upstoxAccessToken) {
-    sendJson(res, 401, {
-      success: false,
-      error: "UPSTOX_LOGIN_REQUIRED",
-      message:
-        "Please connect your Upstox account first."
-    });
+// =====================================================
+// MARKET QUOTE V3
+// =====================================================
 
-    return false;
+async function getQuotes(instrumentKeys) {
+  if (!upstoxAccessToken) {
+    throw new Error(
+      "UPSTOX_LOGIN_REQUIRED"
+    );
   }
 
-  return true;
-}
-
-// -----------------------------------------------------
-// Get live market quotes from Upstox V3
-// -----------------------------------------------------
-async function getMarketQuotes(instrumentKeys) {
-  if (!upstoxAccessToken) {
-    throw new Error("Upstox account is not connected.");
-  }
-
-  const apiUrl =
-    new URL("https://api.upstox.com/v3/market-quote/quotes");
+  const apiUrl = new URL(
+    "https://api.upstox.com/v3/market-quote/quotes"
+  );
 
   apiUrl.searchParams.set(
     "instrument_key",
     instrumentKeys.join(",")
   );
 
-  const response = await fetch(apiUrl.toString(), {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${upstoxAccessToken}`
+  const response = await fetch(
+    apiUrl.toString(),
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization:
+          `Bearer ${upstoxAccessToken}`
+      }
     }
-  });
+  );
 
   const result = await response.json();
 
@@ -194,7 +163,7 @@ async function getMarketQuotes(instrumentKeys) {
     throw new Error(
       result?.errors?.[0]?.message ||
       result?.message ||
-      "Unable to get market data from Upstox."
+      "Market data request failed."
     );
   }
 
@@ -205,307 +174,280 @@ async function getMarketQuotes(instrumentKeys) {
 // SERVER
 // =====================================================
 
-const server = http.createServer(async (req, res) => {
-  try {
-    // -------------------------------------------------
-    // CORS preflight
-    // -------------------------------------------------
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers":
-          "Content-Type, Authorization",
-        "Access-Control-Allow-Methods":
-          "GET, POST, OPTIONS"
-      });
+const server = http.createServer(
+  async (req, res) => {
+    try {
+      if (req.method === "OPTIONS") {
+        res.writeHead(204, headers());
+        return res.end();
+      }
 
-      return res.end();
-    }
+      const url = new URL(
+        req.url,
+        `http://${req.headers.host}`
+      );
 
-    const url = new URL(
-      req.url,
-      `http://${req.headers.host}`
-    );
+      // -------------------------------------------------
+      // HOME / HEALTH
+      // -------------------------------------------------
 
-    // =================================================
-    // HEALTH
-    // =================================================
-
-    if (
-      url.pathname === "/" ||
-      url.pathname === "/health"
-    ) {
-      return sendJson(res, 200, {
-        ok: true,
-        app: "Smart Trade India Backend",
-        status: "running",
-        upstox_connected: !!upstoxAccessToken
-      });
-    }
-
-    // =================================================
-    // UPSTOX LOGIN URL
-    // =================================================
-
-    if (
-      url.pathname === "/api/upstox/login" &&
-      req.method === "GET"
-    ) {
-      const loginUrl = getUpstoxLoginUrl();
-
-      if (!loginUrl) {
-        return sendJson(res, 500, {
-          success: false,
-          error:
-            "UPSTOX_API_KEY or UPSTOX_REDIRECT_URI is missing."
+      if (
+        url.pathname === "/" ||
+        url.pathname === "/health"
+      ) {
+        return sendJson(res, 200, {
+          success: true,
+          app: "Smart Trade India Backend",
+          status: "running",
+          upstox_connected:
+            !!upstoxAccessToken
         });
       }
 
-      return sendJson(res, 200, {
-        success: true,
-        login_url: loginUrl
-      });
-    }
+      // -------------------------------------------------
+      // UPSTOX LOGIN
+      // -------------------------------------------------
 
-    // =================================================
-    // UPSTOX OAUTH CALLBACK
-    // =================================================
+      if (
+        url.pathname === "/api/upstox/login" &&
+        req.method === "GET"
+      ) {
+        try {
+          const loginUrl = createLoginUrl();
 
-    if (
-      url.pathname === "/ups" &&
-      req.method === "GET"
-    ) {
-      const code = url.searchParams.get("code");
-      const state = url.searchParams.get("state");
+          // DIRECT REDIRECT TO UPSTOX
+          res.writeHead(302, {
+            Location: loginUrl
+          });
 
-      if (!code) {
-        return sendText(
-          res,
-          400,
-          `
-          <h2>Upstox Login Failed</h2>
-          <p>Authorization code not received.</p>
-          `
-        );
+          return res.end();
+
+        } catch (error) {
+          return sendJson(res, 500, {
+            success: false,
+            error: error.message
+          });
+        }
       }
 
-      try {
-        await exchangeCodeForToken(code);
+      // -------------------------------------------------
+      // UPSTOX CALLBACK
+      // -------------------------------------------------
 
-        return sendText(
-          res,
-          200,
-          `
-          <html>
-            <head>
-              <meta name="viewport"
-                    content="width=device-width,initial-scale=1">
-              <title>Smart Trade India</title>
-            </head>
-            <body style="font-family:Arial;padding:30px">
-              <h2>✅ Upstox Connected</h2>
-              <p>Smart Trade India backend is connected to Upstox.</p>
-              <p>You can return to the app now.</p>
-            </body>
-          </html>
-          `
-        );
-      } catch (error) {
-        return sendText(
-          res,
-          500,
-          `
-          <h2>❌ Upstox Connection Failed</h2>
-          <p>${error.message}</p>
-          `
-        );
-      }
-    }
-
-    // =================================================
-    // MANUAL TOKEN EXCHANGE
-    // =================================================
-
-    if (
-      url.pathname === "/api/upstox/token" &&
-      req.method === "POST"
-    ) {
-      const body = await readBody(req);
-
-      try {
-        const data = JSON.parse(body || "{}");
-        const code = data.code;
+      if (
+        url.pathname === "/ups" &&
+        req.method === "GET"
+      ) {
+        const code =
+          url.searchParams.get("code");
 
         if (!code) {
-          return sendJson(res, 400, {
+          return sendHtml(
+            res,
+            400,
+            `
+            <html>
+              <body style="font-family:Arial;padding:30px">
+                <h2>❌ Upstox Login Failed</h2>
+                <p>Authorization code not received.</p>
+              </body>
+            </html>
+            `
+          );
+        }
+
+        try {
+          await exchangeCode(code);
+
+          return sendHtml(
+            res,
+            200,
+            `
+            <html>
+              <head>
+                <meta name="viewport"
+                  content="width=device-width,initial-scale=1">
+              </head>
+              <body style="font-family:Arial;padding:30px">
+                <h2>✅ Upstox Connected</h2>
+                <p>Smart Trade India is connected.</p>
+                <p>You can return to the app.</p>
+              </body>
+            </html>
+            `
+          );
+
+        } catch (error) {
+          return sendHtml(
+            res,
+            500,
+            `
+            <html>
+              <body style="font-family:Arial;padding:30px">
+                <h2>❌ Upstox Connection Failed</h2>
+                <p>${error.message}</p>
+              </body>
+            </html>
+            `
+          );
+        }
+      }
+
+      // -------------------------------------------------
+      // UPSTOX STATUS
+      // -------------------------------------------------
+
+      if (
+        url.pathname === "/api/upstox/status" &&
+        req.method === "GET"
+      ) {
+        return sendJson(res, 200, {
+          success: true,
+          connected:
+            !!upstoxAccessToken,
+          token_created_at:
+            tokenCreatedAt
+        });
+      }
+
+      // -------------------------------------------------
+      // SINGLE MARKET QUOTE
+      // -------------------------------------------------
+
+      if (
+        url.pathname === "/api/market/quote" &&
+        req.method === "GET"
+      ) {
+        if (!upstoxAccessToken) {
+          return sendJson(res, 401, {
             success: false,
-            error: "Authorization code is required."
+            error:
+              "UPSTOX_LOGIN_REQUIRED",
+            message:
+              "Please connect Upstox first."
           });
         }
 
-        await exchangeCodeForToken(code);
+        const key =
+          url.searchParams.get(
+            "instrument_key"
+          );
 
-        return sendJson(res, 200, {
-          success: true,
-          message: "Upstox authentication successful.",
-          token_received: true
-        });
-      } catch (error) {
-        return sendJson(res, 500, {
-          success: false,
-          error: error.message
-        });
+        if (!key) {
+          return sendJson(res, 400, {
+            success: false,
+            error:
+              "instrument_key is required."
+          });
+        }
+
+        try {
+          const data =
+            await getQuotes([key]);
+
+          return sendJson(res, 200, {
+            success: true,
+            data
+          });
+
+        } catch (error) {
+          return sendJson(res, 502, {
+            success: false,
+            error: error.message
+          });
+        }
       }
-    }
 
-    // =================================================
-    // UPSTOX CONNECTION STATUS
-    // =================================================
+      // -------------------------------------------------
+      // MULTIPLE MARKET QUOTES
+      // -------------------------------------------------
 
-    if (
-      url.pathname === "/api/upstox/status" &&
-      req.method === "GET"
-    ) {
-      return sendJson(res, 200, {
-        success: true,
-        connected: !!upstoxAccessToken,
-        token_created_at: tokenCreatedAt
+      if (
+        url.pathname === "/api/market/quotes" &&
+        req.method === "GET"
+      ) {
+        if (!upstoxAccessToken) {
+          return sendJson(res, 401, {
+            success: false,
+            error:
+              "UPSTOX_LOGIN_REQUIRED"
+          });
+        }
+
+        const raw =
+          url.searchParams.get(
+            "instrument_keys"
+          );
+
+        if (!raw) {
+          return sendJson(res, 400, {
+            success: false,
+            error:
+              "instrument_keys is required."
+          });
+        }
+
+        const keys = raw
+          .split(",")
+          .map(x => x.trim())
+          .filter(Boolean);
+
+        if (keys.length > 500) {
+          return sendJson(res, 400, {
+            success: false,
+            error:
+              "Maximum 500 instruments allowed."
+          });
+        }
+
+        try {
+          const data =
+            await getQuotes(keys);
+
+          return sendJson(res, 200, {
+            success: true,
+            count: keys.length,
+            data
+          });
+
+        } catch (error) {
+          return sendJson(res, 502, {
+            success: false,
+            error: error.message
+          });
+        }
+      }
+
+      // -------------------------------------------------
+      // 404
+      // -------------------------------------------------
+
+      return sendJson(res, 404, {
+        success: false,
+        error: "Endpoint not found."
+      });
+
+    } catch (error) {
+      console.error(
+        "SERVER ERROR:",
+        error
+      );
+
+      return sendJson(res, 500, {
+        success: false,
+        error:
+          "Internal server error."
       });
     }
-
-    // =================================================
-    // LIVE MARKET QUOTE
-    //
-    // Example:
-    // /api/market/quote?instrument_key=NSE_EQ|INE848E01016
-    // =================================================
-
-    if (
-      url.pathname === "/api/market/quote" &&
-      req.method === "GET"
-    ) {
-      if (!requireAccessToken(res)) {
-        return;
-      }
-
-      const instrumentKey =
-        url.searchParams.get("instrument_key");
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error:
-            "instrument_key is required.",
-          example:
-            "NSE_EQ|INE848E01016"
-        });
-      }
-
-      try {
-        const data = await getMarketQuotes([
-          instrumentKey
-        ]);
-
-        return sendJson(res, 200, {
-          success: true,
-          data
-        });
-      } catch (error) {
-        return sendJson(res, 502, {
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    // =================================================
-    // MULTIPLE LIVE MARKET QUOTES
-    //
-    // Example:
-    // /api/market/quotes?instrument_keys=NSE_EQ|AAA,NSE_EQ|BBB
-    // =================================================
-
-    if (
-      url.pathname === "/api/market/quotes" &&
-      req.method === "GET"
-    ) {
-      if (!requireAccessToken(res)) {
-        return;
-      }
-
-      const rawKeys =
-        url.searchParams.get("instrument_keys");
-
-      if (!rawKeys) {
-        return sendJson(res, 400, {
-          success: false,
-          error:
-            "instrument_keys is required."
-        });
-      }
-
-      const instrumentKeys = rawKeys
-        .split(",")
-        .map(x => x.trim())
-        .filter(Boolean);
-
-      if (instrumentKeys.length === 0) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "No valid instrument keys provided."
-        });
-      }
-
-      if (instrumentKeys.length > 500) {
-        return sendJson(res, 400, {
-          success: false,
-          error:
-            "Maximum 500 instruments per request."
-        });
-      }
-
-      try {
-        const data =
-          await getMarketQuotes(instrumentKeys);
-
-        return sendJson(res, 200, {
-          success: true,
-          count: instrumentKeys.length,
-          data
-        });
-      } catch (error) {
-        return sendJson(res, 502, {
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    // =================================================
-    // 404
-    // =================================================
-
-    return sendJson(res, 404, {
-      success: false,
-      error: "Endpoint not found."
-    });
-
-  } catch (error) {
-    console.error("SERVER ERROR:", error);
-
-    return sendJson(res, 500, {
-      success: false,
-      error: "Internal server error."
-    });
   }
-});
+);
 
 // =====================================================
-// START SERVER
+// START
 // =====================================================
 
 server.listen(PORT, () => {
   console.log(
-    `Smart Trade India backend running on port ${PORT}`
+    `Smart Trade India Backend running on port ${PORT}`
   );
 });
