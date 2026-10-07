@@ -832,7 +832,43 @@ if (url.pathname === "/api/options/auto-scan") {
     results,
     alerts
   });
-                }
+   // ==================================================
+// 5 MINUTE CANDLE API
+// ==================================================
+
+if (url.pathname === "/api/market/candles") {
+
+  const instrumentKey =
+    url.searchParams.get("instrument_key");
+
+  const interval =
+    url.searchParams.get("interval") || "5";
+
+  if (!instrumentKey) {
+    return sendJson(res, 400, {
+      success: false,
+      error: "instrument_key is required"
+    });
+  }
+
+  const apiUrl =
+    `https://api.upstox.com/v3/historical-candle/intraday/` +
+    `${encodeURIComponent(instrumentKey)}/minutes/${encodeURIComponent(interval)}`;
+
+  const data =
+    await upstoxRequest(apiUrl);
+
+  const candles =
+    data?.data?.candles || [];
+
+  return sendJson(res, 200, {
+    success: true,
+    instrument_key: instrumentKey,
+    interval_minutes: Number(interval),
+    candle_count: candles.length,
+    candles
+  });
+}
     // ==================================================
     // NOT FOUND
     // ==================================================
