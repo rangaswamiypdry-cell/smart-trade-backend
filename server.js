@@ -3,6 +3,8 @@ const { URL } = require("url");
 
 const PORT = process.env.PORT || 10000;
 
+const optionSnapshots = new Map();
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -48,6 +50,77 @@ async function upstoxRequest(url) {
   return data;
 }
 
+function number(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function movement(current, previous) {
+  if (!previous || previous === 0) return 0;
+  return ((current - previous) / previous) * 100;
+}
+
+function analyseOption(option, side, snapshotKey) {
+  if (!option || !option.market_data) return null;
+
+  const md = option.market_data;
+
+  const ltp = number(md.ltp);
+  const volume = number(md.volume);
+  const oi = number(md.oi);
+  const prevOi = number(md.prev_oi);
+
+  const old = optionSnapshots.get(snapshotKey);
+
+  const volumeChange = old
+    ? movement(volume, old.volume)
+    : 0;
+
+  const priceChange = old
+    ? movement(ltp, old.ltp)
+    : 0;
+
+  const oiChange = old
+    ? movement(oi, old.oi)
+    : movement(oi, prevOi);
+
+  const bullish =
+    priceChange > 0 &&
+    volumeChange > 0 &&
+    oiChange > 0;
+
+  const bearish =
+    priceChange < 0 &&
+    volumeChange > 0 &&
+    oiChange > 0;
+
+  const strong =
+    Math.abs(priceChange) >= 1 &&
+    volumeChange >= 20 &&
+    oiChange >= 5;
+
+  optionSnapshots.set(snapshotKey, {
+    ltp,
+    volume,
+    oi
+  });
+
+  return {
+    side,
+    instrument_key: option.instrument_key,
+    ltp,
+    volume,
+    oi,
+    prev_oi: prevOi,
+    price_change_percent: Number(priceChange.toFixed(2)),
+    volume_change_percent: Number(volumeChange.toFixed(2)),
+    oi_change_percent: Number(oiChange.toFixed(2)),
+    bullish,
+    bearish,
+    strong
+  };
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === "OPTIONS") {
@@ -60,7 +133,10 @@ const server = http.createServer(async (req, res) => {
       `http://${req.headers.host}`
     );
 
-    // Health
+    // =========================
+    // HEALTH
+    // =========================
+
     if (
       url.pathname === "/" ||
       url.pathname === "/health"
@@ -74,7 +150,10 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // Upstox connection status
+    // =========================
+    // UPSTOX STATUS
+    // =========================
+
     if (
       url.pathname === "/api/upstox/status" &&
       req.method === "GET"
@@ -86,7 +165,10 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // Single quote
+    // =========================
+    // SINGLE LIVE QUOTE
+    // =========================
+
     if (
       url.pathname === "/api/market/quote" &&
       req.method === "GET"
@@ -126,7 +208,10 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // Multiple quotes
+    // =========================
+    // MULTIPLE LIVE QUOTES
+    // =========================
+
     if (
       url.pathname === "/api/market/quotes" &&
       req.method === "GET"
@@ -179,13 +264,229 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // =========================
+    // OPTION CHAIN
+    // =========================
+
+    if (
+      url.pathname === "/api/options/chain" &&
+      req.method === "GET"
+    ) {
+      const instrumentKey =
+        url.searchParams.get("instrument_key");
+
+      const expiry =
+        url.searchParams.get("expiry") ||
+        "current_week";
+
+      if (!instrumentKey) {
+        return sendJson(res, 400, {
+          success: false,
+          error:
+            "instrument_key is required"
+        });
+      }
+
+      const apiUrl = new URL(
+        "https://api.upstox.com/v2/option/chain"
+      );
+
+      apiUrl.searchParams.set(
+        "instrument_key",
+        instrumentKey
+      );
+
+      apiUrl.searchParams.set(
+        "expiry_date",
+        expiry
+      );
+
+      try {
+        const data =
+          await upstoxRequest(apiUrl.toString());
+
+        return sendJson(res, 200, {
+          success: true,
+          underlying: instrumentKey,
+          expiry,
+          data
+        });
+      } catch (error) {
+        return sendJson(res, 502, {
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    // =========================
+    // OPTION MOVERS
+    // =========================
+
+    if (
+      url.pathname === "/api/options/movers" &&
+      req.method === "GET"
+    ) {
+      const instrumentKey =
+        url.searchParams.get("instrument_key");
+
+      const expiry =
+        url.searchParams.get("expiry") ||
+        "current_week";
+
+      const minVolumeChange =
+        number(
+          url.searchParams.get(
+            "min_volume_change"
+          ) || 0
+        );
+
+      const minOiChange =
+        number(
+          url.searchParams.get(
+            "min_oi_change"
+          ) || 0
+        );
+
+      if (!instrumentKey) {
+        return sendJson(res, 400, {
+          success: false,
+          error:
+            "instrument_key is required"
+        });
+      }
+
+      const apiUrl = new URL(
+        "https://api.upstox.com/v2/option/chain"
+      );
+
+      apiUrl.searchParams.set(
+        "instrument_key",
+        instrumentKey
+      );
+
+      apiUrl.searchParams.set(
+        "expiry_date",
+        expiry
+      );
+
+      try {
+        const response =
+          await upstoxRequest(
+            apiUrl.toString()
+          );
+
+        const rows = response.data || [];
+
+        const movers = [];
+
+        for (const row of rows) {
+          const strike =
+            number(row.strike_price);
+
+          const call =
+            analyseOption(
+              row.call_options,
+              "CE",
+              `${row.call_options?.instrument_key}`
+            );
+
+          const put =
+            analyseOption(
+              row.put_options,
+              "PE",
+              `${row.put_options?.instrument_key}`
+            );
+
+          if (call) {
+            const item = {
+              strike,
+              expiry: row.expiry,
+              underlying:
+                row.underlying_key,
+              spot:
+                number(row.underlying_spot_price),
+              ...call
+            };
+
+            if (
+              item.volume_change_percent >=
+                minVolumeChange &&
+              item.oi_change_percent >=
+                minOiChange
+            ) {
+              movers.push(item);
+            }
+          }
+
+          if (put) {
+            const item = {
+              strike,
+              expiry: row.expiry,
+              underlying:
+                row.underlying_key,
+              spot:
+                number(row.underlying_spot_price),
+              ...put
+            };
+
+            if (
+              item.volume_change_percent >=
+                minVolumeChange &&
+              item.oi_change_percent >=
+                minOiChange
+            ) {
+              movers.push(item);
+            }
+          }
+        }
+
+        movers.sort(
+          (a, b) =>
+            Math.abs(
+              b.price_change_percent
+            ) -
+            Math.abs(
+              a.price_change_percent
+            )
+        );
+
+        const alerts =
+          movers.filter(
+            x => x.strong
+          );
+
+        return sendJson(res, 200, {
+          success: true,
+          underlying: instrumentKey,
+          expiry,
+          count: movers.length,
+          alerts,
+          movers
+        });
+
+      } catch (error) {
+        return sendJson(res, 502, {
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    // =========================
+    // NOT FOUND
+    // =========================
+
     return sendJson(res, 404, {
       success: false,
       error: "Endpoint not found"
     });
 
   } catch (error) {
-    console.error("SERVER ERROR:", error.message);
+    console.error(
+      "SERVER ERROR:",
+      error.message
+    );
 
     return sendJson(res, 500, {
       success: false,
