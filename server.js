@@ -264,6 +264,128 @@ function buildOptionRows(chainData, underlyingName = "") {
   }
 
   return rows;
+}// ==================================================
+// AUTOMATIC OPTION SCANNER
+// NIFTY + BANKNIFTY + SENSEX
+// AUTO EXPIRY
+// ==================================================
+
+async function getNearestExpiry(instrumentKey) {
+  const apiUrl =
+    `https://api.upstox.com/v2/option/contract` +
+    `?instrument_key=${encodeURIComponent(instrumentKey)}`;
+
+  const result =
+    await upstoxRequest(apiUrl);
+
+  const contracts =
+    Array.isArray(result?.data)
+      ? result.data
+      : [];
+
+  const expiries = [
+    ...new Set(
+      contracts
+        .map(item => item.expiry)
+        .filter(Boolean)
+    )
+  ].sort();
+
+  if (!expiries.length) {
+    throw new Error(
+      `No expiry found for ${instrumentKey}`
+    );
+  }
+
+  return expiries[0];
+}
+
+async function automaticOptionScan() {
+
+  const underlyings = [
+    {
+      name: "NIFTY",
+      key: "NSE_INDEX|Nifty 50"
+    },
+    {
+      name: "BANKNIFTY",
+      key: "NSE_INDEX|Nifty Bank"
+    },
+    {
+      name: "SENSEX",
+      key: "BSE_INDEX|SENSEX"
+    }
+  ];
+
+  const results = [];
+
+  for (const underlying of underlyings) {
+
+    try {
+
+      const expiry =
+        await getNearestExpiry(
+          underlying.key
+        );
+
+      const chain =
+        await getOptionChain(
+          underlying.key,
+          expiry
+        );
+
+      const rows =
+        buildOptionRows(
+          chain?.data || [],
+          underlying.name
+        );
+
+      const alerts =
+        rows.filter(
+          item => item.strong
+        );
+
+      alerts.sort(
+        (a, b) =>
+          Math.abs(
+            b.price_change_percent || 0
+          ) -
+          Math.abs(
+            a.price_change_percent || 0
+          )
+      );
+
+      results.push({
+        underlying:
+          underlying.name,
+
+        instrument_key:
+          underlying.key,
+
+        expiry,
+
+        scanned:
+          rows.length,
+
+        alert_count:
+          alerts.length,
+
+        alerts
+      });
+
+    } catch (error) {
+
+      results.push({
+        underlying:
+          underlying.name,
+
+        error:
+          error.message
+      });
+    }
+  }
+
+  return results;
 }
 
 // ==================================================
@@ -673,7 +795,44 @@ const server = http.createServer(async (req, res) => {
           allAlerts
       });
     }
+// ==================================================
+// AUTOMATIC SCAN API
+// ==================================================
 
+if (url.pathname === "/api/options/auto-scan") {
+
+  const results =
+    await automaticOptionScan();
+
+  const alerts = [];
+
+  for (const result of results) {
+    if (Array.isArray(result.alerts)) {
+      alerts.push(...result.alerts);
+    }
+  }
+
+  alerts.sort(
+    (a, b) =>
+      Math.abs(
+        b.price_change_percent || 0
+      ) -
+      Math.abs(
+        a.price_change_percent || 0
+      )
+  );
+
+  return sendJson(res, 200, {
+    success: true,
+    market: "NSE/BSE Options",
+    scanned_at:
+      new Date().toISOString(),
+    total_alerts:
+      alerts.length,
+    results,
+    alerts
+  });
+                }
     // ==================================================
     // NOT FOUND
     // ==================================================
