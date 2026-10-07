@@ -398,7 +398,101 @@ const server = http.createServer(async (req, res) => {
         data: filtered
       });
     }
+    // ==================================================
+    // OPTION ALERTS
+    // ==================================================
+    if (url.pathname === "/api/options/alerts") {
+      const instrumentKey =
+        url.searchParams.get("instrument_key");
 
+      const expiry =
+        url.searchParams.get("expiry") ||
+        "current_week";
+
+      if (!instrumentKey) {
+        return sendJson(res, 400, {
+          success: false,
+          error: "instrument_key is required"
+        });
+      }
+
+      const apiUrl =
+        `https://api.upstox.com/v2/option/chain` +
+        `?instrument_key=${encodeURIComponent(instrumentKey)}` +
+        `&expiry_date=${encodeURIComponent(expiry)}`;
+
+      const result = await upstoxRequest(apiUrl);
+
+      const alerts = [];
+
+      for (const item of result?.data || []) {
+        const strike = item.strike_price;
+
+        if (item.call_options) {
+          const md =
+            item.call_options.market_data || {};
+
+          const option = analyseOption({
+            instrument_key:
+              item.call_options.instrument_key,
+            underlying_key:
+              item.underlying_key,
+            strike_price: strike,
+            option_type: "CE",
+            expiry: item.expiry,
+            ltp: md.ltp || 0,
+            volume: md.volume || 0,
+            oi: md.oi || 0,
+            prev_oi: md.prev_oi || 0,
+            bid_price: md.bid_price || 0,
+            ask_price: md.ask_price || 0
+          });
+
+          if (option.strong) {
+            alerts.push(option);
+          }
+        }
+
+        if (item.put_options) {
+          const md =
+            item.put_options.market_data || {};
+
+          const option = analyseOption({
+            instrument_key:
+              item.put_options.instrument_key,
+            underlying_key:
+              item.underlying_key,
+            strike_price: strike,
+            option_type: "PE",
+            expiry: item.expiry,
+            ltp: md.ltp || 0,
+            volume: md.volume || 0,
+            oi: md.oi || 0,
+            prev_oi: md.prev_oi || 0,
+            bid_price: md.bid_price || 0,
+            ask_price: md.ask_price || 0
+          });
+
+          if (option.strong) {
+            alerts.push(option);
+          }
+        }
+      }
+
+      alerts.sort(
+        (a, b) =>
+          Math.abs(b.price_change_percent) -
+          Math.abs(a.price_change_percent)
+      );
+
+      return sendJson(res, 200, {
+        success: true,
+        underlying: instrumentKey,
+        expiry,
+        alert_count: alerts.length,
+        alerts
+      });
+    }
     // -----------------------------
     // NOT FOUND
     // -----------------------------
