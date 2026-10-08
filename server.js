@@ -97,7 +97,43 @@ function calculateRSI(closes, period = 14) {
 // ==================================================
 // OPTION SNAPSHOTS
 // ==================================================
+// ==================================================
+// GET CLOSED 5-MIN RSI
+// ==================================================
 
+async function getClosedCandleRSI(instrumentKey) {
+
+  const apiUrl =
+    `https://api.upstox.com/v3/historical-candle/intraday/` +
+    `${encodeURIComponent(instrumentKey)}/minutes/5`;
+
+  const data =
+    await upstoxRequest(apiUrl);
+
+  const candles =
+    data?.data?.candles || [];
+
+  const intervalMs =
+    5 * 60 * 1000;
+
+  const closedCandles =
+    candles.filter(candle => {
+
+      const candleTime =
+        new Date(candle[0]).getTime();
+
+      return (
+        candleTime + intervalMs <= Date.now()
+      );
+    });
+
+  const closes =
+    closedCandles
+      .map(candle => Number(candle[4]))
+      .reverse();
+
+  return calculateRSI(closes, 14);
+}
 const optionSnapshots = new Map();
 
 function analyseOption(option) {
