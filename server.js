@@ -230,7 +230,7 @@ async function getOptionChain(instrumentKey, expiry) {
 // BUILD OPTION ROWS
 // ==================================================
 
-function buildOptionRows(chainData, underlyingName = "") {
+function buildOptionRows(chainData, underlyingName = "", rsi14 = null) {
   const rows = [];
 
   for (const item of chainData || []) {
