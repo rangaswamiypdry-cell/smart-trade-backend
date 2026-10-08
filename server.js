@@ -174,9 +174,9 @@ function analyseOption(option) {
   });
 
   const strong =
-    Math.abs(priceChange) >= 1 &&
-    volumeChange >= 20 &&
-    oiChange >= 5;
+  Math.abs(priceChange) >= 1 &&
+  volumeChange >= 20 &&
+  oiChange >= 5;
 
   let signal = "NEUTRAL";
 
