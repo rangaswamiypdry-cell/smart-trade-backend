@@ -256,7 +256,7 @@ function buildOptionRows(chainData, underlyingName = "", rsi14 = null) {
 
           strike_price:
             strike,
-
+rsi14: rsi14,
           option_type:
             "CE",
 
@@ -304,7 +304,7 @@ function buildOptionRows(chainData, underlyingName = "", rsi14 = null) {
 
           strike_price:
             strike,
-
+rsi14: rsi14,
           option_type:
             "PE",
 
