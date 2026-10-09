@@ -417,7 +417,7 @@ const rows = buildOptionRows(
 
       const alerts =
         rows.filter(
-          item => item.strong
+  item => item.strong && item.rsi14 >= 65
         );
 
       alerts.sort(
