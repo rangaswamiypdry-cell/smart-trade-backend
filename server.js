@@ -137,8 +137,7 @@ async function getClosedCandleRSI(instrumentKey) {
 const optionSnapshots = new Map();
 
 function analyseOption(option) {
-  rsi14 > 65 &&
-  const key = option.instrument_key;
+  const rsi14 = Number(option.rsi14 ?? 0);
 
   const previous = optionSnapshots.get(key);
 
@@ -175,6 +174,7 @@ function analyseOption(option) {
   });
 
   const strong =
+    rsi14 > 65 &&
   Math.abs(priceChange) >= 1 &&
   volumeChange >= 20 &&
   oiChange >= 5;
@@ -182,20 +182,22 @@ function analyseOption(option) {
   let signal = "NEUTRAL";
 
   if (
-    priceChange > 0 &&
-    volumeChange > 0 &&
-    oiChange > 0
+priceChange > 0 &&
+volumeChange > 0 &&
+oiChange > 0 &&
+rsi14 > 65
   ) {
     signal = "BULLISH";
   }
+if (
+  priceChange < 0 &&
+  volumeChange > 0 &&
+  oiChange > 0 &&
+  rsi14 < 35
+) {
+  signal = "BEARISH";
+}
 
-  if (
-    priceChange < 0 &&
-    volumeChange > 0 &&
-    oiChange > 0
-  ) {
-    signal = "BEARISH";
-  }
 
   return {
     ...option,
