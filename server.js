@@ -407,11 +407,13 @@ async function automaticOptionScan() {
           expiry
         );
 
-      const rows =
-        buildOptionRows(
-          chain?.data || [],
-          underlying.name
-        );
+const rsi14 = await getClosedCandleRSI(underlying.key);
+
+const rows = buildOptionRows(
+  chain?.data || [],
+  underlying.name,
+  rsi14
+);
 
       const alerts =
         rows.filter(
