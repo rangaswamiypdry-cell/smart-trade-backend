@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Market Scanner</title>
+<style>
+body{margin:0;background:#07111f;color:white;font-family:Arial,sans-serif;padding:16px}
+h1{color:#31d6a0;font-size:25px}
+button{background:#16b981;color:white;border:0;padding:12px;border-radius:8px;font-size:16px}
+.card{background:#142338;padding:14px;margin:12px 0;border-radius:12px}
+small{color:#9fb2ca}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<h1>📈 Smart Market Scanner</h1>
+<p>Live NSE / BSE Options Dashboard</p>
+<button onclick="loadData()">Refresh Scanner</button>
+<div id="status" class="card">Connecting to market backend...</div>
+<div id="results"></div>
+<script>
+const API="https://smart-trade-backend-ig6l.onrender.com";
+
+async function loadData(){
+ const status=document.getElementById("status");
+ const results=document.getElementById("results");
+ status.textContent="Loading scanner data...";
+ results.innerHTML="";
+ try{
+  const response=await fetch(API+"/api/options/auto-scan");
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.error||"Backend error");
+  status.textContent="Scanner connected. Scanned at: "+(data.scanned_at||"");
+  if(!data.alerts||data.alerts.length===0){
+   results.innerHTML='<div class="card">No alerts currently. This does not mean there are no market opportunities.</div>';
+   return;
+  }
+  data.alerts.forEach(a=>{
+   const card=document.createElement("div");
+   card.className="card";
+   card.textContent=JSON.stringify(a,null,2);
+   results.appendChild(card);
+  });
+ }catch(e){
+  status.textContent="Connection error: "+e.message+" — Try Refresh Scanner.";
+ }
+}
+loadData();
+</script>
+</body>
+</html>
