@@ -138,7 +138,7 @@ const optionSnapshots = new Map();
 
 function analyseOption(option) {
   const rsi14 = Number(option.rsi14 ?? 0);
-
+const key = option.instrument_key;
   const previous = optionSnapshots.get(key);
 
   const ltp = Number(option.ltp || 0);
