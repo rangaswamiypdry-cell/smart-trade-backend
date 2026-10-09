@@ -137,6 +137,7 @@ async function getClosedCandleRSI(instrumentKey) {
 const optionSnapshots = new Map();
 
 function analyseOption(option) {
+  rsi14 > 65 &&
   const key = option.instrument_key;
 
   const previous = optionSnapshots.get(key);
