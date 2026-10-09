@@ -8,45 +8,106 @@
 body{margin:0;background:#07111f;color:white;font-family:Arial,sans-serif;padding:16px}
 h1{color:#31d6a0;font-size:25px}
 button{background:#16b981;color:white;border:0;padding:12px;border-radius:8px;font-size:16px}
-.card{background:#142338;padding:14px;margin:12px 0;border-radius:12px}
+.card{background:#142338;padding:14px;margin:12px 0;border-radius:12px;overflow-wrap:anywhere}
+.metric{font-size:22px;color:#31d6a0;font-weight:bold}
 small{color:#9fb2ca}
 pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.error{color:#ff7777}
 </style>
 </head>
 <body>
+
 <h1>📈 Smart Market Scanner</h1>
 <p>Live NSE / BSE Options Dashboard</p>
-<button onclick="loadData()">Refresh Scanner</button>
+
+<button onclick="loadData()">🔄 Refresh Scanner</button>
+
 <div id="status" class="card">Connecting to market backend...</div>
+<div id="summary"></div>
 <div id="results"></div>
+
 <script>
 const API="https://smart-trade-backend-ig6l.onrender.com";
 
 async function loadData(){
  const status=document.getElementById("status");
+ const summary=document.getElementById("summary");
  const results=document.getElementById("results");
- status.textContent="Loading scanner data...";
+
+ status.textContent="Loading scanner data... Please wait.";
+ summary.innerHTML="";
  results.innerHTML="";
+
  try{
   const response=await fetch(API+"/api/options/auto-scan");
   const data=await response.json();
-  if(!response.ok) throw new Error(data.error||"Backend error");
-  status.textContent="Scanner connected. Scanned at: "+(data.scanned_at||"");
-  if(!data.alerts||data.alerts.length===0){
-   results.innerHTML='<div class="card">No alerts currently. This does not mean there are no market opportunities.</div>';
-   return;
+
+  if(!response.ok){
+   throw new Error(data.error||"Backend error");
   }
-  data.alerts.forEach(a=>{
-   const card=document.createElement("div");
-   card.className="card";
-   card.textContent=JSON.stringify(a,null,2);
-   results.appendChild(card);
-  });
- }catch(e){
-  status.textContent="Connection error: "+e.message+" — Try Refresh Scanner.";
+
+  status.textContent="✅ Backend Connected | Scan time: "+
+   (data.scanned_at||"Not available");
+
+  summary.innerHTML=
+   '<div class="card"><small>Total Alerts</small>'+
+   '<div class="metric">'+(data.total_alerts??(data.alerts||[]).length)+'</div></div>';
+
+  if(Array.isArray(data.results)){
+   data.results.forEach(item=>{
+    const card=document.createElement("div");
+    card.className="card";
+
+    const title=document.createElement("h3");
+    title.textContent="📊 "+(item.underlying||"Market");
+
+    const details=document.createElement("p");
+    details.textContent=
+     "Options Scanned: "+(item.scanned??"N/A")+
+     " | Alerts: "+(item.alert_count??0);
+
+    const expiry=document.createElement("small");
+    expiry.textContent="Expiry: "+(item.expiry||"N/A");
+
+    card.append(title,details,expiry);
+    summary.appendChild(card);
+   });
+  }
+
+  const alerts=Array.isArray(data.alerts)?data.alerts:[];
+
+  const heading=document.createElement("h2");
+  heading.textContent="🚨 Trading Alerts";
+  results.appendChild(heading);
+
+  if(alerts.length===0){
+   const message=document.createElement("div");
+   message.className="card";
+   message.textContent=
+    "ಈಗ ಯಾವುದೇ alert ಬಂದಿಲ್ಲ. Market conditions match ಆದಾಗ ಮಾತ್ರ alert ಕಾಣಿಸುತ್ತದೆ. Market ಮುಚ್ಚಿದ್ದರೆ live signals ನಿರೀಕ್ಷಿಸಬೇಡಿ.";
+   results.appendChild(message);
+  }else{
+   alerts.forEach(alert=>{
+    const card=document.createElement("div");
+    card.className="card";
+
+    const pre=document.createElement("pre");
+    pre.textContent=JSON.stringify(alert,null,2);
+
+    card.appendChild(pre);
+    results.appendChild(card);
+   });
+  }
+
+ }catch(error){
+  status.innerHTML="";
+  status.className="card error";
+  status.textContent="❌ Connection error: "+error.message+
+   ". ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ Refresh Scanner ಒತ್ತಿ.";
  }
 }
 loadData();
 </script>
+
 </body>
 </html>
