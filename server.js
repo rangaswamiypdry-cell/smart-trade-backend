@@ -102,35 +102,43 @@ function calculateRSI(closes, period = 14) {
 // ==================================================
 
 async function getClosedCandleRSI(instrumentKey) {
+  const now = new Date();
 
-  const apiUrl =
+  const toDate = now.toISOString().slice(0, 10);
+  const fromDate = new Date(
+    now.getTime() - 7 * 24 * 60 * 60 * 1000
+  ).toISOString().slice(0, 10);
+
+  const intradayUrl =
     `https://api.upstox.com/v3/historical-candle/intraday/` +
     `${encodeURIComponent(instrumentKey)}/minutes/5`;
 
-  const data =
-    await upstoxRequest(apiUrl);
+  const intradayData = await upstoxRequest(intradayUrl);
 
-  const candles =
-    data?.data?.candles || [];
+  let candles = intradayData?.data?.candles || [];
 
-  const intervalMs =
-    5 * 60 * 1000;
+  if (candles.length < 15) {
+    const historicalUrl =
+      `https://api.upstox.com/v3/historical-candle/` +
+      `${encodeURIComponent(instrumentKey)}/minutes/5/` +
+      `${toDate}/${fromDate}`;
 
-  const closedCandles =
-    candles.filter(candle => {
+    const historicalData = await upstoxRequest(historicalUrl);
 
-      const candleTime =
-        new Date(candle[0]).getTime();
+    candles = historicalData?.data?.candles || [];
+  }
 
-      return (
-        candleTime + intervalMs <= Date.now()
-      );
-    });
+  const intervalMs = 5 * 60 * 1000;
 
-  const closes =
-    closedCandles
-      .map(candle => Number(candle[4]))
-      .reverse();
+  const closedCandles = candles.filter(candle => {
+    const candleTime = new Date(candle[0]).getTime();
+
+    return candleTime + intervalMs <= Date.now();
+  });
+
+  const closes = closedCandles
+    .map(candle => Number(candle[4]))
+    .reverse();
 
   return calculateRSI(closes, 14);
 }
