@@ -934,15 +934,35 @@ if (url.pathname === "/api/market/candles") {
     });
   }
 
-  const apiUrl =
+  const intradayUrl =
     `https://api.upstox.com/v3/historical-candle/intraday/` +
     `${encodeURIComponent(instrumentKey)}/minutes/${encodeURIComponent(interval)}`;
 
-  const data =
-    await upstoxRequest(apiUrl);
+  const intradayData =
+    await upstoxRequest(intradayUrl);
 
-  const candles =
-  data?.data?.candles || [];
+  let candles =
+    intradayData?.data?.candles || [];
+
+  if (candles.length < 15) {
+    const now = new Date();
+
+    const toDate = now.toISOString().slice(0, 10);
+
+    const fromDate = new Date(
+      now.getTime() - 7 * 24 * 60 * 60 * 1000
+    ).toISOString().slice(0, 10);
+
+    const historicalUrl =
+      `https://api.upstox.com/v3/historical-candle/` +
+      `${encodeURIComponent(instrumentKey)}/minutes/` +
+      `${encodeURIComponent(interval)}/${toDate}/${fromDate}`;
+
+    const historicalData =
+      await upstoxRequest(historicalUrl);
+
+    candles = historicalData?.data?.candles || [];
+  }
 
 // CLOSED CANDLES ONLY
 const intervalMs =
