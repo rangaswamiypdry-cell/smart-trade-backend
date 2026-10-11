@@ -470,7 +470,32 @@ const rows = buildOptionRows(
 
   return results;
 }
+// ==================================================
+// NSE STOCK OPTION CONTRACTS
+// ==================================================
 
+async function getNseStockOptionContracts() {
+  const url =
+    "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("NSE instrument file download failed");
+  }
+
+  const zlib = require("zlib");
+  const compressed = Buffer.from(await response.arrayBuffer());
+  const jsonText = zlib.gunzipSync(compressed).toString("utf8");
+  const instruments = JSON.parse(jsonText);
+
+  const contracts = instruments.filter(item =>
+    item.segment === "NSE_FO" &&
+    item.instrument_type === "OPTSTK"
+  );
+
+  return contracts;
+}
 // ==================================================
 // SERVER
 // ==================================================
@@ -493,7 +518,16 @@ const server = http.createServer(async (req, res) => {
       req.url,
       `http://${req.headers.host}`
     );
+// NSE STOCK OPTION CONTRACTS API
+if (url.pathname === "/api/options/nse-stocks") {
+  const contracts = await getNseStockOptionContracts();
 
+  return sendJson(res, 200, {
+    success: true,
+    count: contracts.length,
+    data: contracts
+  });
+                }
     // ==================================================
     // HOME
     // ==================================================
