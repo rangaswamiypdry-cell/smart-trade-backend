@@ -474,6 +474,7 @@ const rows = buildOptionRows(
 // NSE STOCK OPTION CONTRACTS
 // ==================================================
 
+// NSE STOCK OPTION CONTRACTS
 async function getNseStockOptionContracts() {
   const url =
     "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
@@ -489,12 +490,15 @@ async function getNseStockOptionContracts() {
   const jsonText = zlib.gunzipSync(compressed).toString("utf8");
   const instruments = JSON.parse(jsonText);
 
-  const contracts = instruments.filter(item =>
+  return instruments.filter(item =>
     item.segment === "NSE_FO" &&
-    item.instrument_type === "OPTSTK"
+    (
+      item.instrument_type === "OPTSTK" ||
+      item.instrument_type === "CE" ||
+      item.instrument_type === "PE"
+    ) &&
+    item.underlying_type === "EQUITY"
   );
-
-  return contracts;
 }
 // ==================================================
 // SERVER
