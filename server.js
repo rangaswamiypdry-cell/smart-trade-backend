@@ -423,11 +423,21 @@ const rows = buildOptionRows(
   rsi14
 );
 
-      const alerts =
-        rows.filter(
-  item => item.strong && item.rsi14 >= 65
-        );
-
+  const alerts = rows.filter(item =>
+  
+  (
+    (
+      item.signal === "BULLISH" &&
+      item.option_type === "CE" &&
+      item.rsi14 >= 65
+    ) ||
+    (
+      item.signal === "BEARISH" &&
+      item.option_type === "PE" &&
+      item.rsi14 < 35
+    )
+  )
+);    
       alerts.sort(
         (a, b) =>
           Math.abs(
