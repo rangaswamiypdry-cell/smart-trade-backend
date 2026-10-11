@@ -532,6 +532,39 @@ if (url.pathname === "/api/options/nse-stocks") {
     data: contracts
   });
                 }
+    // LIVE FULL MARKET QUOTES V3
+if (url.pathname === "/api/market/full-quotes") {
+  const instrumentKeys =
+    url.searchParams.get("instrument_keys");
+
+  if (!instrumentKeys) {
+    return sendJson(res, 400, {
+      success: false,
+      error: "instrument_keys is required"
+    });
+  }
+
+  const keys = instrumentKeys.split(",").filter(Boolean);
+
+  if (keys.length > 500) {
+    return sendJson(res, 400, {
+      success: false,
+      error: "Maximum 500 instruments per request"
+    });
+  }
+
+  const apiUrl =
+    "https://api.upstox.com/v3/market-quote/quotes" +
+    "?instrument_key=" + encodeURIComponent(keys.join(","));
+
+  const data = await upstoxRequest(apiUrl);
+
+  return sendJson(res, 200, {
+    success: true,
+    count: keys.length,
+    data
+  });
+      }
     // ==================================================
     // HOME
     // ==================================================
