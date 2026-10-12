@@ -380,7 +380,87 @@ async function getNearestExpiry(instrumentKey) {
 
   return expiries[0];
 }
+// ===== IMPROVED RSI AND VOLUME HELPERS =====
 
+function calculateWilderRSI(closes, period = 14) {
+  if (!Array.isArray(closes) || closes.length < period + 1) {
+    return null;
+  }
+
+  let gain = 0;
+  let loss = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const change = closes[i] - closes[i - 1];
+    if (change > 0) gain += change;
+    else loss += Math.abs(change);
+  }
+
+  let avgGain = gain / period;
+  let avgLoss = loss / period;
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+
+    avgGain =
+      (avgGain * (period - 1) + Math.max(change, 0)) / period;
+
+    avgLoss =
+      (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
+  }
+
+  if (avgLoss === 0) return avgGain === 0 ? 50 : 100;
+
+  return Number(
+    (100 - 100 / (1 + avgGain / avgLoss)).toFixed(2)
+  );
+}
+
+function analyseCompletedCandles(candles) {
+  if (!Array.isArray(candles)) {
+    return { ready: false, reason: "CANDLE_DATA_MISSING" };
+  }
+
+  const intervalMs = 5 * 60 * 1000;
+
+  const completed = candles
+    .filter(c =>
+      new Date(c[0]).getTime() + intervalMs <= Date.now()
+    )
+    .sort((a, b) =>
+      new Date(a[0]).getTime() - new Date(b[0]).getTime()
+    );
+
+  if (completed.length < 21) {
+    return {
+      ready: false,
+      reason: "NEED_21_COMPLETED_CANDLES"
+    };
+  }
+
+  const closes = completed.map(c => Number(c[4]));
+  const volumes = completed.map(c => Number(c[5] || 0));
+
+  const averageVolume =
+    volumes.slice(-21, -1).reduce((sum, v) => sum + v, 0) / 20;
+
+  const currentVolume = volumes[volumes.length - 1];
+
+  return {
+    ready: averageVolume > 0,
+    rsi14: calculateWilderRSI(closes, 14),
+    currentVolume,
+    averageVolume: Number(averageVolume.toFixed(2)),
+    volumeRatio: averageVolume > 0
+      ? Number((currentVolume / averageVolume).toFixed(2))
+      : 0,
+    volumePass:
+      averageVolume > 0 &&
+      currentVolume >= averageVolume * 1.5,
+    close: closes[closes.length - 1],
+    previousClose: closes[closes.length - 2]
+  };
+      }
 async function automaticOptionScan() {
 
   const underlyings = [
