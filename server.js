@@ -1005,16 +1005,18 @@ const server = http.createServer(async (req, res) => {
     // SCAN ALL INDEXES
     // ----------------------------------------------
 
+       // SCAN ALL INDEXES
     if (
       url.pathname === "/api/signals/scan" &&
       req.method === "GET"
     ) {
       const result = await scanAllIndexes();
-      return sendJson(res, 200    }
+      return sendJson(res, 200, result);
+    }
 
     // ----------------------------------------------
     // SCAN ONE UNDERLYING
-    // ----------------------------------------------
+    // ---------------------------------------------- 
 
     if (
       url.pathname === "/api/signals/underlying" &&
