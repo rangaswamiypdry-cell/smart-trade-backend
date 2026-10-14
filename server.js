@@ -145,33 +145,38 @@ async function getClosedCandleRSI(instrumentKey) {
 const optionSnapshots = new Map();
 
 function analyseOption(option) {
-  const rsi14 = Number(option.rsi14 ?? 0);
-const key = option.instrument_key;
+function analyseOption(option) {
+  const key = option.instrument_key;
+
   const previous = optionSnapshots.get(key);
 
   const ltp = Number(option.ltp || 0);
   const volume = Number(option.volume || 0);
   const oi = Number(option.oi || 0);
+  const prevOi = Number(option.prev_oi || 0);
 
   let priceChange = 0;
   let volumeChange = 0;
   let oiChange = 0;
 
-  if (previous) {
-    if (previous.ltp > 0) {
-      priceChange =
-        ((ltp - previous.ltp) / previous.ltp) * 100;
-    }
+  // Price change from previous snapshot
+  if (previous && previous.ltp > 0 && ltp > 0) {
+    priceChange =
+      ((ltp - previous.ltp) / previous.ltp) * 100;
+  }
 
-    if (previous.volume > 0) {
-      volumeChange =
-        ((volume - previous.volume) / previous.volume) * 100;
-    }
+  // Volume change from previous snapshot
+  if (previous && previous.volume > 0) {
+    volumeChange =
+      ((volume - previous.volume) / previous.volume) * 100;
+  }
 
-    if (previous.oi > 0) {
-      oiChange =
-        ((oi - previous.oi) / previous.oi) * 100;
-    }
+  // Prefer actual previous-day OI if supplied by Upstox
+  if (prevOi > 0 && oi > 0) {
+    oiChange = ((oi - prevOi) / prevOi) * 100;
+  } else if (previous && previous.oi > 0 && oi > 0) {
+    oiChange =
+      ((oi - previous.oi) / previous.oi) * 100;
   }
 
   optionSnapshots.set(key, {
@@ -181,48 +186,46 @@ const key = option.instrument_key;
     timestamp: Date.now()
   });
 
-  const strong =
-    rsi14 > 65 &&
-  Math.abs(priceChange) >= 1 &&
-  volumeChange >= 20 &&
-  oiChange >= 5;
+  // First snapshot cannot confirm price/volume momentum
+  const hasPrevious =
+    !!previous &&
+    previous.ltp > 0 &&
+    previous.volume > 0;
 
   let signal = "NEUTRAL";
 
   if (
-priceChange > 0 &&
-volumeChange > 0 &&
-oiChange > 0 &&
-rsi14 > 65
+    hasPrevious &&
+    ltp > previous.ltp &&
+    volumeChange > 0 &&
+    oiChange > 0
   ) {
     signal = "BULLISH";
+  } else if (
+    hasPrevious &&
+    ltp < previous.ltp &&
+    volumeChange > 0 &&
+    oiChange > 0
+  ) {
+    signal = "BEARISH";
   }
-if (
-  priceChange < 0 &&
-  volumeChange > 0 &&
-  oiChange > 0 &&
-  rsi14 < 35
-) {
-  signal = "BEARISH";
-}
 
+  const strong =
+    hasPrevious &&
+    Math.abs(priceChange) >= 1 &&
+    volumeChange >= 20 &&
+    oiChange >= 5;
 
   return {
     ...option,
-
-    price_change_percent:
-      Number(priceChange.toFixed(2)),
-
-    volume_change_percent:
-      Number(volumeChange.toFixed(2)),
-
-    oi_change_percent:
-      Number(oiChange.toFixed(2)),
-
+    price_change_percent: Number(priceChange.toFixed(2)),
+    volume_change_percent: Number(volumeChange.toFixed(2)),
+    oi_change_percent: Number(oiChange.toFixed(2)),
+    snapshot_ready: hasPrevious,
     signal,
     strong
   };
-}
+    }
 
 // ==================================================
 // OPTION CHAIN
