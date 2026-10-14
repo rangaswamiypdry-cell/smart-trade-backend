@@ -727,19 +727,24 @@ async function get5mCandles(instrumentKey) {
   const encodedKey = encodeURIComponent(instrumentKey);
 
   const apiUrl =
-    "https://api.upstox.com/v3/historical-candle/" +
+    "https://api.upstox.com/v3/historical-candle/intraday/" +
     encodedKey +
     "/minutes/5";
 
   const result = await upstoxRequest(apiUrl);
-
   const candles = result?.data?.candles;
 
-  if (!Array.isArray(candles)) {
+  if (!Array.isArray(candles) || candles.length === 0) {
     throw new Error("UPSTOX_CANDLES_NOT_AVAILABLE");
   }
 
-  return getClosedCandles(candles, 5);
+  const closedCandles = getClosedCandles(candles, 5);
+
+  if (closedCandles.length === 0) {
+    throw new Error("NO_COMPLETED_5_MINUTE_CANDLES");
+  }
+
+  return closedCandles;
 }
 
 // ==================================================
