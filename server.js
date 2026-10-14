@@ -874,12 +874,26 @@ if (url.pathname === "/api/market/full-quotes") {
           instrumentKey
         );
 
-      const filtered =
-        rows.filter(item =>
-          item.volume_change_percent >=
-            minVolumeChange &&
-          item.oi_change_percent >=
-        });
+const filtered = rows.filter(item =>
+  item.volume_change_percent >= minVolumeChange &&
+  item.oi_change_percent >= minOiChange
+);
+
+filtered.sort(
+  (a, b) =>
+    Math.abs(b.price_change_percent || 0) -
+    Math.abs(a.price_change_percent || 0)
+);
+
+return sendJson(res, 200, {
+  success: true,
+  underlying: instrumentKey,
+  expiry,
+  count: filtered.length,
+  strong_alerts: filtered.filter(item => item.strong),
+  data: filtered
+});
+        }
 
 // RSI(14)
 const closes =
