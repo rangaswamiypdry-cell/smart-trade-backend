@@ -362,3 +362,310 @@ function candleStructure(c) {
     closePosition: round(closePosition, 2)
   };
       }
+// ==================================================
+// CANDLE ANALYSIS
+// ==================================================
+
+function analyseCompletedCandles(candles) {
+  const completed = getClosedCandles(candles, 5);
+
+  if (completed.length < 35) {
+    return {
+      ready: false,
+      reason: "NEED_AT_LEAST_35_COMPLETED_5M_CANDLES"
+    };
+  }
+
+  const closes = completed.map(c => num(c[4]));
+  const volumes = completed.map(c => num(c[5]));
+
+  const current = completed[completed.length - 1];
+  const previous = completed[completed.length - 2];
+
+  const averageVolume =
+    volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+
+  const volumeRatio =
+    averageVolume > 0
+      ? volumes[volumes.length - 1] / averageVolume
+      : 0;
+
+  const ema20 = calculateEMA(closes, 20);
+  const ema50 = calculateEMA(closes, 50);
+  const rsi14 = calculateRSI(closes, 14);
+  const atr14 = calculateATR(completed, 14);
+  const adxData = calculateADX(completed, 14);
+  const vwap = calculateVWAP(completed);
+  const adr14 = calculateADR(completed, 14);
+  const sr = supportResistance(completed, SR_LOOKBACK);
+  const structure = candleStructure(current);
+
+  const close = num(current[4]);
+  const prevClose = num(previous[4]);
+
+  const breakout =
+    sr &&
+    close > sr.resistance &&
+    prevClose <= sr.resistance;
+
+  const breakdown =
+    sr &&
+    close < sr.support &&
+    prevClose >= sr.support;
+
+  const bullishMomentum =
+    close > num(current[1]) &&
+    close > (ema20 || 0) &&
+    close > (vwap || 0);
+
+  const bearishMomentum =
+    close < num(current[1]) &&
+    close < (ema20 || Number.MAX_SAFE_INTEGER) &&
+    close < (vwap || Number.MAX_SAFE_INTEGER);
+
+  return {
+    ready: true,
+    candleTime: current[0],
+    close,
+    previousClose: prevClose,
+    open: num(current[1]),
+    high: num(current[2]),
+    low: num(current[3]),
+
+    rsi14,
+    ema20,
+    ema50,
+    vwap,
+    atr14,
+    adr14,
+
+    adx: adxData?.adx ?? null,
+    plusDI: adxData?.plusDI ?? null,
+    minusDI: adxData?.minusDI ?? null,
+
+    currentVolume: volumes[volumes.length - 1],
+    averageVolume: round(averageVolume, 2),
+    volumeRatio: round(volumeRatio, 2),
+    volumePass: volumeRatio >= VOLUME_MULTIPLIER,
+
+    support: sr?.support ?? null,
+    resistance: sr?.resistance ?? null,
+
+    breakout: !!breakout,
+    breakdown: !!breakdown,
+
+    bullishMomentum,
+    bearishMomentum,
+    bullishCandle: structure.bullish,
+    bearishCandle: structure.bearish,
+    candle: structure
+  };
+}
+
+// ==================================================
+// CONFIDENCE ENGINE
+// ==================================================
+
+function buildDirectionalSignal(a) {
+  if (!a?.ready) {
+    return {
+      direction: "WAIT",
+      confidence: 0,
+      status: "WAIT",
+      reasons: [],
+      failed: [a?.reason || "NOT_READY"]
+    };
+  }
+
+  let bull = 0;
+  let bear = 0;
+
+  const bullReasons = [];
+  const bearReasons = [];
+  const bullFailed = [];
+  const bearFailed = [];
+
+  // Resistance breakout
+  if (a.breakout) {
+    bull += 20;
+    bullReasons.push("RESISTANCE_BREAKOUT");
+  } else {
+    bullFailed.push("NO_RESISTANCE_BREAKOUT");
+  }
+
+  // Support breakdown
+  if (a.breakdown) {
+    bear += 20;
+    bearReasons.push("SUPPORT_BREAKDOWN");
+  } else {
+    bearFailed.push("NO_SUPPORT_BREAKDOWN");
+  }
+
+  // VWAP confirmation
+  if (a.vwap != null && a.close > a.vwap) {
+    bull += 12;
+    bullReasons.push("PRICE_ABOVE_VWAP");
+  } else {
+    bullFailed.push("PRICE_NOT_ABOVE_VWAP");
+  }
+
+  if (a.vwap != null && a.close < a.vwap) {
+    bear += 12;
+    bearReasons.push("PRICE_BELOW_VWAP");
+  } else {
+    bearFailed.push("PRICE_NOT_BELOW_VWAP");
+  }
+
+  // EMA confirmation
+  if (a.ema20 != null && a.close > a.ema20) {
+    bull += 12;
+    bullReasons.push("PRICE_ABOVE_EMA20");
+  } else {
+    bullFailed.push("PRICE_NOT_ABOVE_EMA20");
+  }
+
+  if (a.ema20 != null && a.close < a.ema20) {
+    bear += 12;
+    bearReasons.push("PRICE_BELOW_EMA20");
+  } else {
+    bearFailed.push("PRICE_NOT_BELOW_EMA20");
+  }
+
+  // RSI confirmation
+  if (a.rsi14 != null && a.rsi14 >= 55) {
+    bull += 10;
+    bullReasons.push(`RSI_${a.rsi14}`);
+  } else {
+    bullFailed.push("RSI_BELOW_55");
+  }
+
+  if (a.rsi14 != null && a.rsi14 <= 45) {
+    bear += 10;
+    bearReasons.push(`RSI_${a.rsi14}`);
+  } else {
+    bearFailed.push("RSI_ABOVE_45");
+  }
+
+  // ADX and directional index
+  if (
+    a.adx != null &&
+    a.adx >= ADX_MIN &&
+    a.plusDI > a.minusDI
+  ) {
+    bull += 10;
+    bullReasons.push(`ADX_${a.adx}_BULLISH_DI`);
+  } else {
+    bullFailed.push("ADX_OR_BULLISH_DI_NOT_CONFIRMED");
+  }
+
+  if (
+    a.adx != null &&
+    a.adx >= ADX_MIN &&
+    a.minusDI > a.plusDI
+  ) {
+    bear += 10;
+    bearReasons.push(`ADX_${a.adx}_BEARISH_DI`);
+  } else {
+    bearFailed.push("ADX_OR_BEARISH_DI_NOT_CONFIRMED");
+  }
+
+  // Volume confirmation
+  if (a.volumePass) {
+    bull += 10;
+    bear += 10;
+
+    bullReasons.push(`VOLUME_${a.volumeRatio}X`);
+    bearReasons.push(`VOLUME_${a.volumeRatio}X`);
+  } else {
+    bullFailed.push("VOLUME_BELOW_1.5X");
+    bearFailed.push("VOLUME_BELOW_1.5X");
+  }
+
+  // Closed candle confirmation
+  if (a.bullishCandle) {
+    bull += 10;
+    bullReasons.push("BULLISH_CLOSED_5M_CANDLE");
+  } else {
+    bullFailed.push("BULLISH_CANDLE_NOT_CONFIRMED");
+  }
+
+  if (a.bearishCandle) {
+    bear += 10;
+    bearReasons.push("BEARISH_CLOSED_5M_CANDLE");
+  } else {
+    bearFailed.push("BEARISH_CANDLE_NOT_CONFIRMED");
+  }
+
+  // ATR support
+  const volatilityOk = a.atr14 != null && a.atr14 > 0;
+
+  if (volatilityOk && a.breakout) {
+    bull += 6;
+    bullReasons.push(`ATR_${a.atr14}_VOLATILITY_OK`);
+  }
+
+  if (volatilityOk && a.breakdown) {
+    bear += 6;
+    bearReasons.push(`ATR_${a.atr14}_VOLATILITY_OK`);
+  }
+
+  // Strict signal gates
+  const bullGate =
+    a.breakout &&
+    a.vwap != null &&
+    a.close > a.vwap &&
+    a.ema20 != null &&
+    a.close > a.ema20 &&
+    a.rsi14 >= 55 &&
+    a.adx >= ADX_MIN &&
+    a.bullishCandle;
+
+  const bearGate =
+    a.breakdown &&
+    a.vwap != null &&
+    a.close < a.vwap &&
+    a.ema20 != null &&
+    a.close < a.ema20 &&
+    a.rsi14 <= 45 &&
+    a.adx >= ADX_MIN &&
+    a.bearishCandle;
+
+  if (bullGate && bull >= ALERT_THRESHOLD) {
+    return {
+      direction: "BULLISH",
+      confidence: Math.min(100, bull),
+      status:
+        bull >= STRONG_THRESHOLD
+          ? "STRONG CONFIRMED"
+          : "CONFIRMED",
+      reasons: bullReasons,
+      failed: bullFailed
+    };
+  }
+
+  if (bearGate && bear >= ALERT_THRESHOLD) {
+    return {
+      direction: "BEARISH",
+      confidence: Math.min(100, bear),
+      status:
+        bear >= STRONG_THRESHOLD
+          ? "STRONG CONFIRMED"
+          : "CONFIRMED",
+      reasons: bearReasons,
+      failed: bearFailed
+    };
+  }
+
+  return {
+    direction:
+      bull > bear
+        ? "BULLISH_BUT_NOT_CONFIRMED"
+        : "BEARISH_BUT_NOT_CONFIRMED",
+
+    confidence: Math.max(bull, bear),
+    status: "WAIT",
+
+    reasons: bull > bear ? bullReasons : bearReasons,
+    failed: bull > bear ? bullFailed : bearFailed
+  };
+}
