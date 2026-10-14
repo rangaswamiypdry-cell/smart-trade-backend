@@ -145,37 +145,33 @@ async function getClosedCandleRSI(instrumentKey) {
 const optionSnapshots = new Map();
 
 function analyseOption(option) {
-  const key = option.instrument_key;
-
+  const rsi14 = Number(option.rsi14 ?? 0);
+const key = option.instrument_key;
   const previous = optionSnapshots.get(key);
 
   const ltp = Number(option.ltp || 0);
   const volume = Number(option.volume || 0);
   const oi = Number(option.oi || 0);
-  const prevOi = Number(option.prev_oi || 0);
 
   let priceChange = 0;
   let volumeChange = 0;
   let oiChange = 0;
 
-  // Price change from previous snapshot
-  if (previous && previous.ltp > 0 && ltp > 0) {
-    priceChange =
-      ((ltp - previous.ltp) / previous.ltp) * 100;
-  }
+  if (previous) {
+    if (previous.ltp > 0) {
+      priceChange =
+        ((ltp - previous.ltp) / previous.ltp) * 100;
+    }
 
-  // Volume change from previous snapshot
-  if (previous && previous.volume > 0) {
-    volumeChange =
-      ((volume - previous.volume) / previous.volume) * 100;
-  }
+    if (previous.volume > 0) {
+      volumeChange =
+        ((volume - previous.volume) / previous.volume) * 100;
+    }
 
-  // Prefer actual previous-day OI if supplied by Upstox
-  if (prevOi > 0 && oi > 0) {
-    oiChange = ((oi - prevOi) / prevOi) * 100;
-  } else if (previous && previous.oi > 0 && oi > 0) {
-    oiChange =
-      ((oi - previous.oi) / previous.oi) * 100;
+    if (previous.oi > 0) {
+      oiChange =
+        ((oi - previous.oi) / previous.oi) * 100;
+    }
   }
 
   optionSnapshots.set(key, {
@@ -185,46 +181,48 @@ function analyseOption(option) {
     timestamp: Date.now()
   });
 
-  // First snapshot cannot confirm price/volume momentum
-  const hasPrevious =
-    !!previous &&
-    previous.ltp > 0 &&
-    previous.volume > 0;
+  const strong =
+    rsi14 > 65 &&
+  Math.abs(priceChange) >= 1 &&
+  volumeChange >= 20 &&
+  oiChange >= 5;
 
   let signal = "NEUTRAL";
 
   if (
-    hasPrevious &&
-    ltp > previous.ltp &&
-    volumeChange > 0 &&
-    oiChange > 0
+priceChange > 0 &&
+volumeChange > 0 &&
+oiChange > 0 &&
+rsi14 > 65
   ) {
     signal = "BULLISH";
-  } else if (
-    hasPrevious &&
-    ltp < previous.ltp &&
-    volumeChange > 0 &&
-    oiChange > 0
-  ) {
-    signal = "BEARISH";
   }
+if (
+  priceChange < 0 &&
+  volumeChange > 0 &&
+  oiChange > 0 &&
+  rsi14 < 35
+) {
+  signal = "BEARISH";
+}
 
-  const strong =
-    hasPrevious &&
-    Math.abs(priceChange) >= 1 &&
-    volumeChange >= 20 &&
-    oiChange >= 5;
 
   return {
     ...option,
-    price_change_percent: Number(priceChange.toFixed(2)),
-    volume_change_percent: Number(volumeChange.toFixed(2)),
-    oi_change_percent: Number(oiChange.toFixed(2)),
-    snapshot_ready: hasPrevious,
+
+    price_change_percent:
+      Number(priceChange.toFixed(2)),
+
+    volume_change_percent:
+      Number(volumeChange.toFixed(2)),
+
+    oi_change_percent:
+      Number(oiChange.toFixed(2)),
+
     signal,
     strong
   };
-    }
+}
 
 // ==================================================
 // OPTION CHAIN
@@ -874,29 +872,123 @@ if (url.pathname === "/api/market/full-quotes") {
           instrumentKey
         );
 
-const filtered = rows.filter(item =>
-  item.volume_change_percent >= minVolumeChange &&
-  item.oi_change_percent >= minOiChange
-);
+      const filtered =
+        rows.filter(item =>
+          item.volume_change_percent >=
+            minVolumeChange &&
+          item.oi_change_percent >=
+            minOiChange
+        );
 
-filtered.sort(
-  (a, b) =>
-    Math.abs(b.price_change_percent || 0) -
-    Math.abs(a.price_change_percent || 0)
-);
+      filtered.sort(
+        (a, b) =>
+          Math.abs(b.price_change_percent) -
+          Math.abs(a.price_change_percent)
+      );
+
+      return sendJson(res, 200, {
+        success: true,
+        underlying: instrumentKey,
+        expiry,
+        count: filtered.length,
+
+        strong_alerts:
+          filtered.filter(
+            item => item.strong
+          ),
+
+        data: filtered
+      });
+    }
+
+    // =if (url.pathname === "/api/market/candles") {
+
+  const instrumentKey =
+    url.searchParams.get("instrument_key");
+
+  const interval =
+    url.searchParams.get("interval") || "5";
+
+  if (!instrumentKey) {
+    return sendJson(res, 400, {
+      success: false,
+      error: "instrument_key is required"
+    });
+  }
+
+  const intradayUrl =
+    `https://api.upstox.com/v3/historical-candle/intraday/` +
+    `${encodeURIComponent(instrumentKey)}/minutes/${encodeURIComponent(interval)}`;
+
+  const intradayData =
+    await upstoxRequest(intradayUrl);
+
+  let candles =
+    intradayData?.data?.candles || [];
+
+  if (candles.length < 15) {
+    const now = new Date();
+
+    const toDate = now.toISOString().slice(0, 10);
+
+    const fromDate = new Date(
+      now.getTime() - 7 * 24 * 60 * 60 * 1000
+    ).toISOString().slice(0, 10);
+
+    const historicalUrl =
+      `https://api.upstox.com/v3/historical-candle/` +
+      `${encodeURIComponent(instrumentKey)}/minutes/` +
+      `${encodeURIComponent(interval)}/${toDate}/${fromDate}`;
+
+    const historicalData =
+      await upstoxRequest(historicalUrl);
+
+    candles = historicalData?.data?.candles || [];
+  }
+
+// CLOSED CANDLES ONLY
+const intervalMs =
+  Number(interval) * 60 * 1000;
+
+const closedCandles =
+  candles.filter(candle => {
+    const candleTime =
+      new Date(candle[0]).getTime();
+
+    return (
+      candleTime + intervalMs <= Date.now()
+    );
+  });
+
+// RSI(14)
+const closes =
+  closedCandles
+    .map(candle => Number(candle[4]))
+    .reverse();
+
+const rsi14 =
+  calculateRSI(closes, 14);
 
 return sendJson(res, 200, {
   success: true,
-  underlying: instrumentKey,
-  expiry,
-  count: filtered.length,
-  strong_alerts: filtered.filter(item => item.strong),
-  data: filtered
-});
-        }
+  instrument_key: instrumentKey,
+  interval_minutes: Number(interval),
 
-// RSI(14)
-c
+  candle_count:
+    candles.length,
+
+  closed_candle_count:
+    closedCandles.length,
+
+  rsi14,
+
+  latest_closed_candle:
+    closedCandles.length > 0
+      ? closedCandles[0]
+      : null,
+
+  candles
+});
 }
     // ==================================================
     // NOT FOUND
