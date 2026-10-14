@@ -669,3 +669,515 @@ function buildDirectionalSignal(a) {
     failed: bull > bear ? bullFailed : bearFailed
   };
 }
+// ==================================================
+// TRADE PLAN
+// ==================================================
+
+function makeTradePlan(analysis, direction, optionLtp = null) {
+  if (!analysis || !analysis.ready) {
+    return null;
+  }
+
+  const entry = num(optionLtp, analysis.close);
+  const atr = num(analysis.atr14);
+
+  if (entry <= 0 || atr <= 0) {
+    return null;
+  }
+
+  // Option premium risk is calculated from option premium,
+  // not from the underlying index ATR.
+  const risk = Math.max(entry * 0.08, 0.05);
+
+  let stopLoss;
+  let target1;
+  let target2;
+
+  if (direction === "CALL BUY") {
+    stopLoss = entry - risk;
+    target1 = entry + risk * 1.5;
+    target2 = entry + risk * 2;
+  } else if (direction === "PUT BUY") {
+    stopLoss = entry - risk;
+    target1 = entry + risk * 1.5;
+    target2 = entry + risk * 2;
+  } else {
+    return null;
+  }
+
+  return {
+    entry: round(entry, 2),
+    stop_loss: round(Math.max(stopLoss, 0.05), 2),
+    target_1: round(target1, 2),
+    target_2: round(target2, 2),
+    risk_per_unit: round(risk, 2),
+    method: "OPTION_PREMIUM_PERCENTAGE_RISK"
+  };
+}
+
+// ==================================================
+// UPSTOX 5-MINUTE CANDLES
+// ==================================================
+
+async function get5mCandles(instrumentKey) {
+  if (!instrumentKey) {
+    throw new Error("instrument_key is required");
+  }
+
+  const encodedKey = encodeURIComponent(instrumentKey);
+
+  const apiUrl =
+    "https://api.upstox.com/v3/historical-candle/" +
+    encodedKey +
+    "/minutes/5";
+
+  const result = await upstoxRequest(apiUrl);
+
+  const candles = result?.data?.candles;
+
+  if (!Array.isArray(candles)) {
+    throw new Error("UPSTOX_CANDLES_NOT_AVAILABLE");
+  }
+
+  return getClosedCandles(candles, 5);
+}
+
+// ==================================================
+// QUOTE
+// ==================================================
+
+async function getMarketQuote(instrumentKey) {
+  if (!instrumentKey) {
+    throw new Error("instrument_key is required");
+  }
+
+  const apiUrl =
+    "https://api.upstox.com/v2/market-quote/quotes?instrument_key=" +
+    encodeURIComponent(instrumentKey);
+
+  const result = await upstoxRequest(apiUrl);
+
+  return result?.data || {};
+}
+
+// ==================================================
+// ANALYSE ONE UNDERLYING
+// ==================================================
+
+async function analyseUnderlying(instrumentKey, name = "") {
+  const candles = await get5mCandles(instrumentKey);
+
+  const analysis = analyseCompletedCandles(candles);
+
+  if (!analysis.ready) {
+    return {
+      success: true,
+      name,
+      instrument_key: instrumentKey,
+      signal: "WAIT",
+      reason: analysis.reason
+    };
+  }
+
+  const signal = buildDirectionalSignal(analysis);
+
+  let tradeType = "WAIT";
+
+  if (signal.direction === "BULLISH" &&
+      signal.status !== "WAIT") {
+    tradeType = "CALL BUY";
+  } else if (signal.direction === "BEARISH" &&
+             signal.status !== "WAIT") {
+    tradeType = "PUT BUY";
+  }
+
+  let quote = null;
+
+  try {
+    quote = await getMarketQuote(instrumentKey);
+  } catch (e) {
+    // Quote is optional for the underlying analysis.
+  }
+
+  return {
+    success: true,
+    name,
+    instrument_key: instrumentKey,
+    signal: tradeType,
+    direction: signal.direction,
+    status: signal.status,
+    confidence_score: signal.confidence,
+    signal_time: analysis.candleTime,
+    last_price: analysis.close,
+
+    indicators: {
+      rsi14: analysis.rsi14,
+      ema20: analysis.ema20,
+      ema50: analysis.ema50,
+      vwap: analysis.vwap,
+      adx: analysis.adx,
+      atr14: analysis.atr14,
+      adr14: analysis.adr14,
+      volume_ratio: analysis.volumeRatio,
+      support: analysis.support,
+      resistance: analysis.resistance,
+      breakout: analysis.breakout,
+      breakdown: analysis.breakdown
+    },
+
+    reasons: signal.reasons,
+    failed_conditions: signal.failed,
+    quote_data: quote
+  };
+      }// ==================================================
+// MARKET SCAN CONFIGURATION
+// ==================================================
+
+const MARKET_INSTRUMENTS = [
+  {
+    name: "NIFTY 50",
+    instrument_key: "NSE_INDEX|Nifty 50"
+  },
+  {
+    name: "BANK NIFTY",
+    instrument_key: "NSE_INDEX|Nifty Bank"
+  },
+  {
+    name: "SENSEX",
+    instrument_key: "BSE_INDEX|SENSEX"
+  }
+];
+
+// ==================================================
+// SCAN ALL INDEXES
+// ==================================================
+
+async function scanAllIndexes() {
+  const results = [];
+
+  for (const item of MARKET_INSTRUMENTS) {
+    try {
+      const result = await analyseUnderlying(
+        item.instrument_key,
+        item.name
+      );
+
+      results.push(result);
+    } catch (error) {
+      results.push({
+        success: false,
+        name: item.name,
+        instrument_key: item.instrument_key,
+        signal: "WAIT",
+        error: error.message
+      });
+    }
+  }
+
+  const alerts = results.filter(
+    item =>
+      item.success &&
+      (
+        item.signal === "CALL BUY" ||
+        item.signal === "PUT BUY"
+      )
+  );
+
+  return {
+    success: true,
+    timeframe: "5minute",
+    candle_confirmation: "CLOSED_CANDLE_ONLY",
+    scanned: results.length,
+    alert_count: alerts.length,
+    alerts,
+    results,
+    generated_at: new Date().toISOString()
+  };
+}
+
+// ==================================================
+// SCAN ONE INDEX
+// ==================================================
+
+async function scanOneIndex(instrumentKey) {
+  const item = MARKET_INSTRUMENTS.find(
+    x => x.instrument_key === instrumentKey
+  );
+
+  if (!item) {
+    throw new Error("Unsupported index instrument_key");
+  }
+
+  return analyseUnderlying(
+    item.instrument_key,
+    item.name
+  );
+}
+
+// ==================================================
+// RESPONSE HELPERS
+// ==================================================
+
+function getInstrumentKey(url) {
+  return (
+    url.searchParams.get("instrument_key") ||
+    url.searchParams.get("instrumentKey") ||
+    ""
+  ).trim();
+}
+
+function getRequestedInstrumentKeys(url) {
+  const raw =
+    url.searchParams.get("instrument_keys") ||
+    url.searchParams.get("instrumentKeys") ||
+    "";
+
+  return raw
+    .split(",")
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+// ==================================================
+// SAFE API ERROR RESPONSE
+// ==================================================
+
+function apiErrorMessage(error) {
+  const message = String(error?.message || "Unknown error");
+
+  if (message.includes("UPSTOX_ACCESS_TOKEN_MISSING")) {
+    return "Upstox access token is not configured";
+  }
+
+  return message;
+}// ==================================================
+// HTTP SERVER AND API ROUTES
+// ==================================================
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, corsHeaders());
+    return res.end();
+  }
+
+  const url = new URL(
+    req.url,
+    `http://${req.headers.host || "localhost"}`
+  );
+
+  try {
+    // ----------------------------------------------
+    // HOME
+    // ----------------------------------------------
+
+    if (url.pathname === "/" && req.method === "GET") {
+      return sendJson(res, 200, {
+        success: true,
+        app: "Smart Trade India Backend",
+        status: "running",
+        version: "2.0",
+        endpoints: [
+          "/health",
+          "/api/signals/scan",
+          "/api/signals/underlying",
+          "/api/market/quotes",
+          "/api/market/candles"
+        ]
+      });
+    }
+
+    // ----------------------------------------------
+    // HEALTH
+    // ----------------------------------------------
+
+    if (url.pathname === "/health" && req.method === "GET") {
+      return sendJson(res, 200, {
+        success: true,
+        app: "Smart Trade India Backend",
+        status: "running",
+        upstox_token_configured:
+          Boolean(process.env.UPSTOX_ACCESS_TOKEN),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // ----------------------------------------------
+    // SCAN ALL INDEXES
+    // ----------------------------------------------
+
+    if (
+      url.pathname === "/api/signals/scan" &&
+      req.method === "GET"
+    ) {
+      const result = await scanAllIndexes();
+      return sendJson(res, 200    }
+
+    // ----------------------------------------------
+    // SCAN ONE UNDERLYING
+    // ----------------------------------------------
+
+    if (
+      url.pathname === "/api/signals/underlying" &&
+      req.method === "GET"
+    ) {
+      const instrumentKey = getInstrumentKey(url);
+
+      if (!instrumentKey) {
+        return sendJson(res, 400, {
+          success: false,
+          error: "instrument_key is required"
+        });
+      }
+
+      const result = await analyseUnderlying(
+        instrumentKey,
+        instrumentKey
+      );
+
+      return sendJson(res, 200, result);
+    }
+
+    // ----------------------------------------------
+    // MARKET QUOTES
+    // ----------------------------------------------
+
+    if (
+      url.pathname === "/api/market/quotes" &&
+      req.method === "GET"
+    ) {
+      const keys = getRequestedInstrumentKeys(url);
+
+      if (!keys.length) {
+        return sendJson(res, 400, {
+          success: false,
+          error: "instrument_keys is required"
+        });
+      }
+
+      const apiUrl =
+        "https://api.upstox.com/v2/market-quote/quotes?instrument_key=" +
+        encodeURIComponent(keys.join(","));
+
+      const result = await upstoxRequest(apiUrl);
+
+      return sendJson(res, 200, {
+        success: true,
+        data: result.data || {}
+      });
+    }
+
+    // ----------------------------------------------
+    // 5-MINUTE CANDLES
+    // ----------------------------------------------
+
+    if (
+      url.pathname === "/api/market/candles" &&
+      req.method === "GET"
+    ) {
+      const instrumentKey = getInstrumentKey(url);
+
+      if (!instrumentKey) {
+        return sendJson(res, 400, {
+          success: false,
+          error: "instrument_key is required"
+        });
+      }
+
+      const interval =
+        url.searchParams.get("interval") || "5minute";
+
+      if (
+        interval !== "5minute" &&
+        interval !== "1minute"
+      ) {
+        return sendJson(res, 400, {
+          success: false,
+          error: "interval must be 1minute or 5minute"
+        });
+      }
+
+      let candles;
+
+      if (interval === "5minute") {
+        candles = await get5mCandles(instrumentKey);
+      } else {
+        const apiUrl =
+          "https://api.upstox.com/v3/historical-candle/" +
+          encodeURIComponent(instrumentKey) +
+          "/minutes/1";
+
+        const result = await upstoxRequest(apiUrl);
+
+        candles = getClosedCandles(
+          result?.data?.candles || [],
+          1
+        );
+      }
+
+      return sendJson(res, 200, {
+        success: true,
+        instrument_key: instrumentKey,
+        interval,
+        candle_count: candles.length,
+        candles
+      });
+    }
+
+    // ----------------------------------------------
+    // OPTION ALERTS — SAFE PLACEHOLDER
+    // ----------------------------------------------
+
+    if (
+      url.pathname === "/api/options/scan" &&
+      req.method === "GET"
+    ) {
+      return sendJson(res, 200, {
+        success: true,
+        expiry:
+          url.searchParams.get("expiry") || "current_week",
+        alert_count: 0,
+        alerts: [],
+        message:
+          "Underlying index scan is available at /api/signals/scan. Option-chain confirmation is not implemented in this section."
+      });
+    }
+
+    // ----------------------------------------------
+    // UNKNOWN ROUTE
+    // ----------------------------------------------
+
+    return sendJson(res, 404, {
+      success: false,
+      error: "Endpoint not found",
+      path: url.pathname
+    });
+
+  } catch (error) {
+    console.error(
+      "API error:",
+      url.pathname,
+      error.message
+    );
+
+    return sendJson(res, 500, {
+      success: false,
+      error: apiErrorMessage(error),
+      path: url.pathname
+    });
+  }
+});
+
+// ==================================================
+// START SERVER
+// ==================================================
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    `Smart Trade India backend listening on port ${PORT}`
+  );
+});
+
+server.on("error", error => {
+  console.error("Server startup error:", error);
+  process.exit(1);
+});
