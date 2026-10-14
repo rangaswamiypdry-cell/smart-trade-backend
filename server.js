@@ -145,7 +145,6 @@ async function getClosedCandleRSI(instrumentKey) {
 const optionSnapshots = new Map();
 
 function analyseOption(option) {
-function analyseOption(option) {
   const key = option.instrument_key;
 
   const previous = optionSnapshots.get(key);
