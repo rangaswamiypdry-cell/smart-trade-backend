@@ -896,34 +896,7 @@ return sendJson(res, 200, {
         }
 
 // RSI(14)
-const closes =
-  closedCandles
-    .map(candle => Number(candle[4]))
-    .reverse();
-
-const rsi14 =
-  calculateRSI(closes, 14);
-
-return sendJson(res, 200, {
-  success: true,
-  instrument_key: instrumentKey,
-  interval_minutes: Number(interval),
-
-  candle_count:
-    candles.length,
-
-  closed_candle_count:
-    closedCandles.length,
-
-  rsi14,
-
-  latest_closed_candle:
-    closedCandles.length > 0
-      ? closedCandles[0]
-      : null,
-
-  candles
-});
+c
 }
     // ==================================================
     // NOT FOUND
