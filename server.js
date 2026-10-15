@@ -402,7 +402,7 @@ function getRequestedIndexes(url) {
     requested.includes(index.name)
   );
 }
-[15/10, 10:17 pm] rangaswamy: // ==================================================
+// ==================================================
 // INDEX OPTIONS AUTO SCANNER
 // ==================================================
 
