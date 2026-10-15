@@ -162,7 +162,7 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
     completed_count: completed.length
   };
 }
-[15/10, 10:17 pm] rangaswamy: // ==================================================
+// ==================================================
 // UPSTOX MARKET DATA HELPERS
 // ==================================================
 
