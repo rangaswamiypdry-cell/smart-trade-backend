@@ -222,7 +222,7 @@ if (
     signal,
     strong
   };
-}
+    }
 
 // ==================================================
 // OPTION CHAIN
@@ -345,7 +345,7 @@ rsi14: rsi14,
   }
 
   return rows;
-}// ==================================================
+  }// ==================================================
 // AUTOMATIC OPTION SCANNER
 // NIFTY + BANKNIFTY + SENSEX
 // AUTO EXPIRY
@@ -559,7 +559,7 @@ const rows = buildOptionRows(
   }
 
   return results;
-}
+    }
 // ==================================================
 // NSE STOCK OPTION CONTRACTS
 // ==================================================
@@ -720,188 +720,117 @@ if (url.pathname === "/api/market/full-quotes") {
         success: true,
         data
       });
-    }
+}
+        {
+          name: "BANKNIFTY",
+          key: "NSE_INDEX|Nifty Bank"
+        },
 
-    // ==================================================
-    // MULTIPLE MARKET QUOTES
-    // ==================================================
+        {
+          name: "SENSEX",
+          key: "BSE_INDEX|SENSEX"
+        }
 
-    if (url.pathname === "/api/market/quotes") {
+      ];
 
-      const instrumentKeys =
-        url.searchParams.get("instrument_keys");
+      const allAlerts = [];
 
-      if (!instrumentKeys) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_keys is required"
-        });
+      for (const underlying of underlyings) {
+
+        try {
+
+          const result =
+            await getOptionChain(
+              underlying.key,
+              expiry
+            );
+
+          const rows =
+            buildOptionRows(
+              result?.data || [],
+              underlying.name
+            );
+
+          const alerts =
+            rows.filter(
+              item => item.strong
+            );
+
+          allAlerts.push(...alerts);
+
+        } catch (error) {
+
+          allAlerts.push({
+            underlying_name:
+              underlying.name,
+
+            error:
+              error.message
+          });
+        }
       }
 
-      const apiUrl =
-        `https://api.upstox.com/v2/market-quote/ltp` +
-        `?instrument_key=${encodeURIComponent(instrumentKeys)}`;
-
-      const data =
-        await upstoxRequest(apiUrl);
-
-      return sendJson(res, 200, {
-        success: true,
-        data
-      });
-    }
-
-    // ==================================================
-    // OPTION CONTRACTS
-    // ==================================================
-
-    if (url.pathname === "/api/options/contracts") {
-
-      const instrumentKey =
-        url.searchParams.get("instrument_key");
-
-      const expiry =
-        url.searchParams.get("expiry");
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_key is required"
-        });
-      }
-
-      let apiUrl =
-        `https://api.upstox.com/v2/option/contract` +
-        `?instrument_key=${encodeURIComponent(instrumentKey)}`;
-
-      if (expiry) {
-        apiUrl +=
-          `&expiry_date=${encodeURIComponent(expiry)}`;
-      }
-
-      const data =
-        await upstoxRequest(apiUrl);
-
-      return sendJson(res, 200, {
-        success: true,
-        underlying: instrumentKey,
-        expiry: expiry || "all",
-        count:
-          Array.isArray(data?.data)
-            ? data.data.length
-            : 0,
-        data:
-          data?.data || []
-      });
-    }
-
-    // ==================================================
-    // OPTION CHAIN
-    // ==================================================
-
-    if (url.pathname === "/api/options/chain") {
-
-      const instrumentKey =
-        url.searchParams.get("instrument_key");
-
-      const expiry =
-        url.searchParams.get("expiry") ||
-        "current_week";
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_key is required"
-        });
-      }
-
-      const data =
-        await getOptionChain(
-          instrumentKey,
-          expiry
-        );
-
-      return sendJson(res, 200, {
-        success: true,
-        underlying: instrumentKey,
-        expiry,
-        data:
-          data?.data || []
-      });
-    }
-
-    // ==================================================
-    // OPTION MOVERS
-    // ==================================================
-
-    if (url.pathname === "/api/options/movers") {
-
-      const instrumentKey =
-        url.searchParams.get("instrument_key");
-
-      const expiry =
-        url.searchParams.get("expiry") ||
-        "current_week";
-
-      const minVolumeChange =
-        Number(
-          url.searchParams.get("min_volume_change") || 0
-        );
-
-      const minOiChange =
-        Number(
-          url.searchParams.get("min_oi_change") || 0
-        );
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_key is required"
-        });
-      }
-
-      const result =
-        await getOptionChain(
-          instrumentKey,
-          expiry
-        );
-
-      const rows =
-        buildOptionRows(
-          result?.data || [],
-          instrumentKey
-        );
-
-      const filtered =
-        rows.filter(item =>
-          item.volume_change_percent >=
-            minVolumeChange &&
-          item.oi_change_percent >=
-            minOiChange
-        );
-
-      filtered.sort(
+      allAlerts.sort(
         (a, b) =>
-          Math.abs(b.price_change_percent) -
-          Math.abs(a.price_change_percent)
+          Math.abs(
+            b.price_change_percent || 0
+          ) -
+          Math.abs(
+            a.price_change_percent || 0
+          )
       );
 
       return sendJson(res, 200, {
         success: true,
-        underlying: instrumentKey,
         expiry,
-        count: filtered.length,
-
-        strong_alerts:
-          filtered.filter(
-            item => item.strong
-          ),
-
-        data: filtered
+        alert_count:
+          allAlerts.length,
+        alerts:
+          allAlerts
       });
     }
+// ==================================================
+// AUTOMATIC SCAN API
+// ==================================================
 
-    // =if (url.pathname === "/api/market/candles") {
+if (url.pathname === "/api/options/auto-scan") {
+
+  const results =
+    await automaticOptionScan();
+
+  const alerts = [];
+
+  for (const result of results) {
+    if (Array.isArray(result.alerts)) {
+      alerts.push(...result.alerts);
+    }
+  }
+
+  alerts.sort(
+    (a, b) =>
+      Math.abs(
+        b.price_change_percent || 0
+      ) -
+      Math.abs(
+        a.price_change_percent || 0
+      )
+  );
+
+  return sendJson(res, 200, {
+    success: true,
+    market: "NSE/BSE Options",
+    scanned_at:
+      new Date().toISOString(),
+    total_alerts:
+      alerts.length,
+    results,
+    alerts
+  });
+} // ==================================================
+// 5 MINUTE CANDLE API
+// ==================================================
+
+if (url.pathname === "/api/market/candles") {
 
   const instrumentKey =
     url.searchParams.get("instrument_key");
@@ -989,8 +918,8 @@ return sendJson(res, 200, {
 
   candles
 });
-}
-    // ==================================================
+        }
+     // ==================================================
     // NOT FOUND
     // ==================================================
 
@@ -1021,4 +950,5 @@ server.listen(PORT, () => {
   console.log(
     `Smart Trade India Backend running on port ${PORT}`
   );
-    
+
+});
