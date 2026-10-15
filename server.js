@@ -134,9 +134,34 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
     };
   }
 
-  const closes = completed.map(c => Number(c[4]));
-  const volumes = completed.map(c => Number(c[5] || 0));
+  const validCandles = completed.filter(c =>
+    Array.isArray(c) &&
+    Number.isFinite(Number(c[1])) &&
+    Number.isFinite(Number(c[2])) &&
+    Number.isFinite(Number(c[3])) &&
+    Number.isFinite(Number(c[4])) &&
+    Number.isFinite(Number(c[5]))
+  );
 
+  if (validCandles.length < 21) {
+    return {
+      ready: false,
+      reason: "INSUFFICIENT_VALID_CANDLES",
+      completed_count: validCandles.length
+    };
+  }
+
+  const closes = validCandles.map(c => Number(c[4]));
+  const highs = validCandles.map(c => Number(c[2]));
+  const lows = validCandles.map(c => Number(c[3]));
+  const volumes = validCandles.map(c => Number(c[5]));
+
+  const latest = validCandles[validCandles.length - 1];
+  const previous = validCandles[validCandles.length - 2];
+
+  const close = Number(latest[4]);
+  const open = Number(latest[1]);
+  const previousClose = Number(previous[4]);
   const latestVolume = volumes[volumes.length - 1];
 
   const averageVolume =
@@ -144,22 +169,118 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
 
   const rsi14 = calculateWilderRSI(closes, 14);
 
+  // EMA calculation
+  function calculateEMA(values, period) {
+    if (values.length < period) return null;
+
+    const multiplier = 2 / (period + 1);
+
+    let ema = values.slice(0, period)
+      .reduce((sum, value) => sum + value, 0) / period;
+
+    for (let i = period; i < values.length; i++) {
+      ema = (values[i] - ema) * multiplier + ema;
+    }
+
+    return Number(ema.toFixed(2));
+  }
+
+  const ema20 = calculateEMA(closes, 20);
+
+  // VWAP for available completed candles
+  let totalPV = 0;
+  let totalVolume = 0;
+
+  for (const candle of validCandles) {
+    const typicalPrice =
+      (Number(candle[2]) + Number(candle[3]) + Number(candle[4])) / 3;
+
+    const volume = Number(candle[5]);
+
+    totalPV += typicalPrice * volume;
+    totalVolume += volume;
+  }
+
+  const vwap =
+    totalVolume > 0
+      ? Number((totalPV / totalVolume).toFixed(2))
+      : null;
+
+  // Previous 20 candles' resistance and support
+  const previousCandles = validCandles.slice(-21, -1);
+
+  const resistance = Math.max(
+    ...previousCandles.map(c => Number(c[2]))
+  );
+
+  const support = Math.min(
+    ...previousCandles.map(c => Number(c[3]))
+  );
+
+  const volumeRatio =
+    averageVolume > 0 ? latestVolume / averageVolume : 0;
+
+  const volumePass =
+    averageVolume > 0 && latestVolume >= averageVolume * 1.5;
+
+  const bullishBreakout = close > resistance;
+  const bearishBreakdown = close < support;
+
+  const bullishTrend =
+    close > open &&
+    ema20 !== null &&
+    close > ema20 &&
+    vwap !== null &&
+    close > vwap;
+
+  const bearishTrend =
+    close < open &&
+    ema20 !== null &&
+    close < ema20 &&
+    vwap !== null &&
+    close < vwap;
+
+  const callConfirmation =
+    rsi14 !== null &&
+    rsi14 >= 65 &&
+    volumePass &&
+    bullishTrend &&
+    bullishBreakout;
+
+  const putConfirmation =
+    rsi14 !== null &&
+    rsi14 <= 35 &&
+    volumePass &&
+    bearishTrend &&
+    bearishBreakdown;
+
   return {
-    ready: averageVolume > 0 && rsi14 !== null,
+    ready: rsi14 !== null && averageVolume > 0,
+    close,
+    open,
+    previousClose,
     rsi14,
     currentVolume: latestVolume,
     averageVolume: Number(averageVolume.toFixed(2)),
-    volumeRatio:
-      averageVolume > 0
-        ? Number((latestVolume / averageVolume).toFixed(2))
-        : 0,
-    volumePass:
-      averageVolume > 0 &&
-      latestVolume >= averageVolume * 1.5,
-    close: closes[closes.length - 1],
-    previousClose: closes[closes.length - 2],
-    latestClosedCandle: completed[completed.length - 1],
-    completed_count: completed.length
+    volumeRatio: Number(volumeRatio.toFixed(2)),
+    volumePass,
+    ema20,
+    vwap,
+    support: Number(support.toFixed(2)),
+    resistance: Number(resistance.toFixed(2)),
+    bullishBreakout,
+    bearishBreakdown,
+    bullishTrend,
+    bearishTrend,
+    callConfirmation,
+    putConfirmation,
+    candleSignal: callConfirmation
+      ? "CALL_CONFIRMATION"
+      : putConfirmation
+        ? "PUT_CONFIRMATION"
+        : "WAIT",
+    latestClosedCandle: latest,
+    completed_count: validCandles.length
   };
 }
 // ==================================================
