@@ -379,12 +379,18 @@ function extractPrice(quote) {
   );
 }
 
-function extractVolume(quote) {
-  return Number(
+ function extractVolume(quote) {
+  const volume = Number(
     quote?.volume ??
     quote?.volume_traded ??
+    quote?.volumeTraded ??
+    quote?.total_traded_quantity ??
+    quote?.total_volume ??
     0
   );
+
+  return Number.isFinite(volume) && volume > 0 ? volume : 0;
+ } 
 }
 
 function extractOI(quote) {
