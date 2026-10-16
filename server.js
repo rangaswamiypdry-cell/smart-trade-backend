@@ -932,7 +932,7 @@ async function scanStockOptions(contracts) {
     all_results: results,
     timestamp: new Date().toISOString()
   };
-        
+}
 // ==================================================
 // HTTP SERVER AND API ROUTES
 // ==================================================
