@@ -1,4 +1,4 @@
-up const http = require("http");
+const http = require("http");
 const { URL } = require("url");
 
 const PORT = process.env.PORT || 10000;
