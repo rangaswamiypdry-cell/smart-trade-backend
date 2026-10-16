@@ -500,7 +500,64 @@ function saveStockOptionSnapshot(key, quote) {
     time: Date.now()
   });
 }
+// ==================================================
+// LONG BUILD-UP DETECTION
+// ==================================================
 
+function detectLongBuildUp(current, previous) {
+  if (!current || !previous) {
+    return {
+      signal: "WAIT",
+      long_build_up: false,
+      reason: "Waiting for previous market data"
+    };
+  }
+
+  const price = extractPrice(current);
+  const previousPrice = extractPrice(previous);
+
+  const volume = extractVolume(current);
+  const previousVolume = extractVolume(previous);
+
+  const oi = extractOI(current);
+  const previousOI = extractOI(previous);
+
+  const priceUp =
+    price > 0 && previousPrice > 0 &&
+    price > previousPrice;
+
+  const volumeUp =
+    volume > 0 && previousVolume > 0 &&
+    volume > previousVolume;
+
+  const oiUp =
+    oi > 0 && previousOI > 0 &&
+    oi > previousOI;
+
+  const longBuildUp =
+    priceUp && volumeUp && oiUp;
+
+  return {
+    signal: longBuildUp ? "LONG_BUILD_UP" : "WAIT",
+    long_build_up: longBuildUp,
+    price,
+    previous_price: previousPrice,
+    volume,
+    previous_volume: previousVolume,
+    oi,
+    previous_oi: previousOI,
+    price_up: priceUp,
+    volume_up: volumeUp,
+    oi_up: oiUp,
+    reason: longBuildUp
+      ? "Price, volume and OI are increasing"
+      : "All three conditions are not confirmed",
+    signal_time: new Date().toISOString()
+  };
+}
+// ==================================================
+// STOCK SYMBOL HELPERS
+// ==================================================
 // ==================================================
 // STOCK SYMBOL HELPERS
 // ==================================================
