@@ -376,7 +376,7 @@ function extractPrice(quote) {
     quote?.ltp ??
     quote?.last_traded_price ??
     0
-  );
+  )
 }
 function extractVolume(quote) {
   const volume = Number(
