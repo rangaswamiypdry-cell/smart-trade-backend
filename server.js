@@ -530,7 +530,26 @@ function getRequestedIndexes(url) {
 // ==================================================
 // INDEX OPTIONS AUTO SCANNER
 // ==================================================
+// ============================================
+// SMART MONEY + STRONG MOMENTUM BUY FILTER
+// Same conditions for CE and PE
+// ============================================
 
+function detectSmartMoneyBuy(data) {
+  if (!data || typeof data !== "object") {
+    return {
+      buy: false,
+      signal: "WAIT",
+      reason: "Market data unavailable"
+    };
+  }
+
+  const price = Number(data.price);
+  const previousPrice = Number(data.previousPrice);
+  const volume = Number(data.volume);
+  const averageVolume20 = Number(data.averageVolume20);
+  const oi = Number(data.oi);
+ 
 async function scanIndexOptions(url) {
   const indexes = getRequestedIndexes(url);
   const results = [];
