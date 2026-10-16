@@ -430,6 +430,10 @@ function normaliseOptionContract(contract) {
 // OPTION SIGNAL HELPERS
 // ==================================================
 
+// ==================================================
+// SMART MONEY OPTION BUY SIGNAL
+// ==================================================
+
 function createOptionSignal(contract, quote, previous) {
   const price = extractPrice(quote);
   const volume = extractVolume(quote);
@@ -448,6 +452,14 @@ function createOptionSignal(contract, quote, previous) {
   const oiUp =
     previousOI !== null && oi > previousOI;
 
+  const validData =
+    price > 0 &&
+    previousPrice !== null &&
+    previousVolume !== null &&
+    previousOI !== null;
+
+  const buy = validData && priceUp && volumeUp && oiUp;
+
   return {
     symbol: contract.trading_symbol,
     instrument_key: contract.instrument_key,
@@ -463,13 +475,11 @@ function createOptionSignal(contract, quote, previous) {
     price_up: priceUp,
     volume_up: volumeUp,
     oi_up: oiUp,
-    signal:
-      priceUp && volumeUp && oiUp
-        ? "BULLISH"
-        : "WAIT",
+    smart_money_buy: buy,
+    signal: buy ? "BULLISH" : "WAIT",
     signal_time: new Date().toISOString()
   };
-}
+   }
 
 function saveOptionSnapshot(key, quote) {
   optionSnapshots.set(key, {
