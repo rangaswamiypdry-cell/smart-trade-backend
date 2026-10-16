@@ -653,13 +653,38 @@ async function scanIndexOptions(url) {
           const previous =
             optionSnapshots.get(contract.instrument_key);
 
-          const signal = createOptionSignal(
-            contract,
-            quote,
-            previous
-          );
+const signal = createOptionSignal(
+  contract,
+  quote,
+  previous
+);
 
-          signals.push(signal);
+// Smart Money filter
+const smartMoney = detectSmartMoneyBuy({
+  price: quote.price,
+  previousPrice: previous?.price,
+  volume: quote.volume,
+  averageVolume20: quote.averageVolume20,
+  oi: quote.oi,
+  previousOI: previous?.oi,
+  rsi14: quote.rsi14,
+  close: quote.close,
+  open: quote.open,
+  vwap: quote.vwap,
+  resistance: quote.resistance,
+  cmf20: quote.cmf20
+});
+
+signal.smart_money = smartMoney;
+
+if (smartMoney.buy) {
+  signal.signal = "BULLISH";
+  signal.smart_money_buy = true;
+} else {
+  signal.smart_money_buy = false;
+}
+
+signals.push(signal);          
 
           saveOptionSnapshot(
             contract.instrument_key,
