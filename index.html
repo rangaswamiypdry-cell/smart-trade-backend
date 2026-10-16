@@ -3,110 +3,284 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smart Market Scanner</title><link rel="manifest" href="./manifest.json">
+<title>Smart Market Scanner</title>
 <meta name="theme-color" content="#07111f">
+
 <style>
-body{margin:0;background:#07111f;color:white;font-family:Arial,sans-serif;padding:16px}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:16px;
+  background:#07111f;color:#fff;
+  font-family:Arial,sans-serif
+}
 h1{color:#31d6a0;font-size:25px}
-button{background:#16b981;color:white;border:0;padding:12px;border-radius:8px;font-size:16px}
-.card{background:#142338;padding:14px;margin:12px 0;border-radius:12px;overflow-wrap:anywhere}
-.metric{font-size:22px;color:#31d6a0;font-weight:bold}
-small{color:#9fb2ca}
-pre{white-space:pre-wrap;overflow-wrap:anywhere}
+h2{font-size:21px}
+button{
+  width:100%;padding:14px;
+  background:#16b981;color:white;
+  border:0;border-radius:10px;
+  font-size:17px;font-weight:bold
+}
+button:disabled{opacity:.6}
+.card{
+  background:#142338;
+  padding:16px;margin:14px 0;
+  border-radius:14px;overflow-wrap:anywhere
+}
+.metric{
+  color:#31d6a0;font-size:27px;
+  font-weight:bold;margin-top:8px
+}
+small{color:#a5b7ce}
+.bull{border-left:5px solid #31d6a0}
+.bear{border-left:5px solid #ff6262}
+.wait{border-left:5px solid #f5bd4f}
+.tag{
+  display:inline-block;padding:7px 10px;
+  border-radius:7px;background:#253b53;
+  margin:5px 0;font-weight:bold
+}
+.row{margin:9px 0}
 .error{color:#ff7777}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
 </style>
 </head>
+
 <body>
 
 <h1>📈 Smart Market Scanner</h1>
 <p>Live NSE / BSE Options Dashboard</p>
 
-<button onclick="loadData()">🔄 Refresh Scanner</button>
+<button id="refreshBtn" onclick="loadData()">
+🔄 Refresh Scanner
+</button>
 
-<div id="status" class="card">Connecting to market backend...</div>
+<div id="status" class="card">
+Connecting to backend...
+</div>
+
 <div id="summary"></div>
 <div id="results"></div>
 
 <script>
 const API="https://smart-trade-backend-ig6l.onrender.com";
 
+function formatTime(value){
+  if(!value)return "Not available";
+  const d=new Date(value);
+  if(isNaN(d.getTime()))return value;
+  return d.toLocaleString("en-IN",{
+    timeZone:"Asia/Kolkata",
+    dateStyle:"medium",
+    timeStyle:"medium"
+  });
+}
+
+function fmt(value){
+  if(value===undefined||value===null||value==="")return "N/A";
+  if(typeof value==="boolean")return value?"YES":"NO";
+  const n=Number(value);
+  return Number.isFinite(n)
+    ?n.toLocaleString("en-IN",{maximumFractionDigits:2})
+    :String(value);
+}
+
+function row(card,label,value){
+  const el=document.createElement("div");
+  el.className="row";
+  el.textContent=label+": "+fmt(value);
+  card.appendChild(el);
+}
+
+function card(title,cls="card"){
+  const el=document.createElement("div");
+  el.className=cls;
+  const h=document.createElement("h3");
+  h.textContent=title;
+  el.appendChild(h);
+  return el;
+}
+
 async function loadData(){
- const status=document.getElementById("status");
- const summary=document.getElementById("summary");
- const results=document.getElementById("results");
+  const status=document.getElementById("status");
+  const summary=document.getElementById("summary");
+  const results=document.getElementById("results");
+  const btn=document.getElementById("refreshBtn");
 
- status.textContent="Loading scanner data... Please wait.";
- summary.innerHTML="";
- results.innerHTML="";
+  btn.disabled=true;
+  status.className="card";
+  status.textContent="Loading scanner data...";
+  summary.replaceChildren();
+  results.replaceChildren();
 
- try{
-  const response=await fetch(API+"/api/options/auto-scan");
-  const data=await response.json();
+  try{
+    const response=await fetch(API+"/api/options/auto-scan",{
+      cache:"no-store"
+    });
 
-  if(!response.ok){
-   throw new Error(data.error||"Backend error");
-  }
+    const text=await response.text();
+    let data;
 
-  status.textContent="✅ Backend Connected | Scan time: "+
-   (data.scanned_at||"Not available");
+    try{
+      data=JSON.parse(text);
+    }catch(e){
+      throw new Error("Invalid JSON from backend");
+    }
 
-  summary.innerHTML=
-   '<div class="card"><small>Total Alerts</small>'+
-   '<div class="metric">'+(data.total_alerts??(data.alerts||[]).length)+'</div></div>';
+    if(!response.ok){
+      throw new Error(data.error||"HTTP "+response.status);
+    }
 
-  if(Array.isArray(data.results)){
-   data.results.forEach(item=>{
-    const card=document.createElement("div");
-    card.className="card";
+    if(data.success===false){
+      throw new Error(data.error||"Scan failed");
+    }
 
-    const title=document.createElement("h3");
-    title.textContent="📊 "+(item.underlying||"Market");
+    const markets=Array.isArray(data.results)?data.results:[];
+    const signals=[];
 
-    const details=document.createElement("p");
-    details.textContent=
-     "Options Scanned: "+(item.scanned??"N/A")+
-     " | Alerts: "+(item.alert_count??0);
+    markets.forEach(m=>{
+      (Array.isArray(m.signals)?m.signals:[]).forEach(s=>{
+        signals.push({
+          ...s,
+          market:m.index||m.underlying||"Market",
+          market_expiry:m.expiry||s.expiry||"N/A"
+        });
+      });
+    });
 
-    const expiry=document.createElement("small");
-    expiry.textContent="Expiry: "+(item.expiry||"N/A");
+    // Support APIs that return alerts directly.
+    if(Array.isArray(data.alerts)){
+      data.alerts.forEach(a=>signals.push(a));
+    }
 
-    card.append(title,details,expiry);
-    summary.appendChild(card);
-   });
-  }
+    const actionable=signals.filter(s=>{
+      const name=String(s.signal||s.type||"").toUpperCase();
+      return name.includes("BULLISH")||
+             name.includes("BEARISH")||
+             name.includes("CALL BUY")||
+             name.includes("PUT BUY");
+    });
 
-  const alerts=Array.isArray(data.alerts)?data.alerts:[];
+    const totalScanned=markets.reduce((sum,m)=>{
+      return sum+(Number(m.contracts_checked)||0);
+    },0);
 
-  const heading=document.createElement("h2");
-  heading.textContent="🚨 Trading Alerts";
-  results.appendChild(heading);
+    status.textContent=
+      "✅ Backend Connected | Scan time: "+
+      formatTime(data.timestamp||data.scanned_at||data.scan_time);
 
-  if(alerts.length===0){
-   const message=document.createElement("div");
-   message.className="card";
-   message.textContent=
-    "ಈಗ ಯಾವುದೇ alert ಬಂದಿಲ್ಲ. Market conditions match ಆದಾಗ ಮಾತ್ರ alert ಕಾಣಿಸುತ್ತದೆ. Market ಮುಚ್ಚಿದ್ದರೆ live signals ನಿರೀಕ್ಷಿಸಬೇಡಿ.";
-   results.appendChild(message);
-  }else{
-   alerts.forEach(alert=>{
-    const card=document.createElement("div");
-    card.className="card";
+    const totalCard=card("Total Alerts");
+    const totalMetric=document.createElement("div");
+    totalMetric.className="metric";
+    totalMetric.textContent=actionable.length;
+    totalCard.appendChild(totalMetric);
+    summary.appendChild(totalCard);
+
+    const scannedCard=card("Options Scanned");
+    const scannedMetric=document.createElement("div");
+    scannedMetric.className="metric";
+    scannedMetric.textContent=totalScanned;
+    scannedCard.appendChild(scannedMetric);
+    summary.appendChild(scannedCard);
+
+    markets.forEach(m=>{
+      const marketCard=card("📊 "+(m.index||m.underlying||"Market"));
+      row(marketCard,"Options Scanned",m.contracts_checked);
+
+      const marketSignals=Array.isArray(m.signals)?m.signals:[];
+      row(marketCard,"Signals",marketSignals.length);
+      row(marketCard,"Expiry",m.expiry||"N/A");
+
+      summary.appendChild(marketCard);
+    });
+
+    const heading=document.createElement("h2");
+    heading.textContent="🚨 Trading Alerts";
+    results.appendChild(heading);
+
+    if(actionable.length===0){
+      const msg=card("No BUY Alerts","card wait");
+      msg.appendChild(document.createTextNode(
+        "ಈಗ ಯಾವುದೇ BULLISH ಅಥವಾ BEARISH alert ಇಲ್ಲ. "+
+        "Market conditions ಹೊಂದಿದಾಗ ಮಾತ್ರ signal ಕಾಣಿಸುತ್ತದೆ."
+      ));
+      results.appendChild(msg);
+    }
+
+    actionable.forEach(s=>{
+      const name=String(s.signal||s.type||"SIGNAL").toUpperCase();
+
+      const bullish=name.includes("BULLISH")||name.includes("CALL BUY");
+      const bearish=name.includes("BEARISH")||name.includes("PUT BUY");
+
+      const c=card(
+        (bullish?"🟢 ":bearish?"🔴 ":"🟡 ")+
+        (s.symbol||s.market||"Option"),
+        bullish?"card bull":bearish?"card bear":"card wait"
+      );
+
+      const tag=document.createElement("div");
+      tag.className="tag";
+      tag.textContent=name;
+      c.appendChild(tag);
+
+      row(c,"Market",s.market);
+      row(c,"Option Symbol",s.symbol);
+      row(c,"Strike Price",s.strike_price);
+      row(c,"Option Type",s.option_type);
+      row(c,"Expiry",s.expiry||s.market_expiry);
+      row(c,"Option Price",s.price);
+      row(c,"Previous Price",s.previous_price);
+      row(c,"Volume",s.volume);
+      row(c,"Previous Volume",s.previous_volume);
+      row(c,"Open Interest",s.oi);
+      row(c,"Previous OI",s.previous_oi);
+      row(c,"Price Up",s.price_up);
+      row(c,"Volume Up",s.volume_up);
+      row(c,"OI Up",s.oi_up);
+
+      const time=document.createElement("small");
+      time.textContent="Signal Time: "+formatTime(s.signal_time);
+      c.appendChild(time);
+
+      results.appendChild(c);
+    });
+
+    const details=document.createElement("details");
+    details.className="card";
+
+    const summaryText=document.createElement("summary");
+    summaryText.textContent="API Diagnostic Details";
+    details.appendChild(summaryText);
 
     const pre=document.createElement("pre");
-    pre.textContent=JSON.stringify(alert,null,2);
+    pre.textContent=JSON.stringify({
+      success:data.success,
+      timestamp:data.timestamp,
+      markets:markets.length,
+      contracts_checked:totalScanned,
+      signals:signals.length,
+      alerts:actionable.length
+    },null,2);
 
-    card.appendChild(pre);
-    results.appendChild(card);
-   });
+    details.appendChild(pre);
+    results.appendChild(details);
+
+  }catch(err){
+    status.className="card error";
+    status.textContent="❌ Error: "+err.message;
+
+    const msg=card("Connection Problem");
+    msg.appendChild(document.createTextNode(
+      "Backend URL, API response ಅಥವಾ internet connection ಪರಿಶೀಲಿಸಿ."
+    ));
+    results.appendChild(msg);
+
+  }finally{
+    btn.disabled=false;
   }
-
- }catch(error){
-  status.innerHTML="";
-  status.className="card error";
-  status.textContent="❌ Connection error: "+error.message+
-   ". ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ Refresh Scanner ಒತ್ತಿ.";
- }
 }
+
 loadData();
 </script>
 
