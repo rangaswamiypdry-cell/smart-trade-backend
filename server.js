@@ -379,7 +379,7 @@ function extractPrice(quote) {
   );
 }
 
- function extractVolume(quote) {
+function extractVolume(quote) {
   const volume = Number(
     quote?.volume ??
     quote?.volume_traded ??
@@ -389,6 +389,8 @@ function extractPrice(quote) {
     0
   );
 
+  return Number.isFinite(volume) && volume > 0 ? volume : 0;
+} 
   return Number.isFinite(volume) && volume > 0 ? volume : 0;
  } 
 }
