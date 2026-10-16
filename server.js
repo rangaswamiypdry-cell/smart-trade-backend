@@ -1,4 +1,4 @@
- const http = require("http");
+up const http = require("http");
 const { URL } = require("url");
 
 const PORT = process.env.PORT || 10000;
@@ -1046,7 +1046,25 @@ const server = http.createServer(async (req, res) => {
         data: response.data || {}
       });
     }
+// LONG BUILD-UP STOCKS API
+if (
+  url.pathname === "/api/stocks/long-build-up" &&
+  req.method === "GET"
+) {
+  const contractResponse = await getNseStockOptions();
+  const contracts = contractResponse.contracts || [];
 
+  const result = await scanStockOptions(contracts);
+
+  return sendJson(res, 200, {
+    success: true,
+    scanner: "LONG_BUILD_UP_STOCKS",
+    total_checked: result.checked,
+    long_build_up_stocks: result.signals || [],
+    all_results: result.all_results || [],
+    timestamp: new Date().toISOString()
+  });
+  }
     // NOT FOUND
     return sendJson(res, 404, {
       success: false,
