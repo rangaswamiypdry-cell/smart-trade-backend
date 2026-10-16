@@ -396,7 +396,7 @@ function extractOI(quote) {
     quote?.open_interest ??
     0
   );
-
+}
 function extractCandles(response) {
   return response?.data?.candles || [];
 }
