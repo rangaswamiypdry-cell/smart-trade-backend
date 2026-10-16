@@ -932,17 +932,7 @@ async function scanStockOptions(contracts) {
     all_results: results,
     timestamp: new Date().toISOString()
   };
-        }
-  return {
-    success: true,
-    timestamp: new Date().toISOString(),
-    checked: results.length,
-    signals: results.filter(
-      s => s.signal === "BULLISH"
-    ),
-    all_results: results
-  };
-}
+        
 // ==================================================
 // HTTP SERVER AND API ROUTES
 // ==================================================
