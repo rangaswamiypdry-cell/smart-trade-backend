@@ -855,40 +855,84 @@ async function getNseStockOptions() {
 // STOCK OPTION SCANNER
 // ==================================================
 
+// STOCK OPTION SCANNER
 async function scanStockOptions(contracts) {
   const results = [];
 
-  for (const contract of contracts.slice(0, 20)) {
+  for (const contract of contracts.slice(0, 100)) {
+    const key = contract.instrument_key;
+
     try {
-      const quoteResponse =
-        await getMarketQuote(contract.instrument_key);
+      const quoteResponse = await getMarketQuote(key);
 
       const quote = extractQuote(
         quoteResponse,
-        contract.instrument_key
+        key
       );
 
-      if (!quote) continue;
+      if (!quote) {
+        results.push({
+          symbol: contract.trading_symbol || key,
+          error: "Quote data unavailable"
+        });
+        continue;
+      }
 
-      const key = contract.instrument_key;
       const previous = stockOptionSnapshots.get(key);
 
-      const signal = createOptionSignal(
+      // Create option signal
+      const optionSignal = createOptionSignal(
         contract,
         quote,
         previous
       );
 
-      results.push(signal);
+      // Long build-up detection
+      const longBuildUp = detectLongBuildUp(
+        quote,
+        previous
+      );
+
+      results.push({
+        ...optionSignal,
+
+        symbol: contract.trading_symbol || key,
+
+        instrument_key: key,
+
+        long_build_up: longBuildUp.long_build_up,
+
+        long_build_up_signal: longBuildUp.signal,
+
+        long_build_up_details: longBuildUp,
+
+        signal_time: new Date().toISOString()
+      });
+
       saveStockOptionSnapshot(key, quote);
+
     } catch (error) {
       results.push({
-        symbol: contract.trading_symbol,
+        symbol: contract.trading_symbol || key,
         error: error.message
       });
     }
   }
 
+  const longBuildUpStocks = results.filter(
+    item => item.long_build_up === true
+  );
+
+  return {
+    success: true,
+    scanner: "LONG_BUILD_UP_STOCKS",
+    checked: results.length,
+    long_build_up_stocks: longBuildUpStocks,
+    signals: longBuildUpStocks,
+    all_results: results,
+    timestamp: new Date().toISOString()
+  };
+        }
   return {
     success: true,
     timestamp: new Date().toISOString(),
