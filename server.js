@@ -505,6 +505,10 @@ const DEFAULT_INDEXES = [
   {
     name: "FINNIFTY",
     instrument_key: "NSE_INDEX|Nifty Fin Service"
+  },
+  {
+    name: "SENSEX",
+    instrument_key: "BSE_INDEX|SENSEX"
   }
 ];
 
