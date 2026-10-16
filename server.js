@@ -436,7 +436,19 @@ function normaliseOptionContract(contract) {
 // SMART MONEY OPTION BUY SIGNAL
 // ==================================================
 
-function createOptionSignal(contract, quote, previous) {
+function createOptionSignal(contract, quote, previous) {// LONG BUILD-UP DETECTION
+const longBuildUp = detectLongBuildUp(
+  quote,
+  previous
+);
+
+signal.long_build_up = longBuildUp.long_build_up;
+signal.long_build_up_signal = longBuildUp.signal;
+signal.long_build_up_details = longBuildUp;
+
+if (longBuildUp.long_build_up) {
+  signal.signal = "LONG_BUILD_UP";
+}
   const price = extractPrice(quote);
   const volume = extractVolume(quote);
   const oi = extractOI(quote);
