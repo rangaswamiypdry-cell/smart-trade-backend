@@ -528,12 +528,8 @@ function getRequestedIndexes(url) {
   );
 }
 // ==================================================
-// INDEX OPTIONS AUTO SCANNER
-// ==================================================
-// ============================================
 // SMART MONEY + STRONG MOMENTUM BUY FILTER
-// Same conditions for CE and PE
-// ============================================
+// ==================================================
 
 function detectSmartMoneyBuy(data) {
   if (!data || typeof data !== "object") {
@@ -549,7 +545,55 @@ function detectSmartMoneyBuy(data) {
   const volume = Number(data.volume);
   const averageVolume20 = Number(data.averageVolume20);
   const oi = Number(data.oi);
- 
+  const previousOI = Number(data.previousOI);
+  const rsi = Number(data.rsi14);
+  const close = Number(data.close);
+  const open = Number(data.open);
+  const vwap = Number(data.vwap);
+  const resistance = Number(data.resistance);
+  const cmf = Number(data.cmf20);
+
+  const values = [
+    price, previousPrice, volume, averageVolume20,
+    oi, previousOI, rsi, close, open, vwap,
+    resistance, cmf
+  ];
+
+  if (!values.every(Number.isFinite)) {
+    return {
+      buy: false,
+      signal: "WAIT",
+      reason: "Indicator data missing"
+    };
+  }
+
+  const conditions = {
+    priceRising: price > previousPrice,
+    bullishCandle: close > open,
+    volumeSpike:
+      averageVolume20 > 0 &&
+      volume >= averageVolume20 * 1.5,
+    oiIncreasing: oi > previousOI,
+    rsiStrong: rsi > 55,
+    aboveVWAP: close > vwap,
+    resistanceBreakout: close > resistance,
+    positiveMoneyFlow: cmf > 0
+  };
+
+  const buy = Object.values(conditions).every(Boolean);
+
+  return {
+    buy,
+    signal: buy ? "SMART_MONEY_BUY" : "WAIT",
+    conditions,
+    price,
+    rsi
+  };
+}
+
+// ==================================================
+// INDEX OPTIONS AUTO SCANNER
+// ==================================================
 async function scanIndexOptions(url) {
   const indexes = getRequestedIndexes(url);
   const results = [];
