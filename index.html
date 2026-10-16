@@ -229,7 +229,21 @@ async function loadData(){
       row(c,"Strike Price",s.strike_price);
       row(c,"Option Type",s.option_type);
       row(c,"Expiry",s.expiry||s.market_expiry);
-      row(c,"Option Price",s.price);
+      row(c,"Option Price",s.price);// Entry Price, Stop Loss and Target
+const entryPrice = Number(s.price);
+
+if (Number.isFinite(entryPrice) && entryPrice > 0) {
+  const stopLoss = entryPrice * 0.90;
+  const target = entryPrice * 1.20;
+
+  row(c, "Entry Price", entryPrice.toFixed(2));
+  row(c, "Stop Loss (10%)", stopLoss.toFixed(2));
+  row(c, "Target (20%)", target.toFixed(2));
+} else {
+  row(c, "Entry Price", "Unavailable");
+  row(c, "Stop Loss", "Unavailable");
+  row(c, "Target", "Unavailable");
+}
       row(c,"Previous Price",s.previous_price);
       row(c,"Volume",s.volume);
       row(c,"Previous Volume",s.previous_volume);
