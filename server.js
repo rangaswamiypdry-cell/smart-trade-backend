@@ -436,19 +436,7 @@ function normaliseOptionContract(contract) {
 // SMART MONEY OPTION BUY SIGNAL
 // ==================================================
 
-function createOptionSignal(contract, quote, previous) {// LONG BUILD-UP DETECTION
-const longBuildUp = detectLongBuildUp(
-  quote,
-  previous
-);
-
-signal.long_build_up = longBuildUp.long_build_up;
-signal.long_build_up_signal = longBuildUp.signal;
-signal.long_build_up_details = longBuildUp;
-
-if (longBuildUp.long_build_up) {
-  signal.signal = "LONG_BUILD_UP";
-}
+function createOptionSignal(contract, quote, previous) {
   const price = extractPrice(quote);
   const volume = extractVolume(quote);
   const oi = extractOI(quote);
@@ -458,13 +446,16 @@ if (longBuildUp.long_build_up) {
   const previousOI = previous?.oi ?? null;
 
   const priceUp =
-    previousPrice !== null && price > previousPrice;
+    previousPrice !== null &&
+    price > previousPrice;
 
   const volumeUp =
-    previousVolume !== null && volume > previousVolume;
+    previousVolume !== null &&
+    volume > previousVolume;
 
   const oiUp =
-    previousOI !== null && oi > previousOI;
+    previousOI !== null &&
+    oi > previousOI;
 
   const validData =
     price > 0 &&
@@ -472,7 +463,11 @@ if (longBuildUp.long_build_up) {
     previousVolume !== null &&
     previousOI !== null;
 
-  const buy = validData && priceUp && volumeUp && oiUp;
+  const longBuildUp =
+    validData &&
+    priceUp &&
+    volumeUp &&
+    oiUp;
 
   return {
     symbol: contract.trading_symbol,
@@ -480,20 +475,34 @@ if (longBuildUp.long_build_up) {
     expiry: contract.expiry,
     strike_price: contract.strike_price,
     option_type: contract.instrument_type,
-    price,
-    volume,
-    oi,
+
+    price: price,
+    volume: volume,
+    oi: oi,
+
     previous_price: previousPrice,
     previous_volume: previousVolume,
     previous_oi: previousOI,
+
     price_up: priceUp,
     volume_up: volumeUp,
     oi_up: oiUp,
-    smart_money_buy: buy,
-    signal: buy ? "BULLISH" : "WAIT",
+
+    long_build_up: longBuildUp,
+
+    long_build_up_signal: longBuildUp
+      ? "LONG_BUILD_UP"
+      : "WAIT",
+
+    smart_money_buy: longBuildUp,
+
+    signal: longBuildUp
+      ? "BULLISH"
+      : "WAIT",
+
     signal_time: new Date().toISOString()
   };
-   }
+      }
 
 function saveOptionSnapshot(key, quote) {
   optionSnapshots.set(key, {
