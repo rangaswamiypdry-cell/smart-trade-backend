@@ -817,47 +817,70 @@ signals.push(signal);
 // ==================================================
 // NSE STOCK OPTIONS CONTRACT LIST
 // ==================================================
-
 async function getNseStockOptions() {
-  const indexes = [
-    "NSE_INDEX|Nifty 50",
-    "NSE_INDEX|Nifty Bank"
-  ];
+  const instrumentsUrl =
+    "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
 
-  const allContracts = [];
-  const errors = [];
+  try {
+    const response = await fetch(instrumentsUrl);
 
-  for (const instrumentKey of indexes) {
-    try {
-      const response = await getOptionContracts(instrumentKey);
-      const contracts = response?.data || [];
-
-      allContracts.push(...contracts);
-    } catch (error) {
-      errors.push({
-        instrument_key: instrumentKey,
-        error: error.message
-      });
+    if (!response.ok) {
+      throw new Error(
+        `Instrument file download failed: HTTP ${response.status}`
+      );
     }
-  }
 
-  const unique = new Map();
+    const compressedData = await response.arrayBuffer();
+    const zlib = require("zlib");
 
-  for (const contract of allContracts) {
-    if (!contract.instrument_key) continue;
+    const jsonText = zlib.gunzipSync(
+      Buffer.from(compressedData)
+    ).toString("utf8");
 
-    unique.set(
-      contract.instrument_key,
-      normaliseOptionContract(contract)
+    const instruments = JSON.parse(jsonText);
+
+    const stockFutures = instruments.filter(item =>
+      item.segment === "NSE_FO" &&
+      item.instrument_type === "FUT" &&
+      item.underlying_type === "EQUITY" &&
+      item.underlying_key &&
+      item.instrument_key
     );
-  }
 
-  return {
-    success: errors.length === 0,
-    count: unique.size,
-    contracts: Array.from(unique.values()),
-    errors
-  };
+    const latestExpiry = new Map();
+
+    for (const contract of stockFutures) {
+      const symbol = contract.underlying_symbol;
+      if (!symbol || !contract.expiry) continue;
+
+      const existing = latestExpiry.get(symbol);
+
+      if (
+        !existing ||
+        Number(contract.expiry) < Number(existing.expiry)
+      ) {
+        latestExpiry.set(symbol, contract);
+      }
+    }
+
+    const contracts = Array.from(latestExpiry.values());
+
+    return {
+      success: true,
+      scanner: "NSE_STOCK_FUTURES",
+      count: contracts.length,
+      contracts,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    return {
+      success: false,
+      scanner: "NSE_STOCK_FUTURES",
+      count: 0,
+      contracts: [],
+      error: error.message
+    };
+  }
 }
 
 // ==================================================
