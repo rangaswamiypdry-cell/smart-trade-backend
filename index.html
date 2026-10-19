@@ -61,7 +61,17 @@ Connecting to backend...
 
 <div id="summary"></div>
 <div id="results"></div>
+<h2>📈 NSE Stock Futures Scanner</h2>
 
+<button onclick="loadStocks()">
+  🔍 Scan Long Build-Up Stocks
+</button>
+
+<div id="stockStatus" class="card">
+  Stock scanner ready
+</div>
+
+<div id="stockResults"></div>
 <script>
 const API="https://smart-trade-backend-ig6l.onrender.com";
 const STOCK_API = API + "/api/stocks/long-build-up";
