@@ -240,20 +240,20 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
     vwap !== null &&
     close < vwap;
 
-  const callConfirmation =
-    rsi14 !== null &&
-    rsi14 >= 65 &&
-    volumePass &&
-    bullishTrend &&
-    bullishBreakout;
+ const callConfirmation =
+  rsi14 !== null &&
+  rsi14 > 65 &&
+  volumePass &&
+  bullishTrend &&
+  bullishBreakout;
 
-  const putConfirmation =
-    rsi14 !== null &&
-    rsi14 <= 35 &&
-    volumePass &&
-    bearishTrend &&
-    bearishBreakdown;
-
+const putConfirmation =
+  rsi14 !== null &&
+  rsi14 < 35 &&
+  volumePass &&
+  bearishTrend &&
+  bearishBreakdown; 
+  
   return {
     ready: rsi14 !== null && averageVolume > 0,
     close,
