@@ -296,6 +296,78 @@ if (Number.isFinite(entryPrice) && entryPrice > 0) {
 }
 
 loadData();
+  async function loadStocks() {
+  const status = document.getElementById("stockStatus");
+  const results = document.getElementById("stockResults");
+
+  status.textContent = "Scanning NSE Stock Futures...";
+  results.replaceChildren();
+
+  try {
+    const response = await fetch(STOCK_API, {
+      cache: "no-store"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      throw new Error(data.error || "Stock scan failed");
+    }
+
+    const all = Array.isArray(data.all_results)
+      ? data.all_results
+      : [];
+
+    const signals = Array.isArray(data.long_build_up_stocks)
+      ? data.long_build_up_stocks
+      : [];
+
+    status.textContent =
+      "✅ Connected | Checked: " +
+      (data.checked ?? all.length) +
+      " | Long Build-Up: " + signals.length;
+
+    if (signals.length === 0) {
+      const msg = card("No Confirmed Long Build-Up", "card wait");
+      msg.textContent =
+        "Price, Volume ಮತ್ತು Futures OI ಏರಿಕೆ ಇನ್ನೂ confirm ಆಗಿಲ್ಲ.";
+      results.appendChild(msg);
+    }
+
+    signals.forEach(s => {
+      const c = card(
+        "🟢 " + (s.symbol || "Stock"),
+        "card bull"
+      );
+
+      row(c, "Signal", "LONG BUILD-UP");
+      row(c, "Price", s.price);
+      row(c, "Volume", s.volume);
+      row(c, "Futures OI", s.oi);
+      row(c, "RSI", s.rsi14);
+      row(c, "VWAP", s.vwap);
+
+      results.appendChild(c);
+    });
+
+    all.forEach(s => {
+      const c = card(
+        s.symbol || "Stock",
+        s.long_build_up ? "card bull" : "card wait"
+      );
+
+      row(c, "Price", s.price);
+      row(c, "Volume", s.volume);
+      row(c, "OI", s.oi);
+      row(c, "Signal", s.long_build_up_signal || "WAIT");
+
+      results.appendChild(c);
+    });
+
+  } catch (error) {
+    status.textContent = "❌ Error: " + error.message;
+  }
+  }
 </script>
 
 </body>
