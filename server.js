@@ -1187,19 +1187,50 @@ if (
   req.method === "GET"
 ) {
   const contractResponse = await getNseStockOptions();
-  const contracts = contractResponse.contracts || [];
+
+  if (!contractResponse) {
+    return sendJson(res, 502, {
+      success: false,
+      scanner: "LONG_BUILD_UP_STOCKS",
+      error: "NSE stock contracts response is empty",
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  const contracts = Array.isArray(contractResponse.contracts)
+    ? contractResponse.contracts
+    : [];
+
+  if (contracts.length === 0) {
+    return sendJson(res, 200, {
+      success: true,
+      scanner: "LONG_BUILD_UP_STOCKS",
+      checked: 0,
+      long_build_up_count: 0,
+      long_build_up_stocks: [],
+      signals: [],
+      all_results: [],
+      message: "No stock option contracts available",
+      timestamp: new Date().toISOString()
+    });
+  }
 
   const result = await scanStockOptions(contracts);
 
   return sendJson(res, 200, {
-    success: true,
+    success: result.success === true,
     scanner: "LONG_BUILD_UP_STOCKS",
-    total_checked: result.checked,
-    long_build_up_stocks: result.signals || [],
+    checked: result.checked || 0,
+    long_build_up_count: result.long_build_up_count ??
+      (Array.isArray(result.long_build_up_stocks)
+        ? result.long_build_up_stocks.length
+        : 0),
+    long_build_up_stocks: result.long_build_up_stocks || [],
+    signals: result.signals || [],
     all_results: result.all_results || [],
     timestamp: new Date().toISOString()
   });
-  }
+}
     // NOT FOUND
     return sendJson(res, 404, {
       success: false,
