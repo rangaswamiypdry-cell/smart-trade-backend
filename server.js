@@ -514,10 +514,18 @@ function saveOptionSnapshot(key, quote) {
 }
 
 function saveStockOptionSnapshot(key, quote) {
+  const price = extractPrice(quote);
+  const volume = extractVolume(quote);
+  const oi = extractOI(quote);
+
+  if (!key || price <= 0) {
+    return;
+  }
+
   stockOptionSnapshots.set(key, {
-    price: extractPrice(quote),
-    volume: extractVolume(quote),
-    oi: extractOI(quote),
+    price,
+    volume,
+    oi,
     time: Date.now()
   });
 }
