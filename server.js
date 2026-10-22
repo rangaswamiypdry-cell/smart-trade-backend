@@ -899,8 +899,32 @@ async function getNseStockOptions() {
 async function scanStockOptions(contracts) {
   const results = [];
 
- for (const contract of contracts) { 
+  if (!Array.isArray(contracts) || contracts.length === 0) {
+    return {
+      success: false,
+      scanner: "LONG_BUILD_UP_STOCKS",
+      checked: 0,
+      long_build_up_count: 0,
+      long_build_up_stocks: [],
+      signals: [],
+      all_results: [],
+      message: "No contracts available",
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  for (const contract of contracts) {
     const key = contract.instrument_key;
+
+    if (!key) {
+      results.push({
+        symbol: contract.trading_symbol || "UNKNOWN",
+        long_build_up: false,
+        long_build_up_signal: "WAIT",
+        error: "Missing instrument key"
+      });
+      continue;
+    }
 
     try {
       const quoteResponse = await getMarketQuote(key);
@@ -913,47 +937,83 @@ async function scanStockOptions(contracts) {
       if (!quote) {
         results.push({
           symbol: contract.trading_symbol || key,
+          instrument_key: key,
+          long_build_up: false,
+          long_build_up_signal: "WAIT",
           error: "Quote data unavailable"
         });
         continue;
       }
 
+      // Get previous market snapshot
       const previous = stockOptionSnapshots.get(key);
 
-      // Create option signal
+      // First scan saves baseline
+      if (!previous) {
+        saveStockOptionSnapshot(key, quote);
+
+        results.push({
+          symbol: contract.trading_symbol || key,
+          instrument_key: key,
+          price: extractPrice(quote),
+          volume: extractVolume(quote),
+          oi: extractOI(quote),
+          long_build_up: false,
+          long_build_up_signal: "WAIT",
+          reason: "Initial snapshot saved"
+        });
+
+        continue;
+      }
+
+      const price = extractPrice(quote);
+      const volume = extractVolume(quote);
+      const oi = extractOI(quote);
+
+      const validData =
+        Number.isFinite(price) && price > 0 &&
+        Number.isFinite(volume) && volume > 0 &&
+        Number.isFinite(oi) && oi > 0;
+
+      const longBuildUp = detectLongBuildUp(
+        quote,
+        previous
+      );
+
       const optionSignal = createOptionSignal(
         contract,
         quote,
         previous
       );
 
-      // Long build-up detection
-      const longBuildUp = detectLongBuildUp(
-        quote,
-        previous
-      );
+      const confirmed =
+        validData &&
+        longBuildUp.long_build_up === true;
 
       results.push({
         ...optionSignal,
-
         symbol: contract.trading_symbol || key,
-
         instrument_key: key,
-
-        long_build_up: longBuildUp.long_build_up,
-
-        long_build_up_signal: longBuildUp.signal,
-
+        price,
+        volume,
+        oi,
+        long_build_up: confirmed,
+        long_build_up_signal: confirmed
+          ? "LONG_BUILD_UP"
+          : "WAIT",
         long_build_up_details: longBuildUp,
-
         signal_time: new Date().toISOString()
       });
 
+      // Update snapshot after comparison
       saveStockOptionSnapshot(key, quote);
 
     } catch (error) {
       results.push({
         symbol: contract.trading_symbol || key,
+        instrument_key: key,
+        long_build_up: false,
+        long_build_up_signal: "WAIT",
         error: error.message
       });
     }
@@ -967,12 +1027,13 @@ async function scanStockOptions(contracts) {
     success: true,
     scanner: "LONG_BUILD_UP_STOCKS",
     checked: results.length,
+    long_build_up_count: longBuildUpStocks.length,
     long_build_up_stocks: longBuildUpStocks,
     signals: longBuildUpStocks,
     all_results: results,
     timestamp: new Date().toISOString()
   };
-}
+    }
 // ==================================================
 // HTTP SERVER AND API ROUTES
 // ==================================================
