@@ -899,7 +899,7 @@ async function getNseStockOptions() {
 async function scanStockOptions(contracts) {
   const results = [];
 
-  for (const contract of contracts.slice(0, 100)) {
+ for (const contract of contracts) { 
     const key = contract.instrument_key;
 
     try {
