@@ -1,12 +1,15 @@
 'use strict';
+
 const http = require('http');
 const { URL } = require('url');
 const zlib = require('zlib');
 
-const PORT = Number(process.env.PORT || 10000);
+const PORT = process.env.PORT || 10000;
 const UPSTOX_BASE = 'https://api.upstox.com';
-const snapshots = new Map();
+
+const optionSnapshots = new Map();
 const stockSnapshots = new Map();
+const lastSignals = new Map();
 
 const INDEXES = [
   { name: 'NIFTY', key: 'NSE_INDEX|Nifty 50' },
@@ -16,456 +19,566 @@ const INDEXES = [
   { name: 'MIDCPNIFTY', key: 'NSE_INDEX|Nifty Midcap 50' }
 ];
 
-function cors() {
+function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS'
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   };
 }
 
-function send(res, status, body) {
+function sendJson(res, status, data) {
   if (res.writableEnded) return;
+
   res.writeHead(status, {
-    ...cors(),
+    ...corsHeaders(),
     'Content-Type': 'application/json; charset=utf-8'
   });
-  res.end(JSON.stringify(body));
+
+  res.end(JSON.stringify(data));
 }
 
-async function upstox(url) {
+async function upstoxRequest(apiUrl) {
   const token = process.env.UPSTOX_ACCESS_TOKEN;
 
   if (!token) {
     throw new Error('UPSTOX_ACCESS_TOKEN_MISSING');
   }
 
-  const r = await fetch(url, {
+  const response = await fetch(apiUrl, {
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${token}`
     }
   });
 
-  const txt = await r.text();
+  const text = await response.text();
+
   let data;
 
   try {
-    data = txt ? JSON.parse(txt) : {};
+    data = text ? JSON.parse(text) : {};
   } catch {
     throw new Error(
-      `Upstox returned non-JSON (HTTP ${r.status})`
+      `Upstox non-JSON response HTTP ${response.status}`
     );
   }
 
-  if (!r.ok) {
+  if (!response.ok) {
     throw new Error(
       data?.errors?.[0]?.message ||
       data?.message ||
-      `Upstox HTTP ${r.status}`
+      `Upstox HTTP ${response.status}`
     );
   }
 
   return data;
 }
 
-function num(v, fallback = 0) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
+function number(value, fallback = 0) {
+  const result = Number(value);
+
+  return Number.isFinite(result)
+    ? result
+    : fallback;
 }
 
-function price(q) {
-  return num(
-    q?.last_price ??
-    q?.ltp ??
-    q?.last_traded_price
+function extractPrice(quote) {
+  return number(
+    quote?.last_price ??
+    quote?.ltp ??
+    quote?.last_traded_price
   );
 }
 
-function volume(q) {
-  return num(
-    q?.volume ??
-    q?.volume_traded ??
-    q?.volumeTraded ??
-    q?.total_traded_quantity ??
-    q?.total_volume
+function extractVolume(quote) {
+  return number(
+    quote?.volume ??
+    quote?.volume_traded ??
+    quote?.volumeTraded ??
+    quote?.total_traded_quantity ??
+    quote?.total_volume
   );
 }
 
-function oi(q) {
-  return num(q?.oi ?? q?.open_interest);
+function extractOI(quote) {
+  return number(
+    quote?.oi ??
+    quote?.open_interest
+  );
 }
 
-function quoteFrom(d, key) {
-  const obj = d?.data || {};
-  return obj[key] || obj[Object.keys(obj)[0]] || null;
+function extractQuote(response, instrumentKey) {
+  const data = response?.data || {};
+
+  return data[instrumentKey] ||
+    data[Object.keys(data)[0]] ||
+    null;
 }
 
-function candlesFrom(d) {
-  return d?.data?.candles || [];
+function extractCandles(response) {
+  return response?.data?.candles || [];
 }
 
-function rsi(closes, p = 14) {
-  if (closes.length < p + 1) return null;
-
-  let gain = 0;
-  let loss = 0;
-
-  for (let i = 1; i <= p; i++) {
-    const x = closes[i] - closes[i - 1];
-    gain += Math.max(x, 0);
-    loss += Math.max(-x, 0);
+function calculateRSI(closes, period = 14) {
+  if (!Array.isArray(closes) ||
+      closes.length < period + 1) {
+    return null;
   }
 
-  let ag = gain / p;
-  let al = loss / p;
+  let gains = 0;
+  let losses = 0;
 
-  for (let i = p + 1; i < closes.length; i++) {
-    const x = closes[i] - closes[i - 1];
+  for (let i = 1; i <= period; i++) {
+    const change = closes[i] - closes[i - 1];
 
-    ag = (ag * (p - 1) + Math.max(x, 0)) / p;
-    al = (al * (p - 1) + Math.max(-x, 0)) / p;
+    gains += Math.max(change, 0);
+    losses += Math.max(-change, 0);
   }
 
-  return al === 0
-    ? (ag === 0 ? 50 : 100)
-    : Number((100 - 100 / (1 + ag / al)).toFixed(2));
+  let averageGain = gains / period;
+  let averageLoss = losses / period;
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const change = closes[i] - closes[i - 1];
+
+    averageGain =
+      (averageGain * (period - 1) +
+       Math.max(change, 0)) / period;
+
+    averageLoss =
+      (averageLoss * (period - 1) +
+       Math.max(-change, 0)) / period;
+  }
+
+  if (averageLoss === 0) {
+    return averageGain === 0 ? 50 : 100;
+  }
+
+  return Number(
+    (100 - 100 / (1 + averageGain / averageLoss))
+      .toFixed(2)
+  );
 }
 
-function analyse(candles) {
+function getCompletedCandles(candles) {
   const now = Date.now();
+  const interval = 5 * 60 * 1000;
 
-  const rows = (
-    Array.isArray(candles) ? candles : []
-  )
+  return (Array.isArray(candles) ? candles : [])
     .filter(c =>
       Array.isArray(c) &&
       Number.isFinite(new Date(c[0]).getTime()) &&
-      new Date(c[0]).getTime() + 300000 <= now &&
       [1, 2, 3, 4, 5].every(
         i => Number.isFinite(Number(c[i]))
-      )
+      ) &&
+      new Date(c[0]).getTime() + interval <= now
     )
     .sort(
-      (a, b) => new Date(a[0]) - new Date(b[0])
+      (a, b) =>
+        new Date(a[0]).getTime() -
+        new Date(b[0]).getTime()
     );
+}
+
+function calculateEMA(values, period) {
+  if (values.length < period) return null;
+
+  const multiplier = 2 / (period + 1);
+
+  let ema = values
+    .slice(0, period)
+    .reduce((sum, value) => sum + value, 0) / period;
+
+  for (let i = period; i < values.length; i++) {
+    ema = (values[i] - ema) * multiplier + ema;
+  }
+
+  return ema;
+}function analyseCandles(candles) {
+  const rows = getCompletedCandles(candles);
 
   if (rows.length < 21) {
     return {
       ready: false,
-      reason: 'NEED_21_COMPLETED_5M_CANDLES',
-      count: rows.length
+      direction: 'WAIT',
+      reason: 'NEED_21_COMPLETED_CANDLES',
+      completedCandles: rows.length
     };
   }
 
-  const close = rows.map(c => num(c[4]));
+  const closes = rows.map(c => Number(c[4]));
+  const volumes = rows.map(c => Number(c[5]));
+
   const latest = rows[rows.length - 1];
-  const vol = rows.map(c => num(c[5]));
+  const previous = rows[rows.length - 2];
 
-  const avgVol =
-    vol.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+  const open = Number(latest[1]);
+  const high = Number(latest[2]);
+  const low = Number(latest[3]);
+  const close = Number(latest[4]);
+  const currentVolume = Number(latest[5]);
 
-  let pv = 0;
-  let vv = 0;
+  const previousClose = Number(previous[4]);
 
-  for (const c of rows) {
-    const v = num(c[5]);
-    pv += (
-      (num(c[2]) + num(c[3]) + num(c[4])) / 3
-    ) * v;
-    vv += v;
+  const averageVolume =
+    volumes.slice(-21, -1)
+      .reduce((sum, value) => sum + value, 0) / 20;
+
+  const ema20 = calculateEMA(closes, 20);
+  const rsi14 = calculateRSI(closes, 14);
+
+  let totalPV = 0;
+  let totalVolume = 0;
+
+  // Intraday VWAP: reset at the date boundary.
+  const latestDate = new Date(latest[0]).toDateString();
+
+  const todayRows = rows.filter(
+    c => new Date(c[0]).toDateString() === latestDate
+  );
+
+  for (const c of todayRows) {
+    const v = Number(c[5]);
+
+    const typicalPrice =
+      (Number(c[2]) + Number(c[3]) + Number(c[4])) / 3;
+
+    totalPV += typicalPrice * v;
+    totalVolume += v;
   }
 
-  const vwap = vv ? pv / vv : null;
-  const rr = rsi(close);
+  const vwap = totalVolume > 0
+    ? totalPV / totalVolume
+    : null;
 
-  const highs = rows.slice(-21, -1).map(c => num(c[2]));
-  const lows = rows.slice(-21, -1).map(c => num(c[3]));
+  const previousRows = rows.slice(-21, -1);
 
-  const c = num(latest[4]);
-  const o = num(latest[1]);
+  const resistance = Math.max(
+    ...previousRows.map(c => Number(c[2]))
+  );
+
+  const support = Math.min(
+    ...previousRows.map(c => Number(c[3]))
+  );
+
+  const volumePass =
+    averageVolume > 0 &&
+    currentVolume >= averageVolume * 1.5;
+
+  const validIndicators =
+    vwap !== null &&
+    ema20 !== null &&
+    rsi14 !== null &&
+    currentVolume > 0 &&
+    averageVolume > 0;
+
+  if (!validIndicators) {
+    return {
+      ready: false,
+      direction: 'WAIT',
+      reason: 'VWAP_OR_VOLUME_DATA_UNAVAILABLE',
+      close,
+      rsi14,
+      vwap,
+      currentVolume,
+      averageVolume
+    };
+  }
 
   const bullish =
-    c > o &&
-    c > close[close.length - 2] &&
-    vwap !== null &&
-    c > vwap &&
-    c > Math.max(...highs) &&
-    rr !== null &&
-    rr >= 65 &&
-    avgVol > 0 &&
-    num(latest[5]) >= avgVol * 1.5;
+    close > open &&
+    close > previousClose &&
+    close > ema20 &&
+    close > vwap &&
+    close > resistance &&
+    rsi14 >= 65 &&
+    volumePass;
 
   const bearish =
-    c < o &&
-    c < close[close.length - 2] &&
-    vwap !== null &&
-    c < vwap &&
-    c < Math.min(...lows) &&
-    rr !== null &&
-    rr <= 35 &&
-    avgVol > 0 &&
-    num(latest[5]) >= avgVol * 1.5;
+    close < open &&
+    close < previousClose &&
+    close < ema20 &&
+    close < vwap &&
+    close < support &&
+    rsi14 <= 35 &&
+    volumePass;
+
+  const direction = bullish
+    ? 'CALL'
+    : bearish
+      ? 'PUT'
+      : 'WAIT';
 
   return {
     ready: true,
-    close: c,
-    open: o,
-    rsi14: rr,
-    vwap: Number(vwap?.toFixed(2)),
-    volume: num(latest[5]),
-    averageVolume20: Number(avgVol.toFixed(2)),
-    volumePass:
-      avgVol > 0 && num(latest[5]) >= avgVol * 1.5,
+    close,
+    open,
+    previousClose,
+    rsi14,
+    ema20: Number(ema20.toFixed(2)),
+    vwap: Number(vwap.toFixed(2)),
+    currentVolume,
+    averageVolume: Number(averageVolume.toFixed(2)),
+    volumePass,
+    resistance,
+    support,
     bullish,
     bearish,
-    direction: bullish ? 'CALL' : bearish ? 'PUT' : 'WAIT',
+    direction,
     candleTime: latest[0]
   };
-}async function getQuote(key) {
-  return quoteFrom(
-    await upstox(
-      `${UPSTOX_BASE}/v2/market-quote/quotes?instrument_key=${encodeURIComponent(key)}`
-    ),
-    key
-  );
 }
 
-async function getIndexAnalysis(key) {
+async function getMarketQuote(instrumentKey) {
+  const url = new URL(
+    `${UPSTOX_BASE}/v2/market-quote/quotes`
+  );
+
+  url.searchParams.set(
+    'instrument_key',
+    instrumentKey
+  );
+
+  return upstoxRequest(url.toString());
+}
+
+async function getIntradayCandles(instrumentKey) {
   const url =
     `${UPSTOX_BASE}/v3/historical-candle/intraday/` +
-    `${encodeURIComponent(key)}/minutes/5`;
+    `${encodeURIComponent(instrumentKey)}/minutes/5`;
 
-  const d = await upstox(url);
-  return analyse(candlesFrom(d));
+  return upstoxRequest(url);
 }
 
-async function getContracts(key) {
-  const d = await upstox(
-    `${UPSTOX_BASE}/v2/option/contract?instrument_key=${encodeURIComponent(key)}`
+async function getOptionContracts(instrumentKey) {
+  const url = new URL(
+    `${UPSTOX_BASE}/v2/option/contract`
   );
 
-  return Array.isArray(d?.data) ? d.data : [];
+  url.searchParams.set(
+    'instrument_key',
+    instrumentKey
+  );
+
+  return upstoxRequest(url.toString());
 }
 
-function expiryNearest(contracts) {
+function getNearestExpiry(contracts) {
   const today = new Date().toISOString().slice(0, 10);
 
   return contracts
     .map(c => c.expiry)
     .filter(Boolean)
     .sort()
-    .find(x => x >= today) || null;
+    .find(date => date >= today) || null;
 }
 
-function contractType(c) {
-  const t = String(
-    c?.instrument_type || c?.option_type || ''
+function getOptionType(contract) {
+  const type = String(
+    contract.instrument_type || ''
   ).toUpperCase();
 
-  const s = String(
-    c?.trading_symbol || ''
-  ).toUpperCase();
-
-  if (t.includes('CE') || t === 'CALL' || s.endsWith('CE')) {
-    return 'CALL';
-  }
-
-  if (t.includes('PE') || t === 'PUT' || s.endsWith('PE')) {
-    return 'PUT';
-  }
+  if (type === 'CE' || type === 'CALL') return 'CALL';
+  if (type === 'PE' || type === 'PUT') return 'PUT';
 
   return '';
 }
 
-function scoreOption(q, prev, direction, greeks = {}) {
-  const p = price(q);
-  const v = volume(q);
-  const oiNow = oi(q);
+function calculateOptionMomentum(
+  contract,
+  quote,
+  previous,
+  direction
+) {
+  const p = extractPrice(quote);
+  const v = extractVolume(quote);
+  const oi = extractOI(quote);
 
-  const prevP = prev?.price;
-  const prevV = prev?.volume;
-  const prevOI = prev?.oi;
+  const valid = p > 0 && v > 0 && oi > 0;
 
-  const checks = {
-    optionPriceUp: Number.isFinite(prevP) && p > prevP,
-    volumeIncreasing: Number.isFinite(prevV) && v > prevV,
-    oiIncreasing: Number.isFinite(prevOI) && oiNow > prevOI,
-    gammaAvailable:
-      Number.isFinite(Number(greeks.gamma)) &&
-      Number(greeks.gamma) > 0
+  const conditions = {
+    priceUp: !!previous && p > previous.price,
+    volumeUp: !!previous && v > previous.volume,
+    oiUp: !!previous && oi > previous.oi
   };
 
-  const positive = [
-    checks.optionPriceUp,
-    checks.volumeIncreasing,
-    checks.oiIncreasing
-  ].filter(Boolean).length;
+  const score =
+    Object.values(conditions).filter(Boolean).length * 100 / 3;
 
-  const score = Math.round((positive / 3) * 100);
-
-  const signal =
-    direction !== 'WAIT' && positive === 3
-      ? direction
-      : 'WAIT';
+  const confirmed =
+    valid &&
+    direction !== 'WAIT' &&
+    getOptionType(contract) === direction &&
+    Object.values(conditions).every(Boolean);
 
   return {
+    symbol: contract.trading_symbol,
+    instrument_key: contract.instrument_key,
+    strike: number(contract.strike_price),
+    expiry: contract.expiry,
+    optionType: getOptionType(contract),
     price: p,
     volume: v,
-    oi: oiNow,
-    previousPrice: prevP ?? null,
-    previousVolume: prevV ?? null,
-    previousOI: prevOI ?? null,
-    checks,
-    score,
-    signal,
-    gamma: Number.isFinite(Number(greeks.gamma))
-      ? Number(greeks.gamma)
-      : null,
-    gammaBlast:
-      signal !== 'WAIT' && checks.gammaAvailable
+    oi,
+    conditions,
+    score: Math.round(score),
+    signal: confirmed ? direction : 'WAIT',
+    gammaBlast: false,
+    gammaNote:
+      'Actual Gamma is not confirmed without valid Gamma Greeks'
   };
-}
-
-async function strongGammaScan(url) {
+    }async function scanIndexOptions(url) {
   const requested = (
     url.searchParams.get('indexes') ||
     INDEXES.map(x => x.name).join(',')
   )
     .split(',')
-    .map(s => s.trim().toUpperCase());
-
-  const indexes = INDEXES.filter(
-    x => requested.includes(x.name)
-  );
+    .map(x => x.trim().toUpperCase());
 
   const results = [];
 
-  for (const idx of indexes) {
+  for (const index of INDEXES.filter(
+    x => requested.includes(x.name)
+  )) {
     try {
-      const [market, trend, allContracts] =
-        await Promise.all([
-          getQuote(idx.key),
-          getIndexAnalysis(idx.key),
-          getContracts(idx.key)
-        ]);
+      const quoteResponse =
+        await getMarketQuote(index.key);
 
-      const spot = price(market);
+      const spotQuote = extractQuote(
+        quoteResponse,
+        index.key
+      );
 
-      if (
-        !trend.ready ||
-        trend.direction === 'WAIT' ||
-        !spot
-      ) {
+      const spot = extractPrice(spotQuote);
+
+      const candleResponse =
+        await getIntradayCandles(index.key);
+
+      const trend = analyseCandles(
+        extractCandles(candleResponse)
+      );
+
+      if (!trend.ready || trend.direction === 'WAIT') {
         results.push({
-          index: idx.name,
+          index: index.name,
           spot,
           trend,
           signal: 'WAIT',
-          reason: 'Index trend is not strongly confirmed'
+          reason: trend.reason ||
+            'Market direction not confirmed'
         });
 
         continue;
       }
 
+      const contractsResponse =
+        await getOptionContracts(index.key);
+
+      const contracts = contractsResponse?.data || [];
+
       const expiry =
         url.searchParams.get('expiry') ||
-        expiryNearest(allContracts);
+        getNearestExpiry(contracts);
 
-      const sameExpiry = allContracts
+      const filtered = contracts
         .filter(c => !expiry || c.expiry === expiry)
-        .filter(c =>
-          contractType(c) === trend.direction &&
-          c.instrument_key &&
-          Number.isFinite(Number(c.strike_price))
-        );
+        .filter(c => getOptionType(c) === trend.direction)
+        .filter(c => c.instrument_key)
+        .sort(
+          (a, b) =>
+            Math.abs(number(a.strike_price) - spot) -
+            Math.abs(number(b.strike_price) - spot)
+        )
+        .slice(0, 10);
 
-      sameExpiry.sort(
-        (a, b) =>
-          Math.abs(Number(a.strike_price) - spot) -
-          Math.abs(Number(b.strike_price) - spot)
-      );
-
-      const selected = sameExpiry.slice(0, 8);
       const candidates = [];
 
-      for (const c of selected) {
+      for (const contract of filtered) {
         try {
-          const q = await getQuote(c.instrument_key);
-          if (!q) continue;
+          const response =
+            await getMarketQuote(contract.instrument_key);
 
-          const key = c.instrument_key;
-          const previous = snapshots.get(key);
-
-          const s = scoreOption(
-            q,
-            previous,
-            trend.direction,
-            c.greeks || {}
+          const quote = extractQuote(
+            response,
+            contract.instrument_key
           );
 
-          snapshots.set(key, {
-            price: price(q),
-            volume: volume(q),
-            oi: oi(q),
+          if (!quote) continue;
+
+          const key = contract.instrument_key;
+          const previous = optionSnapshots.get(key);
+
+          const signal = calculateOptionMomentum(
+            contract,
+            quote,
+            previous,
+            trend.direction
+          );
+
+          candidates.push(signal);
+
+          optionSnapshots.set(key, {
+            price: extractPrice(quote),
+            volume: extractVolume(quote),
+            oi: extractOI(quote),
             time: Date.now()
           });
-
+        } catch (error) {
           candidates.push({
-            symbol: c.trading_symbol,
-            instrument_key: key,
-            expiry: c.expiry,
-            strike: num(c.strike_price),
-            optionType: trend.direction,
-            lotSize: num(c.lot_size),
-            ...s,
-            signalTime: new Date().toISOString()
-          });
-        } catch (e) {
-          candidates.push({
-            symbol: c.trading_symbol,
-            error: e.message,
-            signal: 'WAIT'
+            symbol: contract.trading_symbol,
+            signal: 'WAIT',
+            error: error.message
           });
         }
       }
 
       candidates.sort(
-        (a, b) => (b.score || 0) - (a.score || 0)
+        (a, b) => b.score - a.score
       );
 
-      const best = candidates.find(
-        c =>
-          c.signal === trend.direction &&
-          c.score >= 75
+      const bestStrike = candidates.find(
+        c => c.signal === trend.direction &&
+             c.score >= 75
       ) || null;
 
+      const dedupeKey = `${index.name}:${trend.direction}`;
+
+      const previousSignal = lastSignals.get(dedupeKey);
+
+      const alert = bestStrike
+        ? `${trend.direction}_STRONG`
+        : 'WAIT';
+
+      lastSignals.set(dedupeKey, {
+        signal: alert,
+        strike: bestStrike?.strike || null,
+        time: Date.now()
+      });
+
       results.push({
-        index: idx.name,
+        index: index.name,
         spot,
         expiry,
-        marketDirection: trend.direction,
         trend,
-        bestStrike: best,
+        marketDirection: trend.direction,
+        optionsScanned: candidates.length,
+        bestStrike,
         candidates,
-        alert: best ? `${trend.direction}_STRONG` : 'WAIT',
-        note:
-          'First scan stores baseline; later scans compare ' +
-          'price/volume/OI. Gamma Blast is confirmed only ' +
-          'if Gamma data is supplied.'
+        alert
       });
-    } catch (e) {
+    } catch (error) {
       results.push({
-        index: idx.name,
+        index: index.name,
         signal: 'WAIT',
-        error: e.message
+        error: error.message
       });
     }
   }
 
   return {
     success: true,
-    scanner: 'STRONG_GAMMA_MOMENTUM',
+    scanner: 'STRONG_CALL_PUT_SCANNER',
     threshold: 75,
     timestamp: new Date().toISOString(),
     results
@@ -473,116 +586,128 @@ async function strongGammaScan(url) {
 }
 
 async function getNseStockFutures() {
-  const r = await fetch(
+  const response = await fetch(
     'https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz'
   );
 
-  if (!r.ok) {
+  if (!response.ok) {
     throw new Error(
-      `Instrument download failed HTTP ${r.status}`
+      `NSE instruments HTTP ${response.status}`
     );
   }
 
-  const raw = Buffer.from(await r.arrayBuffer());
+  const buffer = Buffer.from(
+    await response.arrayBuffer()
+  );
 
-  const txt = zlib.gunzipSync(raw).toString('utf8');
-  const items = JSON.parse(txt).filter(
-    x =>
-      x.segment === 'NSE_FO' &&
-      x.instrument_type === 'FUT' &&
-      x.underlying_type === 'EQUITY' &&
-      x.underlying_key &&
-      x.instrument_key
+  const instruments = JSON.parse(
+    zlib.gunzipSync(buffer).toString('utf8')
+  );
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const valid = instruments.filter(c =>
+    c.segment === 'NSE_FO' &&
+    c.instrument_type === 'FUT' &&
+    c.underlying_type === 'EQUITY' &&
+    c.underlying_key &&
+    c.instrument_key &&
+    c.expiry >= today
   );
 
   const map = new Map();
 
-  for (const x of items) {
-    if (!x.expiry) continue;
+  for (const contract of valid) {
+    const symbol = contract.underlying_symbol;
+    const old = map.get(symbol);
 
-    const old = map.get(x.underlying_symbol);
-
-    if (
-      !old ||
-      new Date(x.expiry).getTime() <
-        new Date(old.expiry).getTime()
-    ) {
-      map.set(x.underlying_symbol, x);
+    if (!old || contract.expiry < old.expiry) {
+      map.set(symbol, contract);
     }
   }
 
   return [...map.values()];
-    }async function scanLongBuildUp() {
+}
+
+async function scanLongBuildUp() {
   const contracts = await getNseStockFutures();
-  const out = [];
+  const results = [];
 
-  for (const c of contracts) {
+  for (const contract of contracts) {
     try {
-      const q = await getQuote(c.instrument_key);
-      if (!q) continue;
+      const response =
+        await getMarketQuote(contract.instrument_key);
 
-      const p = price(q);
-      const v = volume(q);
-      const oiNow = oi(q);
+      const quote = extractQuote(
+        response,
+        contract.instrument_key
+      );
 
-      const old = stockSnapshots.get(c.instrument_key);
-      const valid = p > 0 && v > 0 && oiNow > 0;
+      if (!quote) continue;
+
+      const p = extractPrice(quote);
+      const v = extractVolume(quote);
+      const oi = extractOI(quote);
+
+      const key = contract.instrument_key;
+      const previous = stockSnapshots.get(key);
 
       const conditions = {
-        priceUp: !!old && p > old.price,
-        volumeUp: !!old && v > old.volume,
-        oiUp: !!old && oiNow > old.oi
+        priceUp: !!previous && p > previous.price,
+        volumeUp: !!previous && v > previous.volume,
+        oiUp: !!previous && oi > previous.oi
       };
 
       const confirmed =
-        valid &&
+        p > 0 &&
+        v > 0 &&
+        oi > 0 &&
         Object.values(conditions).every(Boolean);
 
-      out.push({
-        symbol: c.underlying_symbol || c.trading_symbol,
-        instrument_key: c.instrument_key,
+      results.push({
+        symbol: contract.underlying_symbol,
+        instrument_key: key,
         price: p,
         volume: v,
-        oi: oiNow,
+        oi,
         conditions,
         longBuildUp: confirmed,
         signal: confirmed ? 'LONG_BUILD_UP' : 'WAIT'
       });
 
-      stockSnapshots.set(c.instrument_key, {
+      stockSnapshots.set(key, {
         price: p,
         volume: v,
-        oi: oiNow,
+        oi,
         time: Date.now()
       });
-    } catch (e) {
-      out.push({
-        symbol: c.underlying_symbol || c.trading_symbol,
+    } catch (error) {
+      results.push({
+        symbol: contract.underlying_symbol,
         signal: 'WAIT',
-        error: e.message
+        error: error.message
       });
     }
   }
 
-  const hits = out.filter(x => x.longBuildUp);
+  const signals = results.filter(
+    x => x.longBuildUp
+  );
 
   return {
     success: true,
     scanner: 'NSE_FNO_LONG_BUILD_UP',
-    checked: out.length,
-    count: hits.length,
-    signals: hits,
-    all_results: out,
-    timestamp: new Date().toISOString(),
-    note:
-      'First scan stores baseline; later scans compare ' +
-      'cumulative values.'
+    checked: results.length,
+    count: signals.length,
+    signals,
+    all_results: results,
+    timestamp: new Date().toISOString()
   };
 }
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, cors());
+    res.writeHead(204, corsHeaders());
     return res.end();
   }
 
@@ -593,15 +718,15 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (url.pathname === '/health') {
-      return send(res, 200, {
+      return sendJson(res, 200, {
         success: true,
-        message: 'Smart Trade India backend running',
+        message: 'Smart Trade India Backend running',
         timestamp: new Date().toISOString()
       });
     }
 
     if (url.pathname === '/api/upstox/status') {
-      return send(res, 200, {
+      return sendJson(res, 200, {
         success: true,
         token_configured:
           Boolean(process.env.UPSTOX_ACCESS_TOKEN)
@@ -612,46 +737,54 @@ const server = http.createServer(async (req, res) => {
       url.pathname === '/api/options/strong-gamma-scan' ||
       url.pathname === '/api/options/auto-scan'
     ) {
-      return send(res, 200, await strongGammaScan(url));
+      return sendJson(
+        res,
+        200,
+        await scanIndexOptions(url)
+      );
     }
 
     if (
       url.pathname === '/api/stocks/long-build-up' ||
       url.pathname === '/api/options/nse-stocks/scan'
     ) {
-      return send(res, 200, await scanLongBuildUp());
+      return sendJson(
+        res,
+        200,
+        await scanLongBuildUp()
+      );
     }
 
     if (url.pathname === '/api/market/quote') {
       const key = url.searchParams.get('instrument_key');
 
       if (!key) {
-        return send(res, 400, {
+        return sendJson(res, 400, {
           success: false,
           error: 'instrument_key is required'
         });
       }
 
-      return send(res, 200, {
+      return sendJson(res, 200, {
         success: true,
-        data: await getQuote(key)
+        data: await getMarketQuote(key)
       });
     }
 
-    return send(res, 404, {
+    return sendJson(res, 404, {
       success: false,
       error: 'API route not found',
       path: url.pathname
     });
-  } catch (e) {
+  } catch (error) {
     const status =
-      e.message === 'UPSTOX_ACCESS_TOKEN_MISSING'
+      error.message === 'UPSTOX_ACCESS_TOKEN_MISSING'
         ? 503
         : 502;
 
-    return send(res, status, {
+    return sendJson(res, status, {
       success: false,
-      error: e.message || 'Internal server error'
+      error: error.message || 'Internal server error'
     });
   }
 });
