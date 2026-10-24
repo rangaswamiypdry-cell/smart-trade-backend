@@ -724,18 +724,17 @@ const server = http.createServer(async (req, res) => {
           error: "instrument_key is required"
         });
       }
-
-      const response = await getIntradayCandles(key);
+const response = await getIntradayCandles(key);
+      const candles = response?.data?.candles || [];
 
       return sendJson(res, 200, {
         success: true,
         instrument_key: key,
-        analysis: analyseCandles(
-          response?.data?.candles || []
-        )
+        candle_count: candles.length,
+        candles,
+        analysis: analyseCandles(candles)
       });
     }
-
     if (
       url.pathname === "/api/stocks/long-build-up" &&
       req.method === "GET"
