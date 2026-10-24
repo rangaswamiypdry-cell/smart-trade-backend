@@ -282,7 +282,9 @@ function analyseCandles(candles) {
     latestClosedCandle: latest,
     completed_count: valid.length
   };
-        }function saveSnapshot(map, key, quote) {
+}
+
+function saveSnapshot(map, key, quote) {
   const price = extractPrice(quote);
   const volume = extractVolume(quote);
   const oi = extractOI(quote);
