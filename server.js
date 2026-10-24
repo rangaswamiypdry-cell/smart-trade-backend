@@ -839,7 +839,8 @@ async function getNseStockOptions() {
 
     const instruments = JSON.parse(jsonText);
 
-    const stockFutures = instruments.filter(item =>
+    const stockFutures = instruments.filter(item =>console.log("Total NSE instruments:", instruments.length);
+console.log("Filtered stock futures:", stockFutures.length);
       item.segment === "NSE_FO" &&
       item.instrument_type === "FUT" &&
       item.underlying_type === "EQUITY" &&
