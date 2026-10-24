@@ -620,14 +620,16 @@ function getRequestedIndexes(url) {
 // ==================================================
 // SMART MONEY + STRONG MOMENTUM BUY FILTER
 // ==================================================
-
 function detectSmartMoneyBuy(data) {
+  const wait = (reason, conditions = {}) => ({
+    buy: false,
+    signal: "WAIT",
+    reason,
+    conditions
+  });
+
   if (!data || typeof data !== "object") {
-    return {
-      buy: false,
-      signal: "WAIT",
-      reason: "Market data unavailable"
-    };
+    return wait("Market data unavailable");
   }
 
   const price = Number(data.price);
@@ -640,33 +642,42 @@ function detectSmartMoneyBuy(data) {
   const close = Number(data.close);
   const open = Number(data.open);
   const vwap = Number(data.vwap);
+  const ema20 = Number(data.ema20);
   const resistance = Number(data.resistance);
   const cmf = Number(data.cmf20);
 
   const values = [
     price, previousPrice, volume, averageVolume20,
     oi, previousOI, rsi, close, open, vwap,
-    resistance, cmf
+    ema20, resistance, cmf
   ];
 
   if (!values.every(Number.isFinite)) {
-    return {
-      buy: false,
-      signal: "WAIT",
-      reason: "Indicator data missing"
-    };
+    return wait("Indicator data missing");
+  }
+
+  if (
+    price <= 0 ||
+    previousPrice <= 0 ||
+    volume <= 0 ||
+    averageVolume20 <= 0 ||
+    oi <= 0 ||
+    previousOI <= 0 ||
+    vwap <= 0 ||
+    ema20 <= 0
+  ) {
+    return wait("Invalid or unavailable market values");
   }
 
   const conditions = {
     priceRising: price > previousPrice,
     bullishCandle: close > open,
-    volumeSpike:
-      averageVolume20 > 0 &&
-      volume >= averageVolume20 * 1.5,
+    volumeSpike: volume >= averageVolume20 * 1.5,
     oiIncreasing: oi > previousOI,
-    rsiStrong: rsi > 55,
+    rsiStrong: rsi > 65,
     aboveVWAP: close > vwap,
-    resistanceBreakout: close > resistance,
+    aboveEMA20: close > ema20,
+    resistanceBreakout: resistance > 0 && close > resistance,
     positiveMoneyFlow: cmf > 0
   };
 
@@ -674,12 +685,25 @@ function detectSmartMoneyBuy(data) {
 
   return {
     buy,
-    signal: buy ? "SMART_MONEY_BUY" : "WAIT",
+    signal: buy ? "STRONG_BUY" : "WAIT",
+    reason: buy
+      ? "All strong bullish conditions confirmed"
+      : "One or more strong BUY conditions not confirmed",
     conditions,
     price,
-    rsi
+    previousPrice,
+    volume,
+    averageVolume20,
+    oi,
+    previousOI,
+    rsi,
+    vwap,
+    ema20,
+    resistance,
+    cmf,
+    signal_time: new Date().toISOString()
   };
-}
+    }
 
 // ==================================================
 // INDEX OPTIONS AUTO SCANNER
