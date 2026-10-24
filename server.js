@@ -381,7 +381,6 @@ async function getOptionContracts(instrumentKey, expiry) {
 
   return upstoxRequest(apiUrl.toString());
 }
-
 async function getOptionChain(instrumentKey, expiry) {
   const apiUrl = new URL(
     `${UPSTOX_BASE}/v2/option/chain`
