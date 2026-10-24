@@ -640,7 +640,9 @@ async function scanIndexOptions(url) {
     timestamp: new Date().toISOString(),
     results
   };
-                           }const server = http.createServer(async (req, res) => {
+  }
+
+const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, corsHeaders());
     return res.end();
