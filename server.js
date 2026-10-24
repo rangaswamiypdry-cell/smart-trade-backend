@@ -1015,7 +1015,6 @@ if (
       error: error.message || "Internal server error"
     });
   }
-});
 
 // ==================================================
 // START SERVER
