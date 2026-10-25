@@ -158,7 +158,7 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
 
   const latest = validCandles[validCandles.length - 1];
   const previous = validCandles[validCandles.length - 2];
-
+const orderBlock = detectOrderBlock(validCandles);
   const close = Number(latest[4]);
   const open = Number(latest[1]);
   const previousClose = Number(previous[4]);
