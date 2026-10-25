@@ -785,15 +785,15 @@ async function getNseStockOptions() {
       "NSE instrument loading error:",
       error.message
     );
-
-    return {
-      success: false,
-        }
-      scanner: "NSE_STOCK_OPTIONS",
-      count: contracts.length,
-      contracts,
-      timestamp: new Date().toISOString()
-    };
+return {
+success: false,
+scanner: "NSE_STOCK_OPTIONS",
+count: 0,
+contracts: [],
+error: error.message,
+timestamp: new Date().toISOString()
+};
+    
   } catch (error) {
     return {
       success: false,
