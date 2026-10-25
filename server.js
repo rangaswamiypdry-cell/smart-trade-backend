@@ -788,13 +788,6 @@ async function getNseStockOptions() {
 
     return {
       success: false,
-      scanner: "NSE_STOCK_OPTIONS",
-      count: 0,
-      contracts: [],
-      error: error.message,
-      timestamp: new Date().toISOString()
-    };
-  }
         }
       scanner: "NSE_STOCK_OPTIONS",
       count: contracts.length,
