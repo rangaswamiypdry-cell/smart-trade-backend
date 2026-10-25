@@ -721,15 +721,81 @@ async function getNseStockOptions() {
 
     const instruments = JSON.parse(jsonText);
 
-    const contracts = instruments.filter(item =>
-      item.segment === "NSE_FO" &&
+    if (!Array.isArray(instruments)) {
+      throw new Error(
+        "Unexpected instrument data format"
+      );
+    }
+
+    // Debug: inspect actual instrument field values
+    const segmentCounts = {};
+    const typeCounts = {};
+
+    for (const item of instruments) {
+      const segment = item.segment || "UNKNOWN";
+      const type = item.instrument_type || "UNKNOWN";
+
+      segmentCounts[segment] =
+        (segmentCounts[segment] || 0) + 1;
+
+      typeCounts[type] =
+        (typeCounts[type] || 0) + 1;
+    }
+
+    console.log(
+      "Total NSE instruments:",
+      instruments.length
+    );
+
+    console.log(
+      "Instrument segments:",
+      JSON.stringify(segmentCounts)
+    );
+
+    console.log(
+      "Instrument types:",
+      JSON.stringify(typeCounts)
+    );
+
+    const stockOptions = instruments.filter(item =>
       item.instrument_type === "OPTSTK" &&
-      item.underlying_key &&
-      item.instrument_key
+      item.instrument_key &&
+      item.underlying_key
+    );
+
+    console.log(
+      "Filtered stock options:",
+      stockOptions.length
     );
 
     return {
       success: true,
+      scanner: "NSE_STOCK_OPTIONS",
+      total_instruments: instruments.length,
+      count: stockOptions.length,
+      contracts: stockOptions,
+      debug: {
+        segment_counts: segmentCounts,
+        instrument_type_counts: typeCounts
+      },
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error(
+      "NSE instrument loading error:",
+      error.message
+    );
+
+    return {
+      success: false,
+      scanner: "NSE_STOCK_OPTIONS",
+      count: 0,
+      contracts: [],
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+        }
       scanner: "NSE_STOCK_OPTIONS",
       count: contracts.length,
       contracts,
