@@ -707,6 +707,171 @@ async function getNseStockOptions() {
     }
 
     const zlib = require("zlib");
+
+    const buffer = Buffer.from(
+      await response.arrayBuffer()
+    );
+
+    let jsonText;
+
+    try {
+      jsonText = zlib.gunzipSync(buffer).toString("utf8");
+    } catch {
+      jsonText = buffer.toString("utf8");
+    }
+
+    const instruments = JSON.parse(jsonText);
+
+    if (!Array.isArray(instruments)) {
+      throw new Error("Unexpected instrument data format");
+    }
+
+    const stockOptions = instruments.filter(item =>
+      item.instrument_type === "OPTSTK" &&
+      item.instrument_key &&
+      item.underlying_key
+    );
+
+    console.log(
+      "Total NSE instruments:",
+      instruments.length
+    );
+
+    console.log(
+      "Filtered stock options:",
+      stockOptions.length
+    );
+
+    return {
+      success: true,
+      scanner: "NSE_STOCK_OPTIONS",
+      total_instruments: instruments.length,
+      count: stockOptions.length,
+      contracts: stockOptions,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error(
+      "NSE instrument loading error:",
+      error.message
+    );
+
+    return {
+      success: false,
+      scanner: "NSE_STOCK_OPTIONS",
+      count: 0,
+      contracts: [],
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+// ==================================================
+// STOCK OPTIONS SCANNER
+// ==================================================
+
+async function scanStockOptions(contracts) {
+  const results = [];
+  let checked = 0;
+
+  if (!Array.isArray(contracts)) {
+    return {
+      success: false,
+      scanner: "NSE_STOCK_OPTIONS",
+      checked: 0,
+      signals: [],
+      all_results: [],
+      error: "Invalid contracts list",
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  for (const contract of contracts.slice(0, 100)) {
+    const key = contract.instrument_key;
+
+    if (!key) continue;
+
+    try {
+      const response = await getMarketQuote(key);
+      const quote = extractQuote(response, key);
+      const previous = stockOptionSnapshots.get(key);
+
+      const price = extractPrice(quote);
+      const volume = extractVolume(quote);
+      const oi = extractOI(quote);
+
+      const longBuildUp = detectLongBuildUp(
+        quote,
+        previous
+      );
+
+      results.push({
+        symbol:
+          contract.trading_symbol ||
+          contract.name ||
+          key,
+        instrument_key: key,
+        strike_price: contract.strike_price,
+        option_type: contract.instrument_type,
+        expiry: contract.expiry,
+        price,
+        volume,
+        oi,
+        long_build_up: longBuildUp.long_build_up,
+        long_build_up_signal: longBuildUp.signal,
+        long_build_up_details: longBuildUp,
+        signal: longBuildUp.long_build_up
+          ? "BULLISH"
+          : "WAIT",
+        signal_time: new Date().toISOString()
+      });
+
+      saveStockOptionSnapshot(key, quote);
+      checked++;
+
+    } catch (error) {
+      results.push({
+        symbol: contract.trading_symbol || key,
+        instrument_key: key,
+        signal: "WAIT",
+        error: error.message
+      });
+    }
+  }
+
+  return {
+    success: true,
+    scanner: "NSE_STOCK_OPTIONS",
+    checked,
+    signals: results.filter(
+      item => item.long_build_up === true
+    ),
+    all_results: results,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// ==================================================
+// INDEX OPTIONS SCANNER
+// ==================================================
+
+// NSE STOCK OPTIONS CONTRACT LIST
+async function getNseStockOptions() {
+  const instrumentsUrl =
+    "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
+
+  try {
+    const response = await fetch(instrumentsUrl);
+
+    if (!response.ok) {
+      throw new Error(
+        `Instrument download failed: HTTP ${response.status}`
+      );
+    }
+
+    const zlib = require("zlib");
     const buffer = Buffer.from(
       await response.arrayBuffer()
     );
@@ -797,11 +962,6 @@ timestamp: new Date().toISOString()
       success: false,
       scanner: "NSE_STOCK_OPTIONS",
       count: 0,
-      contracts: [],
-      error: error.message
-    };
-  }
-}
 
 // ==================================================
 // STOCK OPTIONS SCANNER
