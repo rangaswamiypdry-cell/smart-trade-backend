@@ -793,8 +793,6 @@ contracts: [],
 error: error.message,
 timestamp: new Date().toISOString()
 };
-    
-  } catch (error) {
     return {
       success: false,
       scanner: "NSE_STOCK_OPTIONS",
