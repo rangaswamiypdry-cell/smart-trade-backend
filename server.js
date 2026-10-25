@@ -337,19 +337,35 @@ async function getOptionChain(instrumentKey, expiryDate) {
 
   return upstoxRequest(apiUrl.toString());
 }
-
 async function getHistoricalCandles(
   instrumentKey,
-  interval = "5minute"
+  interval = "5"
 ) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+
+  const fromDateObj = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000
+  );
+
+  const fromDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(fromDateObj);
 
   const apiUrl = new URL(
-    `${UPSTOX_BASE}/v3/historical-candle/${encodeURIComponent(instrumentKey)}/${interval}/${today}`
+    `${UPSTOX_BASE}/v3/historical-candle/${encodeURIComponent(instrumentKey)}/minutes/${interval}/${today}/${fromDate}`
   );
 
   return upstoxRequest(apiUrl.toString());
 }
+
 
 async function getIntradayCandles(instrumentKey) {
   const apiUrl = new URL(
