@@ -42,6 +42,7 @@ async function upstoxRequest(apiUrl) {
   });
 
   const text = await response.text();
+
   let data;
 
   try {
@@ -63,6 +64,10 @@ async function upstoxRequest(apiUrl) {
   return data;
 }
 
+// ==================================================
+// RSI CALCULATION
+// ==================================================
+
 function calculateWilderRSI(closes, period = 14) {
   if (!Array.isArray(closes) || closes.length < period + 1) {
     return null;
@@ -72,7 +77,8 @@ function calculateWilderRSI(closes, period = 14) {
   let losses = 0;
 
   for (let i = 1; i <= period; i++) {
-    const change = Number(closes[i]) - Number(closes[i - 1]);
+    const change =
+      Number(closes[i]) - Number(closes[i - 1]);
 
     if (change > 0) {
       gains += change;
@@ -85,13 +91,16 @@ function calculateWilderRSI(closes, period = 14) {
   let avgLoss = losses / period;
 
   for (let i = period + 1; i < closes.length; i++) {
-    const change = Number(closes[i]) - Number(closes[i - 1]);
+    const change =
+      Number(closes[i]) - Number(closes[i - 1]);
 
     avgGain =
-      (avgGain * (period - 1) + Math.max(change, 0)) / period;
+      (avgGain * (period - 1) +
+        Math.max(change, 0)) / period;
 
     avgLoss =
-      (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
+      (avgLoss * (period - 1) +
+        Math.max(-change, 0)) / period;
   }
 
   if (avgLoss === 0) {
@@ -99,9 +108,16 @@ function calculateWilderRSI(closes, period = 14) {
   }
 
   return Number(
-    (100 - 100 / (1 + avgGain / avgLoss)).toFixed(2)
+    (
+      100 -
+      100 / (1 + avgGain / avgLoss)
+    ).toFixed(2)
   );
 }
+
+// ==================================================
+// COMPLETED CANDLES ONLY
+// ==================================================
 
 function getClosedCandles(candles, intervalMinutes = 5) {
   const intervalMs = intervalMinutes * 60 * 1000;
@@ -123,7 +139,11 @@ function getClosedCandles(candles, intervalMinutes = 5) {
     );
 }
 
-// Completed-candle Order Block approximation.
+// ==================================================
+// ORDER BLOCK APPROXIMATION
+// Heuristic only; not institutional order-flow data.
+// ==================================================
+
 function detectOrderBlock(candles) {
   if (!Array.isArray(candles) || candles.length < 3) {
     return {
@@ -155,6 +175,7 @@ function detectOrderBlock(candles) {
 
   const lastOpen = Number(last[1]);
   const lastClose = Number(last[4]);
+
   const prevOpen = Number(prev[1]);
   const prevClose = Number(prev[4]);
 
@@ -177,7 +198,7 @@ function detectOrderBlock(candles) {
       low: Math.min(Number(prev[3]), lastOpen),
       high: Math.max(prevOpen, lastClose),
       candle_time: last[0],
-      method: "completed-candle engulfing heuristic"
+      method: "Completed-candle engulfing heuristic"
     };
   }
 
@@ -188,7 +209,7 @@ function detectOrderBlock(candles) {
       low: Math.min(prevOpen, lastClose),
       high: Math.max(Number(prev[2]), lastOpen),
       candle_time: last[0],
-      method: "completed-candle engulfing heuristic"
+      method: "Completed-candle engulfing heuristic"
     };
   }
 
@@ -199,8 +220,18 @@ function detectOrderBlock(candles) {
   };
 }
 
-function analyseCompletedCandles(candles, intervalMinutes = 5) {
-  const completed = getClosedCandles(candles, intervalMinutes);
+// ==================================================
+// 5-MINUTE CANDLE ANALYSIS
+// ==================================================
+
+function analyseCompletedCandles(
+  candles,
+  intervalMinutes = 5
+) {
+  const completed = getClosedCandles(
+    candles,
+    intervalMinutes
+  );
 
   if (completed.length < 21) {
     return {
@@ -229,6 +260,8 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
   }
 
   const closes = validCandles.map(c => Number(c[4]));
+  const highs = validCandles.map(c => Number(c[2]));
+  const lows = validCandles.map(c => Number(c[3]));
   const volumes = validCandles.map(c => Number(c[5]));
 
   const latest = validCandles[validCandles.length - 1];
@@ -243,21 +276,27 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
   const latestVolume = volumes[volumes.length - 1];
 
   const averageVolume =
-    volumes.slice(-21, -1).reduce((sum, v) => sum + v, 0) / 20;
+    volumes
+      .slice(-21, -1)
+      .reduce((sum, v) => sum + v, 0) / 20;
 
   const rsi14 = calculateWilderRSI(closes, 14);
 
+  // EMA calculation
   function calculateEMA(values, period) {
     if (values.length < period) return null;
 
     const multiplier = 2 / (period + 1);
 
     let ema =
-      values.slice(0, period).reduce((sum, value) => sum + value, 0) /
+      values
+        .slice(0, period)
+        .reduce((sum, value) => sum + value, 0) /
       period;
 
     for (let i = period; i < values.length; i++) {
-      ema = (values[i] - ema) * multiplier + ema;
+      ema =
+        (values[i] - ema) * multiplier + ema;
     }
 
     return Number(ema.toFixed(2));
@@ -265,14 +304,17 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
 
   const ema20 = calculateEMA(closes, 20);
 
+  // VWAP calculation for available candles
   let totalPV = 0;
   let totalVolume = 0;
 
   for (const candle of validCandles) {
     const typicalPrice =
-      (Number(candle[2]) +
+      (
+        Number(candle[2]) +
         Number(candle[3]) +
-        Number(candle[4])) / 3;
+        Number(candle[4])
+      ) / 3;
 
     const volume = Number(candle[5]);
 
@@ -285,7 +327,9 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
       ? Number((totalPV / totalVolume).toFixed(2))
       : null;
 
-  const previousCandles = validCandles.slice(-21, -1);
+  // Previous 20 candles' resistance and support
+  const previousCandles =
+    validCandles.slice(-21, -1);
 
   const resistance = Math.max(
     ...previousCandles.map(c => Number(c[2]))
@@ -296,7 +340,9 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
   );
 
   const volumeRatio =
-    averageVolume > 0 ? latestVolume / averageVolume : 0;
+    averageVolume > 0
+      ? Number((latestVolume / averageVolume).toFixed(2))
+      : 0;
 
   const volumePass =
     averageVolume > 0 &&
@@ -306,14 +352,12 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
   const bearishBreakdown = close < support;
 
   const bullishTrend =
-    close > open &&
     ema20 !== null &&
     close > ema20 &&
     vwap !== null &&
     close > vwap;
 
   const bearishTrend =
-    close < open &&
     ema20 !== null &&
     close < ema20 &&
     vwap !== null &&
@@ -338,15 +382,15 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
     close,
     open,
     previousClose,
-    rsi14,
-    currentVolume: latestVolume,
+    latestVolume,
     averageVolume: Number(averageVolume.toFixed(2)),
-    volumeRatio: Number(volumeRatio.toFixed(2)),
+    volumeRatio,
     volumePass,
+    rsi14,
     ema20,
     vwap,
-    support: Number(support.toFixed(2)),
-    resistance: Number(resistance.toFixed(2)),
+    resistance,
+    support,
     bullishBreakout,
     bearishBreakdown,
     bullishTrend,
@@ -363,8 +407,9 @@ function analyseCompletedCandles(candles, intervalMinutes = 5) {
     completed_count: validCandles.length
   };
 }
-
-// UPSTOX MARKET DATA HELPERS
+// ==================================================
+// PART 2 - UPSTOX MARKET DATA HELPERS
+// ==================================================
 
 function getAccessTokenStatus() {
   return Boolean(process.env.UPSTOX_ACCESS_TOKEN);
@@ -373,9 +418,9 @@ function getAccessTokenStatus() {
 function getInstrumentKey(url) {
   return (
     url.searchParams.get("instrument_key") ||
-    url.searchParams.get("instrumentKey") ||
+    url.searchParams.get("symbol") ||
     ""
-  ).trim();
+  );
 }
 
 async function getMarketQuote(instrumentKey) {
@@ -383,35 +428,10 @@ async function getMarketQuote(instrumentKey) {
     `${UPSTOX_BASE}/v2/market-quote/quotes`
   );
 
-  apiUrl.searchParams.set("instrument_key", instrumentKey);
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-async function getOptionContracts(instrumentKey, expiryDate) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v2/option/contract`
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
   );
-
-  apiUrl.searchParams.set("instrument_key", instrumentKey);
-
-  if (expiryDate) {
-    apiUrl.searchParams.set("expiry_date", expiryDate);
-  }
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-async function getOptionChain(instrumentKey, expiryDate) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v2/option/chain`
-  );
-
-  apiUrl.searchParams.set("instrument_key", instrumentKey);
-
-  if (expiryDate) {
-    apiUrl.searchParams.set("expiry_date", expiryDate);
-  }
 
   return upstoxRequest(apiUrl.toString());
 }
@@ -420,40 +440,16 @@ async function getHistoricalCandles(
   instrumentKey,
   interval = "5"
 ) {
-  const today = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
-
-  const fromDateObj = new Date(
-    Date.now() - 7 * 24 * 60 * 60 * 1000
-  );
-
-  const fromDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(fromDateObj);
-
   const apiUrl = new URL(
-    `${UPSTOX_BASE}/v3/historical-candle/${encodeURIComponent(instrumentKey)}/minutes/${interval}/${today}/${fromDate}`
+    `${UPSTOX_BASE}/v3/historical-candle/intraday/${encodeURIComponent(instrumentKey)}/minutes/${interval}`
   );
 
   return upstoxRequest(apiUrl.toString());
 }
 
 async function getIntradayCandles(instrumentKey) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v3/historical-candle/intraday/${encodeURIComponent(instrumentKey)}/minutes/5`
-  );
-
-  return upstoxRequest(apiUrl.toString());
-}// ==================================================
-// QUOTE HELPERS
-// ==================================================
+  return getHistoricalCandles(instrumentKey, "5");
+}
 
 function extractQuote(quoteData, instrumentKey) {
   const data = quoteData?.data || {};
@@ -464,25 +460,24 @@ function extractQuote(quoteData, instrumentKey) {
 
   const firstKey = Object.keys(data)[0];
 
-  return firstKey ? data[firstKey] : null;
+  return firstKey ? data[firstKey] : {};
 }
 
 function extractPrice(quote) {
-  return Number(
+  const price = Number(
     quote?.last_price ??
     quote?.ltp ??
     quote?.last_traded_price ??
     0
   );
+
+  return Number.isFinite(price) ? price : 0;
 }
 
 function extractVolume(quote) {
   const volume = Number(
     quote?.volume ??
     quote?.volume_traded ??
-    quote?.volumeTraded ??
-    quote?.total_traded_quantity ??
-    quote?.total_volume ??
     0
   );
 
@@ -492,26 +487,66 @@ function extractVolume(quote) {
 }
 
 function extractOI(quote) {
-  return Number(
+  const oi = Number(
     quote?.oi ??
     quote?.open_interest ??
     0
   );
+
+  return Number.isFinite(oi) ? oi : 0;
 }
 
 function extractCandles(response) {
   return response?.data?.candles || [];
 }
 
+// ==================================================
+// OPTION CONTRACT HELPERS
+// ==================================================
+
+async function getOptionContracts(instrumentKey) {
+  const apiUrl = new URL(
+    `${UPSTOX_BASE}/v2/option/contract`
+  );
+
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
+  );
+
+  return upstoxRequest(apiUrl.toString());
+}
+
+async function getOptionChain(
+  instrumentKey,
+  expiryDate
+) {
+  const apiUrl = new URL(
+    `${UPSTOX_BASE}/v2/option/chain`
+  );
+
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
+  );
+
+  apiUrl.searchParams.set(
+    "expiry_date",
+    expiryDate
+  );
+
+  return upstoxRequest(apiUrl.toString());
+}
+
 function getNearestExpiry(contracts) {
-  const dates = (Array.isArray(contracts) ? contracts : [])
+  if (!Array.isArray(contracts) || contracts.length === 0) {
+    return null;
+  }
+
+  const dates = contracts
     .map(c => c.expiry)
     .filter(Boolean)
     .sort();
-
-  if (!dates.length) {
-    return null;
-  }
 
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -520,92 +555,27 @@ function getNearestExpiry(contracts) {
     day: "2-digit"
   }).format(new Date());
 
-  return dates.find(date => date >= today) || dates[0];
+  return dates.find(date => date >= today) || null;
 }
 
 function normaliseOptionContract(contract) {
   return {
-    instrument_key: contract?.instrument_key || "",
-    trading_symbol: contract?.trading_symbol || "",
-    name: contract?.name || "",
-    expiry: contract?.expiry || "",
-    strike_price: Number(contract?.strike_price || 0),
-    instrument_type: contract?.instrument_type || "",
-    lot_size: Number(contract?.lot_size || 0)
-  };
-}
-
-// ==================================================
-// OPTION SIGNAL HELPERS
-// ==================================================
-
-function createOptionSignal(contract, quote, previous) {
-  const price = extractPrice(quote);
-  const volume = extractVolume(quote);
-  const oi = extractOI(quote);
-
-  const previousPrice = previous?.price ?? null;
-  const previousVolume = previous?.volume ?? null;
-  const previousOI = previous?.oi ?? null;
-
-  const priceUp =
-    previousPrice !== null &&
-    price > previousPrice;
-
-  const volumeUp =
-    previousVolume !== null &&
-    volume > previousVolume;
-
-  const oiUp =
-    previousOI !== null &&
-    oi > previousOI;
-
-  const validData =
-    price > 0 &&
-    previousPrice !== null &&
-    previousVolume !== null &&
-    previousOI !== null;
-
-  const longBuildUp =
-    validData &&
-    priceUp &&
-    volumeUp &&
-    oiUp;
-
-  return {
-    symbol: contract.trading_symbol,
     instrument_key: contract.instrument_key,
+    trading_symbol:
+      contract.trading_symbol ||
+      contract.name ||
+      contract.instrument_key,
+    underlying_key: contract.underlying_key,
+    underlying_symbol: contract.underlying_symbol,
     expiry: contract.expiry,
-    strike_price: contract.strike_price,
-    option_type: contract.instrument_type,
-
-    price,
-    volume,
-    oi,
-
-    previous_price: previousPrice,
-    previous_volume: previousVolume,
-    previous_oi: previousOI,
-
-    price_up: priceUp,
-    volume_up: volumeUp,
-    oi_up: oiUp,
-
-    long_build_up: longBuildUp,
-
-    long_build_up_signal: longBuildUp
-      ? "LONG_BUILD_UP"
-      : "WAIT",
-
-    smart_money_buy: longBuildUp,
-
-    signal: longBuildUp
-      ? "BULLISH"
-      : "WAIT",
-
-    signal_time: new Date().toISOString()
+    strike_price: Number(contract.strike_price),
+    instrument_type: contract.instrument_type
   };
 }
+
+// ==================================================
+// OPTION SNAPSHOTS
+// ==================================================
 
 function saveOptionSnapshot(key, quote) {
   optionSnapshots.set(key, {
@@ -617,129 +587,112 @@ function saveOptionSnapshot(key, quote) {
 }
 
 function saveStockOptionSnapshot(key, quote) {
-  stock// ==================================================
+  stockOptionSnapshots.set(key, {
+    price: extractPrice(quote),
+    volume: extractVolume(quote),
+    oi: extractOI(quote),
+    time: Date.now()
+  });
+}
+
 // ==================================================
-// INDEX OPTIONS AUTO SCANNER
+// LONG BUILD-UP DETECTION
 // ==================================================
 
-async function scanIndexOptions(url) {
-  const indexes = getRequestedIndexes(url);
-  const results = [];
-
-  for (const index of indexes) {
-    try {
-      const contractsResponse =
-        await getOptionContracts(index.instrument_key);
-
-      const contracts = contractsResponse?.data || [];
-
-      if (!contracts.length) {
-        results.push({
-          index: index.name,
-          status: "NO_CONTRACTS",
-          signals: []
-        });
-        continue;
-      }
-
-      const expiry =
-        url.searchParams.get("expiry") ||
-        getNearestExpiry(contracts);
-
-      const expiryContracts = contracts
-        .filter(c => !expiry || c.expiry === expiry)
-        .map(normaliseOptionContract)
-        .filter(c => c.instrument_key);
-
-      const chainResponse =
-        await getOptionChain(index.instrument_key, expiry);
-
-      const chain = chainResponse?.data || [];
-
-      const chainKeys = new Set(
-        chain.map(c => c.instrument_key).filter(Boolean)
-      );
-
-      const selectedContracts = expiryContracts
-        .filter(c => chainKeys.has(c.instrument_key))
-        .slice(0, 30);
-
-      const signals = [];
-
-      for (const contract of selectedContracts) {
-        try {
-          const quoteResponse =
-            await getMarketQuote(contract.instrument_key);
-
-          const quote = extractQuote(
-            quoteResponse,
-            contract.instrument_key
-          );
-
-          if (!quote) continue;
-
-          const previous =
-            optionSnapshots.get(contract.instrument_key);
-
-          const signal = createOptionSignal(
-            contract,
-            quote,
-            previous
-          );
-
-          // Snapshot-based confirmation only.
-          // This is not a verified fake-volume detector.
-          signal.smart_money_buy =
-            signal.long_build_up === true;
-
-          signal.signal = signal.long_build_up
-            ? "BULLISH"
-            : "WAIT";
-
-          signals.push(signal);
-
-          saveOptionSnapshot(
-            contract.instrument_key,
-            quote
-          );
-        } catch (error) {
-          signals.push({
-            symbol: contract.trading_symbol,
-            error: error.message
-          });
-        }
-      }
-
-      results.push({
-        index: index.name,
-        expiry,
-        contracts_checked: selectedContracts.length,
-        signals: signals.filter(
-          s => s.signal === "BULLISH"
-        ),
-        all_results: signals
-      });
-    } catch (error) {
-      results.push({
-        index: index.name,
-        status: "ERROR",
-        error: error.message,
-        signals: []
-      });
-    }
+function detectLongBuildUp(current, previous) {
+  if (!current || !previous) {
+    return {
+      signal: "WAIT",
+      long_build_up: false,
+      reason: "Waiting for previous market data"
+    };
   }
 
+  const price = extractPrice(current);
+  const previousPrice = Number(previous.price);
+
+  const volume = extractVolume(current);
+  const previousVolume = Number(previous.volume);
+
+  const oi = extractOI(current);
+  const previousOI = Number(previous.oi);
+
+  const priceUp =
+    price > 0 &&
+    previousPrice > 0 &&
+    price > previousPrice;
+
+  const volumeUp =
+    volume > 0 &&
+    previousVolume > 0 &&
+    volume > previousVolume;
+
+  const oiUp =
+    oi > 0 &&
+    previousOI > 0 &&
+    oi > previousOI;
+
+  const longBuildUp =
+    priceUp && volumeUp && oiUp;
+
   return {
-    success: true,
-    timestamp: new Date().toISOString(),
-    results
+    signal: longBuildUp ? "LONG_BUILD_UP" : "WAIT",
+    long_build_up: longBuildUp,
+    price,
+    previous_price: previousPrice,
+    volume,
+    previous_volume: previousVolume,
+    oi,
+    previous_oi: previousOI,
+    price_up: priceUp,
+    volume_up: volumeUp,
+    oi_up: oiUp,
+    reason: longBuildUp
+      ? "Price, volume and OI are increasing"
+      : "All conditions are not confirmed",
+    signal_time: new Date().toISOString()
   };
 }
 
 // ==================================================
-// NSE STOCK OPTIONS CONTRACT LIST
+// DEFAULT INDEXES
 // ==================================================
 
+const DEFAULT_INDEXES = [
+  {
+    name: "NIFTY",
+    instrument_key: "NSE_INDEX|Nifty 50"
+  },
+  {
+    name: "BANKNIFTY",
+    instrument_key: "NSE_INDEX|Nifty Bank"
+  },
+  {
+    name: "FINNIFTY",
+    instrument_key: "NSE_INDEX|Nifty Fin Service"
+  }
+];
+
+function getRequestedIndexes(url) {
+  const raw = url.searchParams.get("indexes");
+
+  if (!raw) {
+    return DEFAULT_INDEXES;
+  }
+
+  const requested = raw
+    .split(",")
+    .map(s => s.trim().toUpperCase());
+
+  return DEFAULT_INDEXES.filter(
+    index => requested.includes(index.name)
+  );
+}
+// ==================================================
+// PART 3 - SMART TRADE SCANNER
+// ==================================================
+
+// NSE STOCK OPTIONS CONTRACT LIST
 async function getNseStockOptions() {
   const instrumentsUrl =
     "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
@@ -749,20 +702,26 @@ async function getNseStockOptions() {
 
     if (!response.ok) {
       throw new Error(
-        `Instrument file download failed: HTTP ${response.status}`
+        `Instrument download failed: HTTP ${response.status}`
       );
     }
 
-    const compressedData = await response.arrayBuffer();
     const zlib = require("zlib");
+    const buffer = Buffer.from(
+      await response.arrayBuffer()
+    );
 
-    const jsonText = zlib.gunzipSync(
-      Buffer.from(compressedData)
-    ).toString("utf8");
+    let jsonText;
+
+    try {
+      jsonText = zlib.gunzipSync(buffer).toString("utf8");
+    } catch {
+      jsonText = buffer.toString("utf8");
+    }
 
     const instruments = JSON.parse(jsonText);
 
-    const stockOptions = instruments.filter(item =>
+    const contracts = instruments.filter(item =>
       item.segment === "NSE_FO" &&
       item.instrument_type === "OPTSTK" &&
       item.underlying_key &&
@@ -772,8 +731,8 @@ async function getNseStockOptions() {
     return {
       success: true,
       scanner: "NSE_STOCK_OPTIONS",
-      count: stockOptions.length,
-      contracts: stockOptions,
+      count: contracts.length,
+      contracts,
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -793,33 +752,21 @@ async function getNseStockOptions() {
 
 async function scanStockOptions(contracts) {
   const results = [];
+  let checked = 0;
 
   for (const contract of contracts.slice(0, 100)) {
     const key = contract.instrument_key;
 
+    if (!key) continue;
+
     try {
-      const quoteResponse = await getMarketQuote(key);
-
-      const quote = extractQuote(
-        quoteResponse,
-        key
-      );
-
-      if (!quote) {
-        results.push({
-          symbol: contract.trading_symbol || key,
-          error: "Quote data unavailable"
-        });
-        continue;
-      }
-
+      const response = await getMarketQuote(key);
+      const quote = extractQuote(response, key);
       const previous = stockOptionSnapshots.get(key);
 
-      const optionSignal = createOptionSignal(
-        contract,
-        quote,
-        previous
-      );
+      const price = extractPrice(quote);
+      const volume = extractVolume(quote);
+      const oi = extractOI(quote);
 
       const longBuildUp = detectLongBuildUp(
         quote,
@@ -827,34 +774,190 @@ async function scanStockOptions(contracts) {
       );
 
       results.push({
-        ...optionSignal,
-        symbol: contract.trading_symbol || key,
+        symbol:
+          contract.trading_symbol ||
+          contract.name ||
+          key,
         instrument_key: key,
+        strike_price: contract.strike_price,
+        option_type: contract.instrument_type,
+        expiry: contract.expiry,
+        price,
+        volume,
+        oi,
         long_build_up: longBuildUp.long_build_up,
         long_build_up_signal: longBuildUp.signal,
         long_build_up_details: longBuildUp,
+        signal: longBuildUp.long_build_up
+          ? "BULLISH"
+          : "WAIT",
         signal_time: new Date().toISOString()
       });
 
       saveStockOptionSnapshot(key, quote);
+      checked++;
     } catch (error) {
       results.push({
         symbol: contract.trading_symbol || key,
+        instrument_key: key,
+        signal: "WAIT",
         error: error.message
       });
     }
   }
 
-  const longBuildUpStocks = results.filter(
-    item => item.long_build_up === true
-  );
+  return {
+    success: true,
+    scanner: "NSE_STOCK_OPTIONS",
+    checked,
+    signals: results.filter(
+      item => item.long_build_up === true
+    ),
+    all_results: results,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// ==================================================
+// INDEX OPTIONS SCANNER
+// ==================================================
+
+async function scanIndexOptions(url) {
+  const indexes = getRequestedIndexes(url);
+  const results = [];
+
+  for (const index of indexes) {
+    try {
+      const contractResponse =
+        await getOptionContracts(index.instrument_key);
+
+      const contracts = contractResponse?.data || [];
+
+      const expiry = getNearestExpiry(contracts);
+
+      if (!expiry) {
+        results.push({
+          index: index.name,
+          success: false,
+          signal: "WAIT",
+          reason: "No option expiry found"
+        });
+
+        continue;
+      }
+
+      const chainResponse = await getOptionChain(
+        index.instrument_key,
+        expiry
+      );
+
+      const chain = chainResponse?.data || [];
+
+      const chainKeys = new Set();
+
+      for (const item of chain) {
+        if (item.instrument_key) {
+          chainKeys.add(item.instrument_key);
+        }
+
+        if (item.call_options?.instrument_key) {
+          chainKeys.add(
+            item.call_options.instrument_key
+          );
+        }
+
+        if (item.put_options?.instrument_key) {
+          chainKeys.add(
+            item.put_options.instrument_key
+          );
+        }
+      }
+
+      const selectedContracts = contracts
+        .filter(contract =>
+          contract.expiry === expiry &&
+          contract.instrument_key &&
+          (
+            chainKeys.size === 0 ||
+            chainKeys.has(contract.instrument_key)
+          )
+        )
+        .slice(0, 20);
+
+      for (const contract of selectedContracts) {
+        try {
+          const quoteResponse = await getMarketQuote(
+            contract.instrument_key
+          );
+
+          const quote = extractQuote(
+            quoteResponse,
+            contract.instrument_key
+          );
+
+          const previous = optionSnapshots.get(
+            contract.instrument_key
+          );
+
+          const price = extractPrice(quote);
+          const volume = extractVolume(quote);
+          const oi = extractOI(quote);
+
+          const longBuildUp = detectLongBuildUp(
+            quote,
+            previous
+          );
+
+          results.push({
+            index: index.name,
+            symbol:
+              contract.trading_symbol ||
+              contract.name ||
+              contract.instrument_key,
+            instrument_key: contract.instrument_key,
+            strike_price: contract.strike_price,
+            option_type: contract.instrument_type,
+            expiry,
+            price,
+            volume,
+            oi,
+            long_build_up: longBuildUp.long_build_up,
+            signal: longBuildUp.long_build_up
+              ? "BULLISH"
+              : "WAIT",
+            signal_time: new Date().toISOString()
+          });
+
+          saveOptionSnapshot(
+            contract.instrument_key,
+            quote
+          );
+        } catch (error) {
+          results.push({
+            index: index.name,
+            instrument_key: contract.instrument_key,
+            signal: "WAIT",
+            error: error.message
+          });
+        }
+      }
+    } catch (error) {
+      results.push({
+        index: index.name,
+        success: false,
+        signal: "WAIT",
+        error: error.message
+      });
+    }
+  }
 
   return {
     success: true,
-    scanner: "LONG_BUILD_UP_STOCKS",
+    scanner: "INDEX_OPTIONS",
     checked: results.length,
-    long_build_up_stocks: longBuildUpStocks,
-    signals: longBuildUpStocks,
+    signals: results.filter(
+      item => item.long_build_up === true
+    ),
     all_results: results,
     timestamp: new Date().toISOString()
   };
@@ -898,20 +1001,20 @@ const server = http.createServer(async (req, res) => {
       url.pathname === "/api/market/quote" &&
       req.method === "GET"
     ) {
-      const instrumentKey = getInstrumentKey(url);
+      const key = getInstrumentKey(url);
 
-      if (!instrumentKey) {
+      if (!key) {
         return sendJson(res, 400, {
           success: false,
           error: "instrument_key is required"
         });
       }
 
-      const quote = await getMarketQuote(instrumentKey);
+      const response = await getMarketQuote(key);
 
       return sendJson(res, 200, {
         success: true,
-        data: quote.data || {}
+        data: response.data || {}
       });
     }
 
@@ -920,17 +1023,16 @@ const server = http.createServer(async (req, res) => {
       url.pathname === "/api/market/candles" &&
       req.method === "GET"
     ) {
-      const instrumentKey = getInstrumentKey(url);
+      const key = getInstrumentKey(url);
 
-      if (!instrumentKey) {
+      if (!key) {
         return sendJson(res, 400, {
           success: false,
           error: "instrument_key is required"
         });
       }
 
-      const response =
-        await getIntradayCandles(instrumentKey);
+      const response = await getIntradayCandles(key);
 
       const analysis = analyseCompletedCandles(
         extractCandles(response),
@@ -939,12 +1041,12 @@ const server = http.createServer(async (req, res) => {
 
       return sendJson(res, 200, {
         success: true,
-        instrument_key: instrumentKey,
+        instrument_key: key,
         analysis
       });
     }
 
-    // INDEX OPTIONS SCANNER
+    // INDEX OPTIONS AUTO SCAN
     if (
       url.pathname === "/api/options/auto-scan" &&
       req.method === "GET"
@@ -954,17 +1056,19 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, result);
     }
 
-    // NSE STOCK OPTIONS CONTRACTS
+    // NSE STOCK OPTION CONTRACTS
     if (
       url.pathname === "/api/options/nse-stocks" &&
       req.method === "GET"
     ) {
       const result = await getNseStockOptions();
 
-      return sendJson(res, 200, result);
-    }
-
-    // NSE STOCK OPTIONS SCANNER
+      return sendJson(
+        res,
+        result.success ? 200 : 502,
+        result
+      );
+    }// NSE STOCK OPTIONS SCANNER
     if (
       url.pathname === "/api/options/nse-stocks/scan" &&
       req.method === "GET"
@@ -979,40 +1083,17 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      const contracts = contractResponse.contracts || [];
+      const expiry = url.searchParams.get("expiry");
 
-      const requestedExpiry = url.searchParams.get("expiry");
+      const contracts = expiry
+        ? contractResponse.contracts.filter(
+            contract => contract.expiry === expiry
+          )
+        : contractResponse.contracts;
 
-      const filtered = contracts.filter(contract =>
-        !requestedExpiry ||
-        contract.expiry === requestedExpiry
-      );
-
-      const result = await scanStockOptions(filtered);
+      const result = await scanStockOptions(contracts);
 
       return sendJson(res, 200, result);
-    }
-
-    // FULL QUOTE
-    if (
-      url.pathname === "/api/market/full-quotes" &&
-      req.method === "GET"
-    ) {
-      const instrumentKey = getInstrumentKey(url);
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_key is required"
-        });
-      }
-
-      const response = await getMarketQuote(instrumentKey);
-
-      return sendJson(res, 200, {
-        success: true,
-        data: response.data || {}
-      });
     }
 
     // LONG BUILD-UP STOCKS
@@ -1020,7 +1101,8 @@ const server = http.createServer(async (req, res) => {
       url.pathname === "/api/stocks/long-build-up" &&
       req.method === "GET"
     ) {
-      const contractResponse = await getNseStockOptions();
+      const contractResponse =
+        await getNseStockOptions();
 
       if (!contractResponse.success) {
         return sendJson(res, 502, {
@@ -1030,7 +1112,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = await scanStockOptions(
-        contractResponse.contracts || []
+        contractResponse.contracts
       );
 
       return sendJson(res, 200, {
@@ -1043,7 +1125,29 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // NOT FOUND
+    // FULL QUOTE
+    if (
+      url.pathname === "/api/market/full-quotes" &&
+      req.method === "GET"
+    ) {
+      const key = getInstrumentKey(url);
+
+      if (!key) {
+        return sendJson(res, 400, {
+          success: false,
+          error: "instrument_key is required"
+        });
+      }
+
+      const response = await getMarketQuote(key);
+
+      return sendJson(res, 200, {
+        success: true,
+        data: response.data || {}
+      });
+    }
+
+    // ROUTE NOT FOUND
     return sendJson(res, 404, {
       success: false,
       error: "API route not found",
