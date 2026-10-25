@@ -273,12 +273,13 @@ const putConfirmation =
     bullishTrend,
     bearishTrend,
     callConfirmation,
-    putConfirmation,
-    candleSignal: callConfirmation
-      ? "CALL_CONFIRMATION"
-      : putConfirmation
-        ? "PUT_CONFIRMATION"
-        : "WAIT",
+putConfirmation,
+orderBlock,
+candleSignal: callConfirmation
+  ? "CALL_CONFIRMATION"
+  : putConfirmation
+    ? "PUT_CONFIRMATION"
+    : "WAIT",
     latestClosedCandle: latest,
     completed_count: validCandles.length
   };
