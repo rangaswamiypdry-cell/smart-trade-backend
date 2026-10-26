@@ -110,7 +110,22 @@ async function getNseStockOptions() {
     ).toString("utf8");
 
     const instruments = JSON.parse(jsonText);
+console.log("Instrument count:", instruments.length);
 
+console.log(
+  "Sample instruments:",
+  JSON.stringify(instruments.slice(0, 3), null, 2)
+);
+
+console.log(
+  "Segments:",
+  [...new Set(instruments.map(item => item.segment))]
+);
+
+console.log(
+  "Instrument types:",
+  [...new Set(instruments.map(item => item.instrument_type))]
+);
     if (!Array.isArray(instruments)) {
       throw new Error("Invalid instrument data");
     }
