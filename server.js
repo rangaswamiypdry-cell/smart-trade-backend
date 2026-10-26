@@ -1,19 +1,35 @@
+// ============================================
+// PART 1/3
+// NSE STOCK OPTIONS MOMENTUM SCANNER
+// ============================================
+
 const http = require("http");
 const { URL } = require("url");
+const zlib = require("zlib");
 
 const PORT = process.env.PORT || 10000;
 const UPSTOX_BASE = "https://api.upstox.com";
 
 const optionSnapshots = new Map();
-const stockOptionSnapshots = new Map();
+const stockSnapshots = new Map();
+
+// ============================================
+// CORS
+// ============================================
 
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS"
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization",
+    "Access-Control-Allow-Methods":
+      "GET, OPTIONS"
   };
 }
+
+// ============================================
+// JSON RESPONSE
+// ============================================
 
 function sendJson(res, status, data) {
   if (res.writableEnded) return;
@@ -25,6 +41,10 @@ function sendJson(res, status, data) {
 
   res.end(JSON.stringify(data));
 }
+
+// ============================================
+// UPSTOX API
+// ============================================
 
 async function upstoxRequest(apiUrl) {
   const token = process.env.UPSTOX_ACCESS_TOKEN;
@@ -42,13 +62,14 @@ async function upstoxRequest(apiUrl) {
   });
 
   const text = await response.text();
+
   let data;
 
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
     throw new Error(
-      `Upstox returned non-JSON response (HTTP ${response.status})`
+      `Invalid Upstox response: HTTP ${response.status}`
     );
   }
 
@@ -56,766 +77,17 @@ async function upstoxRequest(apiUrl) {
     throw new Error(
       data?.errors?.[0]?.message ||
       data?.message ||
-      `Upstox API request failed (HTTP ${response.status})`
+      `Upstox API error: HTTP ${response.status}`
     );
   }
 
   return data;
 }
 
-function calculateWilderRSI(closes, period = 14) {
-  if (!Array.isArray(closes) || closes.length < period + 1) {
-    return null;
-  }
+// ============================================
+// LOAD NSE OPTION CONTRACTS
+// ============================================
 
-  let gains = 0;
-  let losses = 0;
-
-  for (let i = 1; i <= period; i++) {
-    const change = Number(closes[i]) - Number(closes[i - 1]);
-
-    if (change > 0) {
-      gains += change;
-    } else {
-      losses += Math.abs(change);
-    }
-  }
-
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
-
-  for (let i = period + 1; i < closes.length; i++) {
-    const change = Number(closes[i]) - Number(closes[i - 1]);
-
-    avgGain =
-      (avgGain * (period - 1) + Math.max(change, 0)) / period;
-
-    avgLoss =
-      (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
-  }
-
-  if (avgLoss === 0) {
-    return avgGain === 0 ? 50 : 100;
-  }
-
-  return Number(
-    (100 - 100 / (1 + avgGain / avgLoss)).toFixed(2)
-  );
-}
-
-function getClosedCandles(candles, intervalMinutes = 5) {
-  const intervalMs = intervalMinutes * 60 * 1000;
-
-  return (Array.isArray(candles) ? candles : [])
-    .filter(
-      c =>
-        Array.isArray(c) &&
-        Number.isFinite(new Date(c[0]).getTime())
-    )
-    .filter(
-      c =>
-        new Date(c[0]).getTime() + intervalMs <= Date.now()
-    )
-    .sort(
-      (a, b) =>
-        new Date(a[0]).getTime() -
-        new Date(b[0]).getTime()
-    );
-}
-
-function analyseCompletedCandles(candles, intervalMinutes = 5) {
-  const completed = getClosedCandles(candles, intervalMinutes);
-
-  if (completed.length < 21) {
-    return {
-      ready: false,
-      reason: "NEED_21_COMPLETED_CANDLES",
-      completed_count: completed.length
-    };
-  }
-
-  const validCandles = completed.filter(c =>
-    Array.isArray(c) &&
-    Number.isFinite(Number(c[1])) &&
-    Number.isFinite(Number(c[2])) &&
-    Number.isFinite(Number(c[3])) &&
-    Number.isFinite(Number(c[4])) &&
-    Number.isFinite(Number(c[5]))
-  );
-
-  if (validCandles.length < 21) {
-    return {
-      ready: false,
-      reason: "INSUFFICIENT_VALID_CANDLES",
-      completed_count: validCandles.length
-    };
-  }
-
-  const closes = validCandles.map(c => Number(c[4]));
-  const highs = validCandles.map(c => Number(c[2]));
-  const lows = validCandles.map(c => Number(c[3]));
-  const volumes = validCandles.map(c => Number(c[5]));
-
-  const latest = validCandles[validCandles.length - 1];
-  const previous = validCandles[validCandles.length - 2];
-
-  const close = Number(latest[4]);
-  const open = Number(latest[1]);
-  const previousClose = Number(previous[4]);
-  const latestVolume = volumes[volumes.length - 1];
-
-  const averageVolume =
-    volumes.slice(-21, -1).reduce((sum, v) => sum + v, 0) / 20;
-
-  const rsi14 = calculateWilderRSI(closes, 14);
-
-  // EMA calculation
-  function calculateEMA(values, period) {
-    if (values.length < period) return null;
-
-    const multiplier = 2 / (period + 1);
-
-    let ema = values.slice(0, period)
-      .reduce((sum, value) => sum + value, 0) / period;
-
-    for (let i = period; i < values.length; i++) {
-      ema = (values[i] - ema) * multiplier + ema;
-    }
-
-    return Number(ema.toFixed(2));
-  }
-
-  const ema20 = calculateEMA(closes, 20);
-
-  // VWAP for available completed candles
-  let totalPV = 0;
-  let totalVolume = 0;
-
-  for (const candle of validCandles) {
-    const typicalPrice =
-      (Number(candle[2]) + Number(candle[3]) + Number(candle[4])) / 3;
-
-    const volume = Number(candle[5]);
-
-    totalPV += typicalPrice * volume;
-    totalVolume += volume;
-  }
-
-  const vwap =
-    totalVolume > 0
-      ? Number((totalPV / totalVolume).toFixed(2))
-      : null;
-
-  // Previous 20 candles' resistance and support
-  const previousCandles = validCandles.slice(-21, -1);
-
-  const resistance = Math.max(
-    ...previousCandles.map(c => Number(c[2]))
-  );
-
-  const support = Math.min(
-    ...previousCandles.map(c => Number(c[3]))
-  );
-
-  const volumeRatio =
-    averageVolume > 0 ? latestVolume / averageVolume : 0;
-
-  const volumePass =
-    averageVolume > 0 && latestVolume >= averageVolume * 1.5;
-
-  const bullishBreakout = close > resistance;
-  const bearishBreakdown = close < support;
-
-  const bullishTrend =
-    close > open &&
-    ema20 !== null &&
-    close > ema20 &&
-    vwap !== null &&
-    close > vwap;
-
-  const bearishTrend =
-    close < open &&
-    ema20 !== null &&
-    close < ema20 &&
-    vwap !== null &&
-    close < vwap;
-
- const callConfirmation =
-  rsi14 !== null &&
-  rsi14 > 65 &&
-  volumePass &&
-  bullishTrend &&
-  bullishBreakout;
-
-const putConfirmation =
-  rsi14 !== null &&
-  rsi14 < 35 &&
-  volumePass &&
-  bearishTrend &&
-  bearishBreakdown; 
-  
-  return {
-    ready: rsi14 !== null && averageVolume > 0,
-    close,
-    open,
-    previousClose,
-    rsi14,
-    currentVolume: latestVolume,
-    averageVolume: Number(averageVolume.toFixed(2)),
-    volumeRatio: Number(volumeRatio.toFixed(2)),
-    volumePass,
-    ema20,
-    vwap,
-    support: Number(support.toFixed(2)),
-    resistance: Number(resistance.toFixed(2)),
-    bullishBreakout,
-    bearishBreakdown,
-    bullishTrend,
-    bearishTrend,
-    callConfirmation,
-    putConfirmation,
-    candleSignal: callConfirmation
-      ? "CALL_CONFIRMATION"
-      : putConfirmation
-        ? "PUT_CONFIRMATION"
-        : "WAIT",
-    latestClosedCandle: latest,
-    completed_count: validCandles.length
-  };
-}
-// ==================================================
-// UPSTOX MARKET DATA HELPERS
-// ==================================================
-
-function getAccessTokenStatus() {
-  return Boolean(process.env.UPSTOX_ACCESS_TOKEN);
-}
-
-function getInstrumentKey(url) {
-  return (
-    url.searchParams.get("instrument_key") ||
-    url.searchParams.get("instrumentKey") ||
-    ""
-  ).trim();
-}
-
-async function getMarketQuote(instrumentKey) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v2/market-quote/quotes`
-  );
-
-  apiUrl.searchParams.set("instrument_key", instrumentKey);
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-async function getOptionContracts(instrumentKey, expiryDate) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v2/option/contract`
-  );
-
-  apiUrl.searchParams.set("instrument_key", instrumentKey);
-
-  if (expiryDate) {
-    apiUrl.searchParams.set("expiry_date", expiryDate);
-  }
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-async function getOptionChain(instrumentKey, expiryDate) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v2/option/chain`
-  );
-
-  apiUrl.searchParams.set("instrument_key", instrumentKey);
-
-  if (expiryDate) {
-    apiUrl.searchParams.set("expiry_date", expiryDate);
-  }
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-async function getHistoricalCandles(
-  instrumentKey,
-  interval = "5minute"
-) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v3/historical-candle/${encodeURIComponent(instrumentKey)}/${interval}/${today}`
-  );
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-async function getIntradayCandles(instrumentKey) {
-  const apiUrl = new URL(
-    `${UPSTOX_BASE}/v3/historical-candle/intraday/${encodeURIComponent(instrumentKey)}/minutes/5`
-  );
-
-  return upstoxRequest(apiUrl.toString());
-}
-
-function extractQuote(quoteData, instrumentKey) {
-  const data = quoteData?.data || {};
-
-  if (data[instrumentKey]) {
-    return data[instrumentKey];
-  }
-
-  const firstKey = Object.keys(data)[0];
-
-  return firstKey ? data[firstKey] : null;
-}
-
-function extractPrice(quote) {
-  return Number(
-    quote?.last_price ??
-    quote?.ltp ??
-    quote?.last_traded_price ??
-    0
-  )
-}
-function extractVolume(quote) {
-  const volume = Number(
-    quote?.volume ??
-    quote?.volume_traded ??
-    quote?.volumeTraded ??
-    quote?.total_traded_quantity ??
-    quote?.total_volume ??
-    0
-  );
-
-  return Number.isFinite(volume) && volume > 0 ? volume : 0;
-}
-function extractOI(quote) {
-  return Number(
-    quote?.oi ??
-    quote?.open_interest ??
-    0
-  );
-}
-function extractCandles(response) {
-  return response?.data?.candles || [];
-}
-
-function getNearestExpiry(contracts) {
-  const dates = (Array.isArray(contracts) ? contracts : [])
-    .map(c => c.expiry)
-    .filter(Boolean)
-    .sort();
-
-  if (!dates.length) {
-    return null;
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
-
-  return dates.find(date => date >= today) || dates[0];
-}
-
-function normaliseOptionContract(contract) {
-  return {
-    instrument_key: contract?.instrument_key || "",
-    trading_symbol: contract?.trading_symbol || "",
-    name: contract?.name || "",
-    expiry: contract?.expiry || "",
-    strike_price: Number(contract?.strike_price || 0),
-    instrument_type: contract?.instrument_type || "",
-    lot_size: Number(contract?.lot_size || 0)
-  };
-}
-
-// ==================================================
-// OPTION SIGNAL HELPERS
-// ==================================================
-
-// ==================================================
-// SMART MONEY OPTION BUY SIGNAL
-// ==================================================
-
-function createOptionSignal(contract, quote, previous) {
-  const price = extractPrice(quote);
-  const volume = extractVolume(quote);
-  const oi = extractOI(quote);
-
-  const previousPrice = previous?.price ?? null;
-  const previousVolume = previous?.volume ?? null;
-  const previousOI = previous?.oi ?? null;
-
-  const priceUp =
-    previousPrice !== null &&
-    price > previousPrice;
-
-  const volumeUp =
-    previousVolume !== null &&
-    volume > previousVolume;
-
-  const oiUp =
-    previousOI !== null &&
-    oi > previousOI;
-
-  const validData =
-    price > 0 &&
-    previousPrice !== null &&
-    previousVolume !== null &&
-    previousOI !== null;
-
-  const longBuildUp =
-    validData &&
-    priceUp &&
-    volumeUp &&
-    oiUp;
-
-  return {
-    symbol: contract.trading_symbol,
-    instrument_key: contract.instrument_key,
-    expiry: contract.expiry,
-    strike_price: contract.strike_price,
-    option_type: contract.instrument_type,
-
-    price: price,
-    volume: volume,
-    oi: oi,
-
-    previous_price: previousPrice,
-    previous_volume: previousVolume,
-    previous_oi: previousOI,
-
-    price_up: priceUp,
-    volume_up: volumeUp,
-    oi_up: oiUp,
-
-    long_build_up: longBuildUp,
-
-    long_build_up_signal: longBuildUp
-      ? "LONG_BUILD_UP"
-      : "WAIT",
-
-    smart_money_buy: longBuildUp,
-
-    signal: longBuildUp
-      ? "BULLISH"
-      : "WAIT",
-
-    signal_time: new Date().toISOString()
-  };
-      }
-
-function saveOptionSnapshot(key, quote) {
-  optionSnapshots.set(key, {
-    price: extractPrice(quote),
-    volume: extractVolume(quote),
-    oi: extractOI(quote),
-    time: Date.now()
-  });
-}
-
-function saveStockOptionSnapshot(key, quote) {
-  stockOptionSnapshots.set(key, {
-    price: extractPrice(quote),
-    volume: extractVolume(quote),
-    oi: extractOI(quote),
-    time: Date.now()
-  });
-}
-// ==================================================
-// LONG BUILD-UP DETECTION
-// ==================================================
-
-function detectLongBuildUp(current, previous) {
-  if (!current || !previous) {
-    return {
-      signal: "WAIT",
-      long_build_up: false,
-      reason: "Waiting for previous market data"
-    };
-  }
-
-  const price = extractPrice(current);
-  const previousPrice = extractPrice(previous);
-
-  const volume = extractVolume(current);
-  const previousVolume = extractVolume(previous);
-
-  const oi = extractOI(current);
-  const previousOI = extractOI(previous);
-
-  const priceUp =
-    price > 0 && previousPrice > 0 &&
-    price > previousPrice;
-
-  const volumeUp =
-    volume > 0 && previousVolume > 0 &&
-    volume > previousVolume;
-
-  const oiUp =
-    oi > 0 && previousOI > 0 &&
-    oi > previousOI;
-
-  const longBuildUp =
-    priceUp && volumeUp && oiUp;
-
-  return {
-    signal: longBuildUp ? "LONG_BUILD_UP" : "WAIT",
-    long_build_up: longBuildUp,
-    price,
-    previous_price: previousPrice,
-    volume,
-    previous_volume: previousVolume,
-    oi,
-    previous_oi: previousOI,
-    price_up: priceUp,
-    volume_up: volumeUp,
-    oi_up: oiUp,
-    reason: longBuildUp
-      ? "Price, volume and OI are increasing"
-      : "All three conditions are not confirmed",
-    signal_time: new Date().toISOString()
-  };
-}
-// ==================================================
-// STOCK SYMBOL HELPERS
-// ==================================================
-// ==================================================
-// STOCK SYMBOL HELPERS
-// ==================================================
-
-const DEFAULT_INDEXES = [
-  {
-    name: "NIFTY",
-    instrument_key: "NSE_INDEX|Nifty 50"
-  },
-  {
-    name: "BANKNIFTY",
-    instrument_key: "NSE_INDEX|Nifty Bank"
-  },
-  {
-    name: "FINNIFTY",
-    instrument_key: "NSE_INDEX|Nifty Fin Service"
-  },
-  {
-    name: "SENSEX",
-    instrument_key: "BSE_INDEX|SENSEX"
-  }
-];
-
-function getRequestedIndexes(url) {
-  const raw = url.searchParams.get("indexes");
-
-  if (!raw) {
-    return DEFAULT_INDEXES;
-  }
-
-  const requested = raw
-    .split(",")
-    .map(s => s.trim().toUpperCase());
-
-  return DEFAULT_INDEXES.filter(index =>
-    requested.includes(index.name)
-  );
-}
-// ==================================================
-// SMART MONEY + STRONG MOMENTUM BUY FILTER
-// ==================================================
-
-function detectSmartMoneyBuy(data) {
-  if (!data || typeof data !== "object") {
-    return {
-      buy: false,
-      signal: "WAIT",
-      reason: "Market data unavailable"
-    };
-  }
-
-  const price = Number(data.price);
-  const previousPrice = Number(data.previousPrice);
-  const volume = Number(data.volume);
-  const averageVolume20 = Number(data.averageVolume20);
-  const oi = Number(data.oi);
-  const previousOI = Number(data.previousOI);
-  const rsi = Number(data.rsi14);
-  const close = Number(data.close);
-  const open = Number(data.open);
-  const vwap = Number(data.vwap);
-  const resistance = Number(data.resistance);
-  const cmf = Number(data.cmf20);
-
-  const values = [
-    price, previousPrice, volume, averageVolume20,
-    oi, previousOI, rsi, close, open, vwap,
-    resistance, cmf
-  ];
-
-  if (!values.every(Number.isFinite)) {
-    return {
-      buy: false,
-      signal: "WAIT",
-      reason: "Indicator data missing"
-    };
-  }
-
-  const conditions = {
-    priceRising: price > previousPrice,
-    bullishCandle: close > open,
-    volumeSpike:
-      averageVolume20 > 0 &&
-      volume >= averageVolume20 * 1.5,
-    oiIncreasing: oi > previousOI,
-    rsiStrong: rsi > 55,
-    aboveVWAP: close > vwap,
-    resistanceBreakout: close > resistance,
-    positiveMoneyFlow: cmf > 0
-  };
-
-  const buy = Object.values(conditions).every(Boolean);
-
-  return {
-    buy,
-    signal: buy ? "SMART_MONEY_BUY" : "WAIT",
-    conditions,
-    price,
-    rsi
-  };
-}
-
-// ==================================================
-// INDEX OPTIONS AUTO SCANNER
-// ==================================================
-async function scanIndexOptions(url) {
-  const indexes = getRequestedIndexes(url);
-  const results = [];
-
-  for (const index of indexes) {
-    try {
-      const contractsResponse =
-        await getOptionContracts(index.instrument_key);
-
-      const contracts = contractsResponse?.data || [];
-
-      if (!contracts.length) {
-        results.push({
-          index: index.name,
-          status: "NO_CONTRACTS",
-          signals: []
-        });
-        continue;
-      }
-
-      const expiry =
-        url.searchParams.get("expiry") ||
-        getNearestExpiry(contracts);
-
-      const expiryContracts = contracts
-        .filter(c => !expiry || c.expiry === expiry)
-        .map(normaliseOptionContract)
-        .filter(c => c.instrument_key);
-
-      const chainResponse =
-        await getOptionChain(index.instrument_key, expiry);
-
-      const chain = chainResponse?.data || [];
-
-      const chainKeys = new Set(
-        expiryContracts.map(c => c.instrument_key)
-      );
-
-      const selectedContracts = expiryContracts
-        .filter(c => chainKeys.has(c.instrument_key))
-        .slice(0, 30);
-
-      const signals = [];
-
-      for (const contract of selectedContracts) {
-        try {
-          const quoteResponse =
-            await getMarketQuote(contract.instrument_key);
-
-          const quote = extractQuote(
-            quoteResponse,
-            contract.instrument_key
-          );
-
-          if (!quote) continue;
-
-          const previous =
-            optionSnapshots.get(contract.instrument_key);
-
-const signal = createOptionSignal(
-  contract,
-  quote,
-  previous
-);
-
-// Smart Money filter
-const smartMoney = detectSmartMoneyBuy({
-  price: quote.price,
-  previousPrice: previous?.price,
-  volume: quote.volume,
-  averageVolume20: quote.averageVolume20,
-  oi: quote.oi,
-  previousOI: previous?.oi,
-  rsi14: quote.rsi14,
-  close: quote.close,
-  open: quote.open,
-  vwap: quote.vwap,
-  resistance: quote.resistance,
-  cmf20: quote.cmf20
-});
-
-signal.smart_money = smartMoney;
-
-if (smartMoney.buy) {
-  signal.signal = "BULLISH";
-  signal.smart_money_buy = true;
-} else {
-  signal.smart_money_buy = false;
-}
-
-signals.push(signal);          
-
-          saveOptionSnapshot(
-            contract.instrument_key,
-            quote
-          );
-        } catch (error) {
-          signals.push({
-            symbol: contract.trading_symbol,
-            error: error.message
-          });
-        }
-      }
-
-      results.push({
-        index: index.name,
-        expiry,
-        contracts_checked: selectedContracts.length,
-        signals: signals.filter(
-          s => s.signal === "BULLISH"
-        ),
-        all_results: signals
-      });
-    } catch (error) {
-      results.push({
-        index: index.name,
-        status: "ERROR",
-        error: error.message,
-        signals: []
-      });
-    }
-  }
-
-  return {
-    success: true,
-    timestamp: new Date().toISOString(),
-    results
-  };
-}
-// ==================================================
-// NSE STOCK OPTIONS CONTRACT LIST
-// ==================================================
 async function getNseStockOptions() {
   const instrumentsUrl =
     "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
@@ -825,206 +97,1026 @@ async function getNseStockOptions() {
 
     if (!response.ok) {
       throw new Error(
-        `Instrument file download failed: HTTP ${response.status}`
+        `Instrument download failed: HTTP ${response.status}`
       );
     }
 
-    const compressedData = await response.arrayBuffer();
-    const zlib = require("zlib");
+    const compressed = Buffer.from(
+      await response.arrayBuffer()
+    );
 
     const jsonText = zlib.gunzipSync(
-      Buffer.from(compressedData)
+      compressed
     ).toString("utf8");
 
     const instruments = JSON.parse(jsonText);
 
-    const stockFutures = instruments.filter(item =>
-      item.segment === "NSE_FO" &&
-      item.instrument_type === "FUT" &&
-      item.underlying_type === "EQUITY" &&
-      item.underlying_key &&
-      item.instrument_key
-    );
-
-    const latestExpiry = new Map();
-
-    for (const contract of stockFutures) {
-      const symbol = contract.underlying_symbol;
-      if (!symbol || !contract.expiry) continue;
-
-      const existing = latestExpiry.get(symbol);
-
-      if (
-        !existing ||
-        Number(contract.expiry) < Number(existing.expiry)
-      ) {
-        latestExpiry.set(symbol, contract);
-      }
+    if (!Array.isArray(instruments)) {
+      throw new Error("Invalid instrument data");
     }
 
-    const contracts = Array.from(latestExpiry.values());
+    // Only actual stock option contracts.
+    const contracts = instruments.filter(item =>
+      item.segment === "NSE_FO" &&
+      item.instrument_type === "CE" &&
+      item.underlying_type === "EQUITY" &&
+      item.underlying_symbol &&
+      item.instrument_key &&
+      item.expiry
+    );
+
+    const putContracts = instruments.filter(item =>
+      item.segment === "NSE_FO" &&
+      item.instrument_type === "PE" &&
+      item.underlying_type === "EQUITY" &&
+      item.underlying_symbol &&
+      item.instrument_key &&
+      item.expiry
+    );
+
+    const allContracts = [
+      ...contracts,
+      ...putContracts
+    ];
+
+    const today = new Date()
+      .toISOString()
+      .slice(0, 10);
+
+    const validContracts = allContracts.filter(
+      item => String(item.expiry) >= today
+    );
 
     return {
       success: true,
-      scanner: "NSE_STOCK_FUTURES",
-      count: contracts.length,
-      contracts,
+      scanner: "NSE_STOCK_OPTIONS",
+      count: validContracts.length,
+      contracts: validContracts,
       timestamp: new Date().toISOString()
     };
+
   } catch (error) {
     return {
       success: false,
-      scanner: "NSE_STOCK_FUTURES",
+      scanner: "NSE_STOCK_OPTIONS",
       count: 0,
       contracts: [],
-      error: error.message
+      error: error.message,
+      timestamp: new Date().toISOString()
     };
   }
 }
 
-// ==================================================
-// STOCK OPTION SCANNER
-// ==================================================
+// ============================================
+// OPTION CONTRACT NORMALISATION
+// ============================================
 
-// STOCK OPTION SCANNER
-async function scanStockOptions(contracts) {
+function normaliseContract(contract) {
+  return {
+    symbol:
+      contract.underlying_symbol ||
+      contract.name ||
+      "",
+    trading_symbol:
+      contract.trading_symbol || "",
+    instrument_key:
+      contract.instrument_key || "",
+    instrument_type:
+      contract.instrument_type || "",
+    strike_price:
+      Number(contract.strike_price || 0),
+    lot_size:
+      Number(contract.lot_size || 0),
+    expiry:
+      contract.expiry || ""
+      // ============================================
+// PART 2/3
+// HIGH MOMENTUM + STRIKE PRICE SELECTION
+// ============================================
+
+// ============================================
+// GET OPTION QUOTE
+// ============================================
+
+async function getOptionQuote(instrumentKey) {
+  const apiUrl = new URL(
+    `${UPSTOX_BASE}/v2/market-quote/quotes`
+  );
+
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
+  );
+
+  const response = await upstoxRequest(
+    apiUrl.toString()
+  );
+
+  const data = response?.data || {};
+
+  return (
+    data[instrumentKey] ||
+    Object.values(data)[0] ||
+    null
+  );
+}
+
+// ============================================
+// QUOTE HELPERS
+// ============================================
+
+function getOptionPrice(quote) {
+  return Number(
+    quote?.last_price ??
+    quote?.ltp ??
+    0
+  );
+}
+
+function getOptionVolume(quote) {
+  return Number(
+    quote?.volume ??
+    quote?.volume_traded ??
+    quote?.volumeTraded ??
+    0
+  );
+}
+
+function getOptionOI(quote) {
+  return Number(
+    quote?.oi ??
+    quote?.open_interest ??
+    0
+  );
+}
+
+// ============================================
+// HIGH MOMENTUM DETECTION
+// ============================================
+
+function analyseOptionMomentum(contract, quote) {
+  const key = contract.instrument_key;
+
+  const price = getOptionPrice(quote);
+  const volume = getOptionVolume(quote);
+  const oi = getOptionOI(quote);
+
+  const previous = optionSnapshots.get(key);
+
+  const validPrice =
+    Number.isFinite(price) &&
+    price >= 1 &&
+    price <= 50;
+
+  const priceUp =
+    previous !== undefined &&
+    price > previous.price;
+
+  const volumeUp =
+    previous !== undefined &&
+    volume > previous.volume;
+
+  const oiUp =
+    previous !== undefined &&
+    oi > previous.oi;
+
+  // Long build-up requires price, volume and OI
+  // to increase compared with the previous scan.
+  const longBuildUp =
+    previous !== undefined &&
+    priceUp &&
+    volumeUp &&
+    oiUp;
+
+  // Save current quote for the next comparison.
+  optionSnapshots.set(key, {
+    price,
+    volume,
+    oi,
+    time: Date.now()
+  });
+
+  return {
+    symbol:
+      contract.underlying_symbol ||
+      contract.name ||
+      "",
+    trading_symbol:
+      contract.trading_symbol || "",
+    instrument_key: key,
+    option_type:
+      contract.instrument_type || "",
+    strike_price:
+      Number(contract.strike_price || 0),
+    expiry: contract.expiry || "",
+    premium: price,
+    volume,
+    oi,
+    price_up: priceUp,
+    volume_up: volumeUp,
+    oi_up: oiUp,
+    long_build_up: longBuildUp,
+    premium_filter_pass: validPrice,
+    signal:
+      validPrice && longBuildUp
+        ? "HIGH_MOMENTUM"
+        : "WAIT",
+    signal_time: new Date().toISOString()
+  };
+}
+
+// ============================================
+// SCAN STOCK OPTION MOMENTUM
+// ============================================
+
+async function scanHighMomentumOptions(
+  contracts,
+  premiumMin = 1,
+  premiumMax = 50
+) {
   const results = [];
 
-  for (const contract of contracts.slice(0, 100)) {
-    const key = contract.instrument_key;
+  // Avoid scanning too many contracts in one request.
+  const batch = contracts.slice(0, 100);
+
+  for (const rawContract of batch) {
+    const contract = normaliseContract(rawContract);
+
+    if (!contract.instrument_key) {
+      continue;
+    }
 
     try {
-      const quoteResponse = await getMarketQuote(key);
-
-      const quote = extractQuote(
-        quoteResponse,
-        key
+      const quote = await getOptionQuote(
+        contract.instrument_key
       );
 
       if (!quote) {
-        results.push({
-          symbol: contract.trading_symbol || key,
-          error: "Quote data unavailable"
-        });
         continue;
       }
 
-      const previous = stockOptionSnapshots.get(key);
-
-      // Create option signal
-      const optionSignal = createOptionSignal(
-        contract,
-        quote,
-        previous
+      const signal = analyseOptionMomentum(
+        rawContract,
+        quote
       );
 
-      // Long build-up detection
-      const longBuildUp = detectLongBuildUp(
-        quote,
-        previous
-      );
-      const price = extractPrice(quote);
-const volume = extractVolume(quote);
-const oi = extractOI(quote);
+      const premiumPass =
+        signal.premium >= premiumMin &&
+        signal.premium <= premiumMax;
 
-const previousPrice = previous?.price ?? null;
-const previousVolume = previous?.volume ?? null;
-const previousOI = previous?.oi ?? null;
-
-const changePercent =
-  previousPrice > 0
-    ? ((price - previousPrice) / previousPrice) * 100
-    : 0;
-
-const momentumCandidate =
-  price >= 1 &&
-  price <= 50 &&
-  previousPrice > 0 &&
-  previousVolume !== null &&
-  previousOI !== null &&
-  changePercent >= 10 &&
-  volume > previousVolume &&
-  oi > previousOI;
-      
-results.push({
-  ...optionSignal,
-
-  symbol: contract.trading_symbol || key,
-
-  instrument_key: key,
-
-  long_build_up: longBuildUp.long_build_up,
-
-  long_build_up_signal: longBuildUp.signal,
-
-  long_build_up_details: longBuildUp,
-
-  signal_time: new Date().toISOString()
-});
-
-      saveStockOptionSnapshot(key, quote);
+      if (premiumPass) {
+        results.push(signal);
+      }
 
     } catch (error) {
       results.push({
-        symbol: contract.trading_symbol || key,
+        symbol: contract.symbol,
+        instrument_key: contract.instrument_key,
         error: error.message
       });
     }
   }
 
-  const longBuildUpStocks = results.filter(
-    item => item.long_build_up === true
+  const highMomentum = results.filter(
+    item =>
+      item.signal === "HIGH_MOMENTUM"
   );
 
   return {
     success: true,
-    scanner: "LONG_BUILD_UP_STOCKS",
-    checked: results.length,
-    long_build_up_stocks: longBuildUpStocks,
-    signals: longBuildUpStocks,
+    scanner: "HIGH_MOMENTUM_STOCK_OPTIONS",
+    premium_min: premiumMin,
+    premium_max: premiumMax,
+    contracts_checked: batch.length,
+    momentum_count: highMomentum.length,
+    high_momentum_options: highMomentum,
     all_results: results,
     timestamp: new Date().toISOString()
   };
-          }
-// HIGH MOMENTUM OPTION SCANNER
-function findHighMomentumOptions(options) {
-  if (!Array.isArray(options)) return [];
+}
 
-  return options.filter(option => {
-    const price = Number(option.price);
-    const previousPrice = Number(option.previousPrice);
-    const previousVolume = Number(option.previousVolume);
-    const volume = Number(option.volume);
-    const oi = Number(option.oi);
-    const previousOI = Number(option.previousOI);
-    const rsi = Number(option.rsi);
+// ============================================
+// STRIKE PRICE SELECTION
+// ============================================
 
-    if (
-      ![
-        price, previousPrice, previousVolume,
-        volume, oi, previousOI, rsi
-      ].every(Number.isFinite)
-    ) return false;
+function selectNearATMStrike(
+  contracts,
+  underlyingPrice
+) {
+  const price = Number(underlyingPrice);
 
-    if (price < 1 || price > 50) return false;
-    if (previousPrice <= 0 || previousVolume <= 0) return false;
+  if (!Number.isFinite(price) || price <= 0) {
+    return [];
+  }
 
-    const change =
-      ((price - previousPrice) / previousPrice) * 100;
+  const valid = contracts.filter(contract =>
+    Number(contract.strike_price) > 0 &&
+    ["CE", "PE"].includes(
+      contract.instrument_type
+    )
+  );
+
+  const strikes = valid
+    .map(contract =>
+      Number(contract.strike_price)
+    )
+    .filter(Number.isFinite);
+
+  if (!strikes.length) {
+    return [];
+  }
+
+  const nearestStrike = strikes.reduce(
+    (nearest, strike) =>
+      Math.abs(strike - price) <
+      Math.abs(nearest - price)
+        ? strike
+        : nearest
+  );
+
+  return valid.filter(
+    contract =>
+      Number(contract.strike_price) ===
+      nearestStrike
+  );
+}
+  // ============================================
+// PART 2/3
+// HIGH MOMENTUM + STRIKE PRICE SELECTION
+// ============================================
+
+// ============================================
+// GET OPTION QUOTE
+// ============================================
+
+async function getOptionQuote(instrumentKey) {
+  const apiUrl = new URL(
+    `${UPSTOX_BASE}/v2/market-quote/quotes`
+  );
+
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
+  );
+
+  const response = await upstoxRequest(
+    apiUrl.toString()
+  );
+
+  const data = response?.data || {};
+
+  return (
+    data[instrumentKey] ||
+    Object.values(data)[0] ||
+    null
+  );
+}
+
+// ============================================
+// QUOTE HELPERS
+// ============================================
+
+function getOptionPrice(quote) {
+  return Number(
+    quote?.last_price ??
+    quote?.ltp ??
+    0
+  );
+}
+
+function getOptionVolume(quote) {
+  return Number(
+    quote?.volume ??
+    quote?.volume_traded ??
+    quote?.volumeTraded ??
+    0
+  );
+}
+
+function getOptionOI(quote) {
+  return Number(
+    quote?.oi ??
+    quote?.open_interest ??
+    0
+  );
+}
+
+// ============================================
+// HIGH MOMENTUM DETECTION
+// ============================================
+
+function analyseOptionMomentum(contract, quote) {
+  const key = contract.instrument_key;
+
+  const price = getOptionPrice(quote);
+  const volume = getOptionVolume(quote);
+  const oi = getOptionOI(quote);
+
+  const previous = optionSnapshots.get(key);
+
+  const validPrice =
+    Number.isFinite(price) &&
+    price >= 1 &&
+    price <= 50;
+
+  const priceUp =
+    previous !== undefined &&
+    price > previous.price;
+
+  const volumeUp =
+    previous !== undefined &&
+    volume > previous.volume;
+
+  const oiUp =
+    previous !== undefined &&
+    oi > previous.oi;
+
+  // Long build-up requires price, volume and OI
+  // to increase compared with the previous scan.
+  const longBuildUp =
+    previous !== undefined &&
+    priceUp &&
+    volumeUp &&
+    oiUp;
+
+  // Save current quote for the next comparison.
+  optionSnapshots.set(key, {
+    price,
+    volume,
+    oi,
+    time: Date.now()
+  });
+
+  return {
+    symbol:
+      contract.underlying_symbol ||
+      contract.name ||
+      "",
+    trading_symbol:
+      contract.trading_symbol || "",
+    instrument_key: key,
+    option_type:
+      contract.instrument_type || "",
+    strike_price:
+      Number(contract.strike_price || 0),
+    expiry: contract.expiry || "",
+    premium: price,
+    volume,
+    oi,
+    price_up: priceUp,
+    volume_up: volumeUp,
+    oi_up: oiUp,
+    long_build_up: longBuildUp,
+    premium_filter_pass: validPrice,
+    signal:
+      validPrice && longBuildUp
+        ? "HIGH_MOMENTUM"
+        : "WAIT",
+    signal_time: new Date().toISOString()
+  };
+}
+
+// ============================================
+// SCAN STOCK OPTION MOMENTUM
+// ============================================
+
+async function scanHighMomentumOptions(
+  contracts,
+  premiumMin = 1,
+  premiumMax = 50
+) {
+  const results = [];
+
+  // Avoid scanning too many contracts in one request.
+  const batch = contracts.slice(0, 100);
+
+  for (const rawContract of batch) {
+    const contract = normaliseContract(rawContract);
+
+    if (!contract.instrument_key) {
+      continue;
+    }
+
+    try {
+      const quote = await getOptionQuote(
+        contract.instrument_key
+      );
+
+      if (!quote) {
+        continue;
+      }
+
+      const signal = analyseOptionMomentum(
+        rawContract,
+        quote
+      );
+
+      const premiumPass =
+        signal.premium >= premiumMin &&
+        signal.premium <= premiumMax;
+
+      if (premiumPass) {
+        results.push(signal);
+      }
+
+    } catch (error) {
+      results.push({
+        symbol: contract.symbol,
+        instrument_key: contract.instrument_key,
+        error: error.message
+      });
+    }
+  }
+
+  const highMomentum = results.filter(
+    item =>
+      item.signal === "HIGH_MOMENTUM"
+  );
+
+  return {
+    success: true,
+    scanner: "HIGH_MOMENTUM_STOCK_OPTIONS",
+    premium_min: premiumMin,
+    premium_max: premiumMax,
+    contracts_checked: batch.length,
+    momentum_count: highMomentum.length,
+    high_momentum_options: highMomentum,
+    all_results: results,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// ============================================
+// STRIKE PRICE SELECTION
+// ============================================
+
+function selectNearATMStrike(
+  contracts,
+  underlyingPrice
+) {
+  const price = Number(underlyingPrice);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return [];
+  }
+
+  const valid = contracts.filter(contract =>
+    Number(contract.strike_price) > 0 &&
+    ["CE", "PE"].includes(
+      contract.instrument_type
+    )
+  );
+
+  const strikes = valid
+    .map(contract =>
+      Number(contract.strike_price)
+    )
+    .filter(Number.isFinite);
+
+  if (!strikes.length) {
+    return [];
+  }
+
+  const nearestStrike = strikes.reduce(
+    (nearest, strike) =>
+      Math.abs(strike - price) <
+      Math.abs(nearest - price)
+        ? strike
+        : nearest
+  );
+
+  return valid.filter(
+    contract =>
+      Number(contract.strike_price) ===
+      nearestStrike
+  );
+}
+// ============================================
+// PART 2/3
+// HIGH MOMENTUM + STRIKE PRICE SELECTION
+// ============================================
+
+// ============================================
+// GET OPTION QUOTE
+// ============================================
+
+async function getOptionQuote(instrumentKey) {
+  const apiUrl = new URL(
+    `${UPSTOX_BASE}/v2/market-quote/quotes`
+  );
+
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
+  );
+
+  const response = await upstoxRequest(
+    apiUrl.toString()
+  );
+
+  const data = response?.data || {};
+
+  return (
+    data[instrumentKey] ||
+    Object.values(data)[0] ||
+    null
+  );
+}
+
+// ============================================
+// QUOTE HELPERS
+// ============================================
+
+function getOptionPrice(quote) {
+  return Number(
+    quote?.last_price ??
+    quote?.ltp ??
+    0
+  );
+}
+
+function getOptionVolume(quote) {
+  return Number(
+    quote?.volume ??
+    quote?.volume_traded ??
+    quote?.volumeTraded ??
+    0
+  );
+}
+
+function getOptionOI(quote) {
+  return Number(
+    quote?.oi ??
+    quote?.open_interest ??
+    0
+  );
+}
+
+// ============================================
+// HIGH MOMENTUM DETECTION
+// ============================================
+
+function analyseOptionMomentum(contract, quote) {
+  const key = contract.instrument_key;
+
+  const price = getOptionPrice(quote);
+  const volume = getOptionVolume(quote);
+  const oi = getOptionOI(quote);
+
+  const previous = optionSnapshots.get(key);
+
+  const validPrice =
+    Number.isFinite(price) &&
+    price >= 1 &&
+    price <= 50;
+
+  const priceUp =
+    previous !== undefined &&
+    price > previous.price;
+
+  const volumeUp =
+    previous !== undefined &&
+    volume > previous.volume;
+
+  const oiUp =
+    previous !== undefined &&
+    oi > previous.oi;
+
+  // Long build-up requires price, volume and OI
+  // to increase compared with the previous scan.
+  const longBuildUp =
+    previous !== undefined &&
+    priceUp &&
+    volumeUp &&
+    oiUp;
+
+  // Save current quote for the next comparison.
+  optionSnapshots.set(key, {
+    price,
+    volume,
+    oi,
+    time: Date.now()
+  });
+
+  return {
+    symbol:
+      contract.underlying_symbol ||
+      contract.name ||
+      "",
+    trading_symbol:
+      contract.trading_symbol || "",
+    instrument_key: key,
+    option_type:
+      contract.instrument_type || "",
+    strike_price:
+      Number(contract.strike_price || 0),
+    expiry: contract.expiry || "",
+    premium: price,
+    volume,
+    oi,
+    price_up: priceUp,
+    volume_up: volumeUp,
+    oi_up: oiUp,
+    long_build_up: longBuildUp,
+    premium_filter_pass: validPrice,
+    signal:
+      validPrice && longBuildUp
+        ? "HIGH_MOMENTUM"
+        : "WAIT",
+    signal_time: new Date().toISOString()
+  };
+}
+
+// ============================================
+// SCAN STOCK OPTION MOMENTUM
+// ============================================
+
+async function scanHighMomentumOptions(
+  contracts,
+  premiumMin = 1,
+  premiumMax = 50
+) {
+  const results = [];
+
+  // Avoid scanning too many contracts in one request.
+  const batch = contracts.slice(0, 100);
+
+  for (const rawContract of batch) {
+    const contract = normaliseContract(rawContract);
+
+    if (!contract.instrument_key) {
+      continue;
+    }
+
+    try {
+      const quote = await getOptionQuote(
+        contract.instrument_key
+      );
+
+      if (!quote) {
+        continue;
+      }
+
+      const signal = analyseOptionMomentum(
+        rawContract,
+        quote
+      );
+
+      const premiumPass =
+        signal.premium >= premiumMin &&
+        signal.premium <= premiumMax;
+
+      if (premiumPass) {
+        results.push(signal);
+      }
+
+    } catch (error) {
+      results.push({
+        symbol: contract.symbol,
+        instrument_key: contract.instrument_key,
+        error: error.message
+      });
+    }
+  }
+
+  const highMomentum = results.filter(
+    item =>
+      item.signal === "HIGH_MOMENTUM"
+  );
+
+  return {
+    success: true,
+    scanner: "HIGH_MOMENTUM_STOCK_OPTIONS",
+    premium_min: premiumMin,
+    premium_max: premiumMax,
+    contracts_checked: batch.length,
+    momentum_count: highMomentum.length,
+    high_momentum_options: highMomentum,
+    all_results: results,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// ============================================
+// STRIKE PRICE SELECTION
+// ============================================
+
+function selectNearATMStrike(
+  contracts,
+  underlyingPrice
+) {
+  const price = Number(underlyingPrice);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    return [];
+  }
+
+  const valid = contracts.filter(contract =>
+    Number(contract.strike_price) > 0 &&
+    ["CE", "PE"].includes(
+      contract.instrument_type
+    )
+  );
+
+  const strikes = valid
+    .map(contract =>
+      Number(contract.strike_price)
+    )
+    .filter(Number.isFinite);
+
+  if (!strikes.length) {
+    return [];
+  }
+
+  const nearestStrike = strikes.reduce(
+    (nearest, strike) =>
+      Math.abs(strike - price) <
+      Math.abs(nearest - price)
+        ? strike
+        : nearest
+  );
+
+  return valid.filter(
+    contract =>
+      Number(contract.strike_price) ===
+      nearestStrike
+  );
+             }// ============================================
+// PART 3/3
+// OPTION SIGNAL + API ROUTES + SERVER START
+// ============================================
+
+// ============================================
+// FILTER HIGH MOMENTUM SIGNALS
+// ============================================
+
+function filterHighMomentumSignals(
+  signals,
+  optionType = null
+) {
+  return signals.filter(signal => {
+    const typePass =
+      !optionType ||
+      signal.option_type === optionType;
 
     return (
-      change >= 10 &&
-      volume > previousVolume &&
-      oi > previousOI &&
-      rsi > 55 &&
-      option.priceAboveVWAP === true &&
-      option.breakout === true
+      signal.signal === "HIGH_MOMENTUM" &&
+      signal.premium_filter_pass &&
+      typePass
     );
   });
-      }
-// ==================================================
-// HTTP SERVER AND API ROUTES
-// ==================================================
+}
+
+// ============================================
+// SELECT BEST OPTION
+// ============================================
+
+function selectBestOption(signals) {
+  if (!Array.isArray(signals) || !signals.length) {
+    return null;
+  }
+
+  // Rank using volume, OI and premium.
+  // This is a ranking heuristic, not a guarantee.
+  return [...signals].sort((a, b) => {
+    const aScore =
+      Number(a.volume || 0) +
+      Number(a.oi || 0);
+
+    const bScore =
+      Number(b.volume || 0) +
+      Number(b.oi || 0);
+
+    return bScore - aScore;
+  })[0];
+}
+
+// ============================================
+// BUILD OPTION SIGNAL
+// ============================================
+
+function buildOptionSignal(option) {
+  if (!option) {
+    return {
+      success: false,
+      signal: "WAIT",
+      message: "No high momentum option found"
+    };
+  }
+
+  return {
+    success: true,
+    signal: option.signal,
+    symbol: option.symbol,
+    trading_symbol: option.trading_symbol,
+    instrument_key: option.instrument_key,
+    option_type: option.option_type,
+    strike_price: option.strike_price,
+    expiry: option.expiry,
+    premium: option.premium,
+    volume: option.volume,
+    oi: option.oi,
+    price_up: option.price_up,
+    volume_up: option.volume_up,
+    oi_up: option.oi_up,
+    long_build_up: option.long_build_up,
+    signal_time: option.signal_time
+  };
+}
+
+// ============================================
+// GET UNDERLYING PRICE
+// ============================================
+
+async function getUnderlyingPrice(instrumentKey) {
+  const apiUrl = new URL(
+    `${UPSTOX_BASE}/v2/market-quote/quotes`
+  );
+
+  apiUrl.searchParams.set(
+    "instrument_key",
+    instrumentKey
+  );
+
+  const response = await upstoxRequest(
+    apiUrl.toString()
+  );
+
+  const data = response?.data || {};
+  const quote =
+    data[instrumentKey] ||
+    Object.values(data)[0];
+
+  const price = Number(quote?.last_price || 0);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Underlying price unavailable");
+  }
+
+  return price;
+}
+
+// ============================================
+// SCAN STOCK OPTIONS AND SELECT BEST
+// ============================================
+
+async function scanAndSelectBestOption(
+  contracts,
+  underlyingPrice,
+  premiumMin = 1,
+  premiumMax = 50,
+  optionType = null
+) {
+  const nearATMContracts = selectNearATMStrike(
+    contracts,
+    underlyingPrice
+  );
+
+  const filteredContracts = nearATMContracts.filter(
+    contract =>
+      !optionType ||
+      contract.instrument_type === optionType
+  );
+
+  if (!filteredContracts.length) {
+    return {
+      success: true,
+      scanner: "HIGH_MOMENTUM_STOCK_OPTIONS",
+      signal: {
+        success: false,
+        signal: "WAIT",
+        message: "No matching near-ATM contracts"
+      },
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  const scanResult = await scanHighMomentumOptions(
+    filteredContracts,
+    premiumMin,
+    premiumMax
+  );
+
+  const candidates = filterHighMomentumSignals(
+    scanResult.high_momentum_options,
+    optionType
+  );
+
+  const bestOption = selectBestOption(candidates);
+
+  return {
+    success: true,
+    scanner: "HIGH_MOMENTUM_STOCK_OPTIONS",
+    signal: buildOptionSignal(bestOption),
+    contracts_checked: scanResult.contracts_checked,
+    momentum_count: candidates.length,
+    timestamp: new Date().toISOString()
+  };
+}
+
+// ============================================
+// HTTP SERVER + API ROUTES
+// ============================================
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
@@ -1042,177 +1134,149 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/health") {
       return sendJson(res, 200, {
         success: true,
-        message: "Smart Trade India Backend running",
+        message: "Stock Options Scanner running",
         timestamp: new Date().toISOString()
       });
     }
 
-    // UPSTOX STATUS
-    if (url.pathname === "/api/upstox/status") {
-      return sendJson(res, 200, {
-        success: true,
-        token_configured: getAccessTokenStatus()
-      });
-    }
-
-    // MARKET QUOTE
-    if (
-      url.pathname === "/api/market/quote" &&
-      req.method === "GET"
-    ) {
-      const instrumentKey = getInstrumentKey(url);
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_key is required"
-        });
-      }
-
-      const quote = await getMarketQuote(instrumentKey);
-
-      return sendJson(res, 200, {
-        success: true,
-        data: quote.data || {}
-      });
-    }
-
-    // HISTORICAL CANDLES
-    if (
-      url.pathname === "/api/market/candles" &&
-      req.method === "GET"
-    ) {
-      const instrumentKey = getInstrumentKey(url);
-
-      if (!instrumentKey) {
-        return sendJson(res, 400, {
-          success: false,
-          error: "instrument_key is required"
-        });
-      }
-
-      const response =
-        await getIntradayCandles(instrumentKey);
-
-      const analysis = analyseCompletedCandles(
-        extractCandles(response),
-        5
-      );
-
-      return sendJson(res, 200, {
-        success: true,
-        instrument_key: instrumentKey,
-        analysis
-      });
-    }
-
-    // INDEX OPTIONS SCANNER
-    if (
-      url.pathname === "/api/options/auto-scan" &&
-      req.method === "GET"
-    ) {
-      const result = await scanIndexOptions(url);
-
-      return sendJson(res, 200, result);
-    }
-
-    // STOCK OPTIONS CONTRACTS
+    // NSE STOCK OPTIONS LIST
     if (
       url.pathname === "/api/options/nse-stocks" &&
       req.method === "GET"
     ) {
       const result = await getNseStockOptions();
 
-      return sendJson(res, 200, result);
+      return sendJson(
+        res,
+        result.success ? 200 : 502,
+        result
+      );
     }
 
-    // STOCK OPTIONS SCANNER
+    // HIGH MOMENTUM SCANNER
     if (
       url.pathname === "/api/options/nse-stocks/scan" &&
       req.method === "GET"
     ) {
-      const contractResponse =
-        await getNseStockOptions();
-
-      const contracts = contractResponse.contracts || [];
-
-      const requestedExpiry = url.searchParams.get("expiry");
-
-      const filtered = contracts.filter(contract =>
-        !requestedExpiry ||
-        contract.expiry === requestedExpiry
+      const premiumMin = Number(
+        url.searchParams.get("min_premium") || 1
       );
 
-      const result = await scanStockOptions(filtered);
+      const premiumMax = Number(
+        url.searchParams.get("max_premium") || 50
+      );
 
-      return sendJson(res, 200, result);
-    }
+      const requestedType =
+        url.searchParams.get("type");
 
-    // FULL QUOTE
-    if (
-      url.pathname === "/api/market/full-quotes" &&
-      req.method === "GET"
-    ) {
-      const instrumentKey = getInstrumentKey(url);
+      const optionType =
+        requestedType === "CE" ||
+        requestedType === "PE"
+          ? requestedType
+          : null;
 
-      if (!instrumentKey) {
+      if (
+        !Number.isFinite(premiumMin) ||
+        !Number.isFinite(premiumMax) ||
+        premiumMin < 0 ||
+        premiumMax < premiumMin
+      ) {
         return sendJson(res, 400, {
           success: false,
-          error: "instrument_key is required"
+          error: "Invalid premium range"
         });
       }
 
-      const response = await getMarketQuote(instrumentKey);
+      const contractResult = await getNseStockOptions();
+
+      if (!contractResult.success) {
+        return sendJson(res, 502, contractResult);
+      }
+
+      const allContracts = contractResult.contracts;
+
+      const symbols = [
+        ...new Set(
+          allContracts.map(
+            contract => contract.underlying_symbol
+          ).filter(Boolean)
+        )
+      ];
+
+      const results = [];
+
+      for (const symbol of symbols.slice(0, 30)) {
+        const stockContracts = allContracts.filter(
+          contract =>
+            contract.underlying_symbol === symbol
+        );
+
+        if (!stockContracts.length) continue;
+
+        try {
+          const underlyingKey =
+            stockContracts[0].underlying_key;
+
+          if (!underlyingKey) continue;
+
+          const underlyingPrice = await getUnderlyingPrice(
+            underlyingKey
+          );
+
+          const result = await scanAndSelectBestOption(
+            stockContracts,
+            underlyingPrice,
+            premiumMin,
+            premiumMax,
+            optionType
+          );
+
+          if (result.signal?.success) {
+            results.push(result.signal);
+          }
+        } catch (error) {
+          results.push({
+            symbol,
+            signal: "ERROR",
+            error: error.message
+          });
+        }
+      }
 
       return sendJson(res, 200, {
         success: true,
-        data: response.data || {}
+        scanner: "HIGH_MOMENTUM_STOCK_OPTIONS",
+        premium_min: premiumMin,
+        premium_max: premiumMax,
+        option_type: optionType || "CE_AND_PE",
+        stocks_checked: Math.min(symbols.length, 30),
+        signals: results,
+        timestamp: new Date().toISOString()
       });
     }
-// LONG BUILD-UP STOCKS API
-if (
-  url.pathname === "/api/stocks/long-build-up" &&
-  req.method === "GET"
-) {
-  const contractResponse = await getNseStockOptions();
-  const contracts = contractResponse.contracts || [];
 
-  const result = await scanStockOptions(contracts);
-
-  return sendJson(res, 200, {
-    success: true,
-    scanner: "LONG_BUILD_UP_STOCKS",
-    total_checked: result.checked,
-    long_build_up_stocks: result.signals || [],
-    all_results: result.all_results || [],
-    timestamp: new Date().toISOString()
-  });
-  }
-    // NOT FOUND
+    // UNKNOWN ROUTE
     return sendJson(res, 404, {
       success: false,
       error: "API route not found",
       path: url.pathname
     });
-  } catch (error) {
-    const status =
-      error.message === "UPSTOX_ACCESS_TOKEN_MISSING"
-        ? 503
-        : 502;
 
-    return sendJson(res, status, {
+  } catch (error) {
+    return sendJson(res, 502, {
       success: false,
       error: error.message || "Internal server error"
     });
   }
 });
 
-// ==================================================
+// ============================================
 // START SERVER
-// ==================================================
+// ============================================
 
 server.listen(PORT, () => {
   console.log(
-    `Smart Trade India Backend running on port ${PORT}`
+    `Stock Options Scanner running on port ${PORT}`
   );
-  });
+});
+    
