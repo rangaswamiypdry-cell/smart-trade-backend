@@ -188,7 +188,8 @@ function normaliseContract(contract) {
     lot_size:
       Number(contract.lot_size || 0),
     expiry:
-      contract.expiry || ""
+      contract.expiry || ""  };
+}
       // ============================================
 // PART 2/3
 // HIGH MOMENTUM + STRIKE PRICE SELECTION
