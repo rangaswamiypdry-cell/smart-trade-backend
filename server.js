@@ -964,6 +964,42 @@ async function scanStockOptions(contracts) {
     timestamp: new Date().toISOString()
   };
           }
+// HIGH MOMENTUM OPTION SCANNER
+function findHighMomentumOptions(options) {
+  if (!Array.isArray(options)) return [];
+
+  return options.filter(option => {
+    const price = Number(option.price);
+    const previousPrice = Number(option.previousPrice);
+    const previousVolume = Number(option.previousVolume);
+    const volume = Number(option.volume);
+    const oi = Number(option.oi);
+    const previousOI = Number(option.previousOI);
+    const rsi = Number(option.rsi);
+
+    if (
+      ![
+        price, previousPrice, previousVolume,
+        volume, oi, previousOI, rsi
+      ].every(Number.isFinite)
+    ) return false;
+
+    if (price < 1 || price > 50) return false;
+    if (previousPrice <= 0 || previousVolume <= 0) return false;
+
+    const change =
+      ((price - previousPrice) / previousPrice) * 100;
+
+    return (
+      change >= 10 &&
+      volume > previousVolume &&
+      oi > previousOI &&
+      rsi > 55 &&
+      option.priceAboveVWAP === true &&
+      option.breakout === true
+    );
+  });
+      }
 // ==================================================
 // HTTP SERVER AND API ROUTES
 // ==================================================
