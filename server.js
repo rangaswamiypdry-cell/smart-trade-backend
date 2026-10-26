@@ -923,22 +923,21 @@ async function scanStockOptions(contracts) {
         quote,
         previous
       );
+results.push({
+  ...optionSignal,
 
-      results.push({
-        ...optionSignal,
+  symbol: contract.trading_symbol || key,
 
-        symbol: contract.trading_symbol || key,
+  instrument_key: key,
 
-        instrument_key: key,
+  long_build_up: longBuildUp.long_build_up,
 
-        long_build_up: longBuildUp.long_build_up,
+  long_build_up_signal: longBuildUp.signal,
 
-        long_build_up_signal: longBuildUp.signal,
+  long_build_up_details: longBuildUp,
 
-        long_build_up_details: longBuildUp,
-
-        signal_time: new Date().toISOString()
-      });
+  signal_time: new Date().toISOString()
+});
 
       saveStockOptionSnapshot(key, quote);
 
