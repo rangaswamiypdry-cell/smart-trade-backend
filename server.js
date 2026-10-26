@@ -923,6 +923,28 @@ async function scanStockOptions(contracts) {
         quote,
         previous
       );
+      const price = extractPrice(quote);
+const volume = extractVolume(quote);
+const oi = extractOI(quote);
+
+const previousPrice = previous?.price ?? null;
+const previousVolume = previous?.volume ?? null;
+const previousOI = previous?.oi ?? null;
+
+const changePercent =
+  previousPrice > 0
+    ? ((price - previousPrice) / previousPrice) * 100
+    : 0;
+
+const momentumCandidate =
+  price >= 1 &&
+  price <= 50 &&
+  previousPrice > 0 &&
+  previousVolume !== null &&
+  previousOI !== null &&
+  changePercent >= 10 &&
+  volume > previousVolume &&
+  oi > previousOI;
 results.push({
   ...optionSignal,
 
