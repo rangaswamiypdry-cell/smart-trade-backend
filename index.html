@@ -3,381 +3,610 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smart Market Scanner</title>
 <meta name="theme-color" content="#07111f">
+<title>Smart Market Scanner</title>
 
 <style>
-*{box-sizing:border-box}
-body{
-  margin:0;padding:16px;
-  background:#07111f;color:#fff;
-  font-family:Arial,sans-serif
+* {
+  box-sizing: border-box;
 }
-h1{color:#31d6a0;font-size:25px}
-h2{font-size:21px}
-button{
-  width:100%;padding:14px;
-  background:#16b981;color:white;
-  border:0;border-radius:10px;
-  font-size:17px;font-weight:bold
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: #07111f;
+  color: #ffffff;
+  font-family: Arial, sans-serif;
 }
-button:disabled{opacity:.6}
-.card{
-  background:#142338;
-  padding:16px;margin:14px 0;
-  border-radius:14px;overflow-wrap:anywhere
+
+h1 {
+  color: #31d6a0;
+  font-size: 25px;
 }
-.metric{
-  color:#31d6a0;font-size:27px;
-  font-weight:bold;margin-top:8px
+
+h2 {
+  font-size: 20px;
+  margin-top: 24px;
 }
-small{color:#a5b7ce}
-.bull{border-left:5px solid #31d6a0}
-.bear{border-left:5px solid #ff6262}
-.wait{border-left:5px solid #f5bd4f}
-.tag{
-  display:inline-block;padding:7px 10px;
-  border-radius:7px;background:#253b53;
-  margin:5px 0;font-weight:bold
+
+button, select, input {
+  width: 100%;
+  padding: 13px;
+  border-radius: 9px;
+  font-size: 16px;
+  margin: 6px 0;
 }
-.row{margin:9px 0}
-.error{color:#ff7777}
-pre{white-space:pre-wrap;overflow-wrap:anywhere}
+
+button {
+  background: #16b981;
+  color: white;
+  border: none;
+  font-weight: bold;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+select, input {
+  background: #142338;
+  color: white;
+  border: 1px solid #344b66;
+}
+
+.card {
+  background: #142338;
+  padding: 15px;
+  margin: 12px 0;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+
+.bull {
+  border-left: 5px solid #31d6a0;
+}
+
+.bear {
+  border-left: 5px solid #ff6262;
+}
+
+.wait {
+  border-left: 5px solid #f5bd4f;
+}
+
+.metric {
+  color: #31d6a0;
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.row {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+small {
+  color: #a5b7ce;
+}
+
+.tag {
+  display: inline-block;
+  padding: 7px 10px;
+  background: #253b53;
+  border-radius: 7px;
+  margin: 5px 0;
+  font-weight: bold;
+}
+
+.error {
+  color: #ff7777;
+}
+
+.muted {
+  color: #a5b7ce;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #b9d2ec;
+}
 </style>
 </head>
 
 <body>
 
 <h1>📈 Smart Market Scanner</h1>
-<p>Live NSE / BSE Options Dashboard</p>
 
-<button id="refreshBtn" onclick="loadData()">
-🔄 Refresh Scanner
-</button>
+<p class="muted">
+NSE Stock Options | High Momentum | Long Build-Up
+</p>
+
+<div class="card">
+  <h3>⚙️ Scanner Settings</h3>
+
+  <label for="minPremium">Minimum Option Premium (₹)</label>
+  <input
+    id="minPremium"
+    type="number"
+    value="1"
+    min="0"
+    step="0.05"
+  >
+
+  <label for="maxPremium">Maximum Option Premium (₹)</label>
+  <input
+    id="maxPremium"
+    type="number"
+    value="50"
+    min="0"
+    step="0.05"
+  >
+
+  <label for="optionType">Option Type</label>
+  <select id="optionType">
+    <option value="">CE + PE</option>
+    <option value="CE">CE Only</option>
+    <option value="PE">PE Only</option>
+  </select>
+
+  <button id="scanButton" onclick="loadScanner()">
+    🔍 Scan Stock Options
+  </button>
+
+  <p class="muted">
+    Premium filter, CE/PE filter ಮತ್ತು Backend‌ನ
+    High Momentum signals ಆಧರಿಸಿ ಫಲಿತಾಂಶ ತೋರಿಸಲಾಗುತ್ತದೆ.
+  </p>
+</div>
 
 <div id="status" class="card">
-Connecting to backend...
+  Connecting to backend...
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div>Stocks Checked</div>
+    <div id="stocksChecked" class="metric">0</div>
+  </div>
+
+  <div class="card">
+    <div>Momentum Signals</div>
+    <div id="signalsCount" class="metric">0</div>
+  </div>
 </div>
 
 <div id="summary"></div>
+
+<h2>🚨 High Momentum Options</h2>
 <div id="results"></div>
-<h2>📈 NSE Stock Futures Scanner</h2>
 
-<button onclick="loadStocks()">
-  🔍 Scan Long Build-Up Stocks
-</button>
-
-<div id="stockStatus" class="card">
-  Stock scanner ready
+<h2>📋 Scanner Diagnostics</h2>
+<div id="diagnostics" class="card">
+  Scanner not started.
 </div>
 
-<div id="stockResults"></div>
 <script>
-const API="https://smart-trade-backend-ig6l.onrender.com";
-const STOCK_API = API + "/api/stocks/long-build-up";
-function formatTime(value){
-  if(!value)return "Not available";
-  const d=new Date(value);
-  if(isNaN(d.getTime()))return value;
-  return d.toLocaleString("en-IN",{
-    timeZone:"Asia/Kolkata",
-    dateStyle:"medium",
-    timeStyle:"medium"
+"use strict";
+
+// ========================================
+// BACKEND CONFIGURATION
+// ========================================
+
+const API =
+  "https://smart-trade-backend-ig6l.onrender.com";
+
+const SCANNER_API =
+  API + "/api/options/nse-stocks/scan";
+
+// ========================================
+// HELPERS
+// ========================================
+
+function formatTime(value) {
+  if (!value) return "Not available";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    dateStyle: "medium",
+    timeStyle: "medium"
   });
 }
 
-function fmt(value){
-  if(value===undefined||value===null||value==="")return "N/A";
-  if(typeof value==="boolean")return value?"YES":"NO";
-  const n=Number(value);
-  return Number.isFinite(n)
-    ?n.toLocaleString("en-IN",{maximumFractionDigits:2})
-    :String(value);
-}
+function number(value, digits = 2) {
+  const n = Number(value);
 
-function row(card,label,value){
-  const el=document.createElement("div");
-  el.className="row";
-  el.textContent=label+": "+fmt(value);
-  card.appendChild(el);
-}
-
-function card(title,cls="card"){
-  const el=document.createElement("div");
-  el.className=cls;
-  const h=document.createElement("h3");
-  h.textContent=title;
-  el.appendChild(h);
-  return el;
-}
-
-async function loadData(){
-  const status=document.getElementById("status");
-  const summary=document.getElementById("summary");
-  const results=document.getElementById("results");
-  const btn=document.getElementById("refreshBtn");
-
-  btn.disabled=true;
-  status.className="card";
-  status.textContent="Loading scanner data...";
-  summary.replaceChildren();
-  results.replaceChildren();
-
-  try{
-    const response=await fetch(API+"/api/options/auto-scan",{
-      cache:"no-store"
-    });
-
-    const text=await response.text();
-    let data;
-
-    try{
-      data=JSON.parse(text);
-    }catch(e){
-      throw new Error("Invalid JSON from backend");
-    }
-
-    if(!response.ok){
-      throw new Error(data.error||"HTTP "+response.status);
-    }
-
-    if(data.success===false){
-      throw new Error(data.error||"Scan failed");
-    }
-
-    const markets=Array.isArray(data.results)?data.results:[];
-    const signals=[];
-
-    markets.forEach(m=>{
-      (Array.isArray(m.signals)?m.signals:[]).forEach(s=>{
-        signals.push({
-          ...s,
-          market:m.index||m.underlying||"Market",
-          market_expiry:m.expiry||s.expiry||"N/A"
-        });
-      });
-    });
-
-    // Support APIs that return alerts directly.
-    if(Array.isArray(data.alerts)){
-      data.alerts.forEach(a=>signals.push(a));
-    }
-
-    const actionable=signals.filter(s=>{
-      const name=String(s.signal||s.type||"").toUpperCase();
-      return name.includes("BULLISH")||
-             name.includes("BEARISH")||
-             name.includes("CALL BUY")||
-             name.includes("PUT BUY");
-    });
-
-    const totalScanned=markets.reduce((sum,m)=>{
-      return sum+(Number(m.contracts_checked)||0);
-    },0);
-
-    status.textContent=
-      "✅ Backend Connected | Scan time: "+
-      formatTime(data.timestamp||data.scanned_at||data.scan_time);
-
-    const totalCard=card("Total Alerts");
-    const totalMetric=document.createElement("div");
-    totalMetric.className="metric";
-    totalMetric.textContent=actionable.length;
-    totalCard.appendChild(totalMetric);
-    summary.appendChild(totalCard);
-
-    const scannedCard=card("Options Scanned");
-    const scannedMetric=document.createElement("div");
-    scannedMetric.className="metric";
-    scannedMetric.textContent=totalScanned;
-    scannedCard.appendChild(scannedMetric);
-    summary.appendChild(scannedCard);
-
-    markets.forEach(m=>{
-      const marketCard=card("📊 "+(m.index||m.underlying||"Market"));
-      row(marketCard,"Options Scanned",m.contracts_checked);
-
-      const marketSignals=Array.isArray(m.signals)?m.signals:[];
-      row(marketCard,"Signals",marketSignals.length);
-      row(marketCard,"Expiry",m.expiry||"N/A");
-
-      summary.appendChild(marketCard);
-    });
-
-    const heading=document.createElement("h2");
-    heading.textContent="🚨 Trading Alerts";
-    results.appendChild(heading);
-
-    if(actionable.length===0){
-      const msg=card("No BUY Alerts","card wait");
-      msg.appendChild(document.createTextNode(
-        "ಈಗ ಯಾವುದೇ BULLISH ಅಥವಾ BEARISH alert ಇಲ್ಲ. "+
-        "Market conditions ಹೊಂದಿದಾಗ ಮಾತ್ರ signal ಕಾಣಿಸುತ್ತದೆ."
-      ));
-      results.appendChild(msg);
-    }
-
-    actionable.forEach(s=>{
-      const name=String(s.signal||s.type||"SIGNAL").toUpperCase();
-
-      const bullish=name.includes("BULLISH")||name.includes("CALL BUY");
-      const bearish=name.includes("BEARISH")||name.includes("PUT BUY");
-
-      const c=card(
-        (bullish?"🟢 ":bearish?"🔴 ":"🟡 ")+
-        (s.symbol||s.market||"Option"),
-        bullish?"card bull":bearish?"card bear":"card wait"
-      );
-
-      const tag=document.createElement("div");
-      tag.className="tag";
-      tag.textContent=name;
-      c.appendChild(tag);
-
-      row(c,"Market",s.market);
-      row(c,"Option Symbol",s.symbol);
-      row(c,"Strike Price",s.strike_price);
-      row(c,"Option Type",s.option_type);
-      row(c,"Expiry",s.expiry||s.market_expiry);
-      row(c,"Option Price",s.price);// Entry Price, Stop Loss and Target
-const entryPrice = Number(s.price);
-
-if (Number.isFinite(entryPrice) && entryPrice > 0) {
-  const stopLoss = entryPrice * 0.90;
-  const target = entryPrice * 1.20;
-
-  row(c, "Entry Price", entryPrice.toFixed(2));
-  row(c, "Stop Loss (10%)", stopLoss.toFixed(2));
-  row(c, "Target (20%)", target.toFixed(2));
-} else {
-  row(c, "Entry Price", "Unavailable");
-  row(c, "Stop Loss", "Unavailable");
-  row(c, "Target", "Unavailable");
-}
-      row(c,"Previous Price",s.previous_price);
-      row(c,"Volume",s.volume);
-      row(c,"Previous Volume",s.previous_volume);
-      row(c,"Open Interest",s.oi);
-      row(c,"Previous OI",s.previous_oi);
-      row(c,"Price Up",s.price_up);
-      row(c,"Volume Up",s.volume_up);
-      row(c,"OI Up",s.oi_up);
-
-      const time=document.createElement("small");
-      time.textContent="Signal Time: "+formatTime(s.signal_time);
-      c.appendChild(time);
-
-      results.appendChild(c);
-    });
-
-    const details=document.createElement("details");
-    details.className="card";
-
-    const summaryText=document.createElement("summary");
-    summaryText.textContent="API Diagnostic Details";
-    details.appendChild(summaryText);
-
-    const pre=document.createElement("pre");
-    pre.textContent=JSON.stringify({
-      success:data.success,
-      timestamp:data.timestamp,
-      markets:markets.length,
-      contracts_checked:totalScanned,
-      signals:signals.length,
-      alerts:actionable.length
-    },null,2);
-
-    details.appendChild(pre);
-    results.appendChild(details);
-
-  }catch(err){
-    status.className="card error";
-    status.textContent="❌ Error: "+err.message;
-
-    const msg=card("Connection Problem");
-    msg.appendChild(document.createTextNode(
-      "Backend URL, API response ಅಥವಾ internet connection ಪರಿಶೀಲಿಸಿ."
-    ));
-    results.appendChild(msg);
-
-  }finally{
-    btn.disabled=false;
+  if (value === null ||
+      value === undefined ||
+      value === "" ||
+      !Number.isFinite(n)) {
+    return "N/A";
   }
+
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits
+  });
 }
 
-loadData();
-  async function loadStocks() {
-  const status = document.getElementById("stockStatus");
-  const results = document.getElementById("stockResults");
+function makeCard(title, className = "card") {
+  const element = document.createElement("div");
+  element.className = className;
 
-  status.textContent = "Scanning NSE Stock Futures...";
-  results.replaceChildren();
+  const heading = document.createElement("h3");
+  heading.textContent = title;
+
+  element.appendChild(heading);
+
+  return element;
+}
+
+function addRow(container, label, value) {
+  const element = document.createElement("div");
+  element.className = "row";
+
+  element.textContent =
+    label + ": " +
+    (
+      value === null ||
+      value === undefined ||
+      value === ""
+        ? "N/A"
+        : String(value)
+    );
+
+  container.appendChild(element);
+}
+
+function addMetric(container, label, value) {
+  const card = makeCard(label);
+
+  const metric = document.createElement("div");
+  metric.className = "metric";
+  metric.textContent = String(value);
+
+  card.appendChild(metric);
+  container.appendChild(card);
+}
+
+// ========================================
+// REQUEST TIMEOUT
+// ========================================
+
+async function fetchJson(url) {
+  const controller = new AbortController();
+
+  const timeout = setTimeout(
+    () => controller.abort(),
+    90000
+  );
 
   try {
-    const response = await fetch(STOCK_API, {
-      cache: "no-store"
+    const response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
     });
 
-    const data = await response.json();
+    const text = await response.text();
 
-    if (!response.ok || data.success === false) {
-      throw new Error(data.error || "Stock scan failed");
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        "Backend returned invalid JSON. HTTP " +
+        response.status
+      );
     }
 
-    const all = Array.isArray(data.all_results)
-      ? data.all_results
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        "HTTP " + response.status
+      );
+    }
+
+    if (data.success === false) {
+      throw new Error(
+        data.error || "Scanner failed"
+      );
+    }
+
+    return data;
+
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ========================================
+// OPTION CARD
+// ========================================
+
+function renderOption(option, index) {
+  const premium = Number(option.premium);
+
+  const card = makeCard(
+    (index + 1) + ". " +
+    (option.symbol || option.trading_symbol || "Stock"),
+    "card bull"
+  );
+
+  const tag = document.createElement("div");
+  tag.className = "tag";
+  tag.textContent =
+    option.signal || "HIGH_MOMENTUM";
+
+  card.appendChild(tag);
+
+  addRow(card, "Stock",
+    option.symbol);
+
+  addRow(card, "Trading Symbol",
+    option.trading_symbol);
+
+  addRow(card, "Option Type",
+    option.option_type);
+
+  addRow(card, "Strike Price",
+    number(option.strike_price));
+
+  addRow(card, "Expiry",
+    option.expiry);
+
+  addRow(card, "Option Premium",
+    "₹" + number(premium));
+
+  addRow(card, "Volume",
+    number(option.volume, 0));
+
+  addRow(card, "Open Interest",
+    number(option.oi, 0));
+
+  addRow(card, "Price Increasing",
+    option.price_up ? "YES" : "NO");
+
+  addRow(card, "Volume Increasing",
+    option.volume_up ? "YES" : "NO");
+
+  addRow(card, "OI Increasing",
+    option.oi_up ? "YES" : "NO");
+
+  addRow(card, "Long Build-Up",
+    option.long_build_up ? "YES" : "NO");
+
+  // Illustrative risk levels only.
+  // These are not verified support/resistance levels.
+  if (Number.isFinite(premium) && premium > 0) {
+    addRow(card, "Reference Premium",
+      "₹" + number(premium));
+
+    addRow(card, "Illustrative 10% Stop",
+      "₹" + number(premium * 0.90));
+
+    addRow(card, "Illustrative 20% Target",
+      "₹" + number(premium * 1.20));
+  }
+
+  addRow(card, "Instrument Key",
+    option.instrument_key);
+
+  const time = document.createElement("small");
+  time.textContent =
+    "Signal Time: " + formatTime(option.signal_time);
+
+  card.appendChild(time);
+
+  return card;
+}
+
+// ========================================
+// MAIN SCANNER
+// ========================================
+
+async function loadScanner() {
+  const button =
+    document.getElementById("scanButton");
+
+  const status =
+    document.getElementById("status");
+
+  const results =
+    document.getElementById("results");
+
+  const summary =
+    document.getElementById("summary");
+
+  const diagnostics =
+    document.getElementById("diagnostics");
+
+  const minPremium = Number(
+    document.getElementById("minPremium").value
+  );
+
+  const maxPremium = Number(
+    document.getElementById("maxPremium").value
+  );
+
+  const optionType =
+    document.getElementById("optionType").value;
+
+  if (
+    !Number.isFinite(minPremium) ||
+    !Number.isFinite(maxPremium) ||
+    minPremium < 0 ||
+    maxPremium < minPremium
+  ) {
+    status.className = "card error";
+    status.textContent =
+      "Invalid premium range. Please check the settings.";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "⏳ Scanning...";
+
+  status.className = "card";
+  status.textContent =
+    "Connecting to backend and scanning stock options...";
+
+  results.replaceChildren();
+  summary.replaceChildren();
+
+  document.getElementById("stocksChecked")
+    .textContent = "0";
+
+  document.getElementById("signalsCount")
+    .textContent = "0";
+
+  diagnostics.textContent =
+    "Waiting for API response...";
+
+  try {
+    const params = new URLSearchParams({
+      min_premium: String(minPremium),
+      max_premium: String(maxPremium)
+    });
+
+    if (optionType) {
+      params.set("type", optionType);
+    }
+
+    const data = await fetchJson(
+      SCANNER_API + "?" + params.toString()
+    );
+
+    const signals = Array.isArray(data.signals)
+      ? data.signals
       : [];
 
-    const signals = Array.isArray(data.long_build_up_stocks)
-      ? data.long_build_up_stocks
-      : [];
+    document.getElementById("stocksChecked")
+      .textContent =
+        number(data.stocks_checked, 0);
+
+    document.getElementById("signalsCount")
+      .textContent =
+        number(signals.length, 0);
 
     status.textContent =
-      "✅ Connected | Checked: " +
-      (data.checked ?? all.length) +
-      " | Long Build-Up: " + signals.length;
+      "✅ Backend Connected | Scan Time: " +
+      formatTime(data.timestamp);
+
+    addMetric(
+      summary,
+      "Premium Range",
+      "₹" + minPremium + " – ₹" + maxPremium
+    );
+
+    addMetric(
+      summary,
+      "Option Type",
+      optionType || "CE + PE"
+    );
 
     if (signals.length === 0) {
-      const msg = card("No Confirmed Long Build-Up", "card wait");
-      msg.textContent =
-        "Price, Volume ಮತ್ತು Futures OI ಏರಿಕೆ ಇನ್ನೂ confirm ಆಗಿಲ್ಲ.";
-      results.appendChild(msg);
+      const empty = makeCard(
+        "No Confirmed High Momentum Options",
+        "card wait"
+      );
+
+      empty.appendChild(
+        document.createTextNode(
+          "ಈ Scan ನಲ್ಲಿ matching signal ಸಿಕ್ಕಿಲ್ಲ. " +
+          "ಇದು API ಕೆಲಸ ಮಾಡುತ್ತಿಲ್ಲ ಎಂಬುದಕ್ಕೆ ಸ್ವತಃ ಸಾಕ್ಷಿಯಲ್ಲ. " +
+          "Contract count, quote data ಮತ್ತು backend logs ಪರಿಶೀಲಿಸಿ."
+        )
+      );
+
+      results.appendChild(empty);
+
+    } else {
+      signals.forEach((signal, index) => {
+        results.appendChild(
+          renderOption(signal, index)
+        );
+      });
     }
 
-    signals.forEach(s => {
-      const c = card(
-        "🟢 " + (s.symbol || "Stock"),
-        "card bull"
-      );
-
-      row(c, "Signal", "LONG BUILD-UP");
-      row(c, "Price", s.price);
-      row(c, "Volume", s.volume);
-      row(c, "Futures OI", s.oi);
-      row(c, "RSI", s.rsi14);
-      row(c, "VWAP", s.vwap);
-
-      results.appendChild(c);
-    });
-
-    all.forEach(s => {
-      const c = card(
-        s.symbol || "Stock",
-        s.long_build_up ? "card bull" : "card wait"
-      );
-
-      row(c, "Price", s.price);
-      row(c, "Volume", s.volume);
-      row(c, "OI", s.oi);
-      row(c, "Signal", s.long_build_up_signal || "WAIT");
-
-      results.appendChild(c);
-    });
+    diagnostics.textContent = JSON.stringify({
+      success: data.success,
+      scanner: data.scanner,
+      premium_min: data.premium_min,
+      premium_max: data.premium_max,
+      option_type: data.option_type,
+      stocks_checked: data.stocks_checked,
+      signals_count: signals.length,
+      timestamp: data.timestamp
+    }, null, 2);
 
   } catch (error) {
-    status.textContent = "❌ Error: " + error.message;
+    status.className = "card error";
+
+    status.textContent =
+      "❌ Scanner Error: " + error.message;
+
+    const errorCard = makeCard(
+      "Connection / API Error",
+      "card wait"
+    );
+
+    errorCard.appendChild(
+      document.createTextNode(
+        "Render Backend status, Upstox token, " +
+        "instrument contracts ಮತ್ತು API response ಪರಿಶೀಲಿಸಿ."
+      )
+    );
+
+    results.appendChild(errorCard);
+
+    diagnostics.textContent = error.stack || error.message;
+
+  } finally {
+    button.disabled = false;
+    button.textContent = "🔍 Scan Stock Options";
   }
+}
+
+// ========================================
+// INITIAL STATUS CHECK
+// ========================================
+
+async function checkBackend() {
+  const status =
+    document.getElementById("status");
+
+  try {
+    const data = await fetchJson(API + "/health");
+
+    status.textContent =
+      "✅ Backend Online: " +
+      (data.message || "Server running") +
+      " | " + formatTime(data.timestamp);
+
+  } catch (error) {
+    status.className = "card error";
+    status.textContent =
+      "Backend check failed: " + error.message;
   }
+}
+
+checkBackend();
 </script>
 
 </body>
