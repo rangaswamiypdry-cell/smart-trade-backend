@@ -809,7 +809,8 @@ async function scanZeroHeroAndMomentum(url) {
     all_candidates: allCandidates,
     errors
   };
-  }// ==================================================
+  }
+  // ==================================================
 // PART 3/3 — API ROUTES + SERVER START
 // ==================================================
 
