@@ -1215,3 +1215,4 @@ server.listen(PORT, () => {
   console.log(
     `Smart Trade India Backend running on port ${PORT}`
   );
+});
