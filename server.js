@@ -554,11 +554,13 @@ const rows = buildOptionRows(
       });
     }
   }
+  return results;
+}
 
-  return results;// ==================================================
+// ==================================================
 // NSE STOCK OPTION CONTRACTS
 // ==================================================
-
+  
 // NSE STOCK OPTION CONTRACTS
 async function getNseStockOptionContracts() {
   const url =
