@@ -1,13 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#07111f">
+<title>Smart Market Scanner Pro</title>
+
+<style>
+:root {
+  --bg:#07111f;
+  --card:#101e30;
+  --border:#263b53;
+  --text:#f2f6fc;
+  --muted:#9aacc1;
+  --green:#00d68f;
+  --red:#ff5263;
+  --blue:#55a6ff;
+  --yellow:#ffd166;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  padding:14px;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Arial,sans-serif;
+}
+header,.panel{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:13px;
+  padding:15px;
+  margin-bottom:13px;
+}
+h1{font-size:23px;margin:0 0 8px}
+h2{font-size:16px;margin:0 0 13px}
+.subtitle,.muted{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.7;
+}
+.status{margin-top:10px;font-size:12px;color:var(--yellow)}
+.controls{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+input,select,button{
+  width:100%;
+  padding:12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#091626;
+  color:white;
+  font-size:13px;
+}
+button{
+  background:var(--blue);
+  color:#07111f;
+  font-weight:bold;
+  border:0;
+}
+button:disabled{opacity:.5}
+.secondary{background:#263951;color:white}
+.full{grid-column:1/-1}
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:9px;
+}
+.metric{
+  background:#091626;
+  border-radius:8px;
+  padding:12px;
+  overflow-wrap:anywhere;
+}
+.metric span{
+  display:block;
+  color:var(--muted);
+  font-size:11px;
+}
+.metric strong{display:block;margin-top:7px;font-size:19px}
+.signal{
+  background:#091626;
+  border:1px solid var(--border);
+  border-left:4px solid var(--green);
+  border-radius:9px;
+  padding:13px;
+  margin-bottom:10px;
+}
+.signal.put{border-left-color:var(--red)}
+.signal-title{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  font-weight:bold;
+  flex-wrap:wrap;
+}
+.green{color:var(--green)}
+.red{color:var(--red)}
+.yellow{color:var(--yellow)}
+.details{
+  margin-top:10px;
+  font-size:12px;
+  color:var(--muted);
+  line-height:1.9;
+  overflow-wrap:anywhere;
+}
+.bar{
+  height:7px;
+  background:#263951;
+  margin:10px 0;
+  border-radius:8px;
+  overflow:hidden;
+}
+.bar div{height:100%;background:var(--green)}
+.put .bar div{background:var(--red)}
+.message{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.8;
+  overflow-wrap:anywhere;
+}
+table{
+  width:100%;
+  min-width:540px;
+  border-collapse:collapse;
+  font-size:12px;
+}
+th,td{
+  text-align:left;
+  padding:9px;
+  border-bottom:1px solid var(--border);
+}
+th{color:var(--muted)}
+.table-wrap{overflow-x:auto}
+label{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin-bottom:6px;
+}
+.field{margin-bottom:11px}
+footer{
+  color:var(--muted);
+  font-size:11px;
+  text-align:center;
+  padding:15px 0;
+}
+@media(min-width:650px){
+  body{max-width:1000px;margin:auto}
+  .metrics{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>📊 Smart Market Scanner Pro</h1>
+  <div class="subtitle">
+    NIFTY • BANKNIFTY • SENSEX • FINNIFTY • MIDCPNIFTY<br>
+    RSI 65+ • VWAP • OI • Volume • 5-Minute Candles
+  </div>
+  <div class="status" id="connectionStatus">● Checking backend...</div>
+</header>
+
+<section class="panel">
+  <h2>⚙️ Scanner Settings</h2>
+
+  <div class="field">
+    <label for="apiBase">Render Backend URL</label>
+    <input id="apiBase"
+      value="https://smart-trade-backend-ig6l.onrender.com">
+  </div>
+
+  <div class="controls">
+    <button id="scanBtn" onclick="runScan()">🔎 Scan Now</button>
+    <button id="autoBtn" class="secondary" onclick="toggleAuto()">▶ Auto Scan OFF</button>
+
+    <div>
+      <label for="indexFilter">Index</label>
+      <select id="indexFilter">
+        <option value="ALL">All Indexes</option>
+        <option>NIFTY</option>
+        <option>BANKNIFTY</option>
+        <option>SENSEX</option>
+        <option>FINNIFTY</option>
+        <option>MIDCPNIFTY</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="sideFilter">Signal Side</label>
+      <select id="sideFilter">
+        <option value="ALL">CALL + PUT</option>
+        <option value="CALL">CALL BUY</option>
+        <option value="PUT">PUT BUY</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="interval">Auto scan</label>
+      <select id="interval">
+        <option value="60">60 seconds</option>
+        <option value="120">2 minutes</option>
+        <option value="300">5 minutes</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="minStrength">Minimum strength</label>
+      <select id="minStrength">
+        <option value="75">75%</option>
+        <option value="80">80%</option>
+        <option value="90">90%</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="message" id="statusMessage">
+    Ready to connect.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>📈 Summary</h2>
+  <div class="metrics">
+    <div class="metric"><span>Indexes</span><strong id="indexCount">0</strong></div>
+    <div class="metric"><span>Options scanned</span><strong id="optionCount">0</strong></div>
+    <div class="metric"><span>Qualified signals</span><strong id="alertCount">0</strong></div>
+    <div class="metric"><span>Last scan</span><strong id="lastScan" style="font-size:13px">--</strong></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>🚨 Qualified CALL / PUT Signals</h2>
+  <div id="alerts" class="message">Press Scan Now.</div>
+</section>
+
+<section class="panel">
+  <h2>🛡️ Stop Loss & Target Alerts</h2>
+
+  <div class="field">
+    <label for="slPercent">Stop Loss (%)</label>
+    <input id="slPercent" type="number" value="20" min="1" max="80">
+  </div>
+
+  <div class="field">
+    <label for="tpPercent">Target (%)</label>
+    <input id="tpPercent" type="number" value="30" min="1" max="200">
+  </div>
+
+  <button class="secondary" onclick="enableNotifications()">
+    🔔 Enable Browser Notifications
+  </button>
+
+  <div id="riskAlerts" class="message">
+    SL/TP monitoring begins after valid signals are received.
+  </div>
+
+  <div class="message">
+    SL/TP are based on the option premium at signal time.
+    Monitoring works only while this page remains open and
+    fresh prices are returned by the backend.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>📋 Index Scan Results</h2>
+  <div id="indexResults" class="message">Waiting for scan...</div>
+</section>
+
+<footer>
+  Informational scanner only. No automatic orders are placed.
+  Verify signals and manage risk independently.
+</footer>
+
+<script>
 "use strict";
 
-let autoTimer = null;
-let scanning = false;
-let lastData = null;
-
-const MIN_RSI = 65;
-const MIN_STRENGTH = 75;
-
-const REQUIRED_INDEXES = [
+const INDEXES = [
   "NIFTY",
   "BANKNIFTY",
   "SENSEX",
@@ -15,464 +288,420 @@ const REQUIRED_INDEXES = [
   "MIDCPNIFTY"
 ];
 
-function apiBase() {
+const MIN_RSI = 65;
+let autoTimer = null;
+let scanning = false;
+let riskTimer = null;
+let lastData = null;
+
+/* Active option premium monitoring */
+const watchedTrades = new Map();
+const notifiedEvents = new Set();
+
+function apiBase(){
   return document.getElementById("apiBase")
-    .value.trim().replace(/\/+$/, "");
+    .value.trim().replace(/\/+$/,"");
 }
 
-function setMessage(message) {
-  document.getElementById("statusMessage").textContent = message;
+function msg(text){
+  document.getElementById("statusMessage").textContent=text;
 }
 
-async function apiGet(path) {
-  const response = await fetch(apiBase() + path, {
-    headers: { Accept: "application/json" },
-    cache: "no-store"
+function esc(value){
+  return String(value ?? "").replace(/[&<>"']/g,c=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  })[c]);
+}
+
+function num(...values){
+  for(const value of values){
+    if(value!==null && value!==undefined && value!=="" &&
+       Number.isFinite(Number(value))) return Number(value);
+  }
+  return null;
+}
+
+function bool(...values){
+  for(const value of values){
+    if(typeof value==="boolean") return value;
+    if(typeof value==="string"){
+      const v=value.toLowerCase();
+      if(["true","yes","pass"].includes(v)) return true;
+      if(["false","no","fail"].includes(v)) return false;
+    }
+  }
+  return null;
+}
+
+async function apiGet(path){
+  const response=await fetch(apiBase()+path,{
+    method:"GET",
+    headers:{"Accept":"application/json"},
+    cache:"no-store"
   });
 
-  const text = await response.text();
+  const text=await response.text();
   let data;
 
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error("Backend returned invalid JSON");
-  }
+  try{data=JSON.parse(text);}
+  catch{throw new Error("Backend did not return JSON");}
 
-  if (!response.ok) {
-    throw new Error(data.error || "HTTP " + response.status);
-  }
+  if(!response.ok)
+    throw new Error(data.error || "HTTP "+response.status);
 
   return data;
 }
 
-async function checkBackend() {
-  const status = document.getElementById("connectionStatus");
+async function checkBackend(){
+  const status=document.getElementById("connectionStatus");
 
-  status.textContent = "● Connecting...";
-  status.style.color = "#ffd166";
+  try{
+    const data=await apiGet("/health");
 
-  try {
-    const data = await apiGet("/health");
+    if(!data.success) throw new Error("Health check failed");
 
-    if (!data.success) {
-      throw new Error("Health check failed");
-    }
-
-    status.textContent = "● Backend Live";
-    status.style.color = "#00d68f";
-
-    setMessage(
-      "Backend connected. Upstox token configured: " +
-      (data.upstox_token_configured ? "Yes" : "No")
-    );
-  } catch (error) {
-    status.textContent = "● Connection Error";
-    status.style.color = "#ff5263";
-    setMessage(error.message);
+    status.textContent="● Backend Live";
+    status.style.color="#00d68f";
+  }catch(error){
+    status.textContent="● Backend Error";
+    status.style.color="#ff5263";
+    msg(error.message);
   }
 }
 
-function safeNumber(...values) {
-  for (const value of values) {
-    if (
-      value !== null &&
-      value !== undefined &&
-      value !== "" &&
-      Number.isFinite(Number(value))
-    ) {
-      return Number(value);
-    }
-  }
+function getIndex(item){
+  const raw=String(
+    item.index || item.underlying || item.underlying_name ||
+    item.indexName || item.symbol || ""
+  ).toUpperCase().replace(/[\s_-]/g,"");
 
-  return null;
-}
-
-function safeBoolean(...values) {
-  for (const value of values) {
-    if (typeof value === "boolean") return value;
-
-    if (typeof value === "string") {
-      const v = value.toLowerCase();
-
-      if (["true", "yes", "pass"].includes(v)) return true;
-      if (["false", "no", "fail"].includes(v)) return false;
-    }
-  }
-
-  return null;
-}
-
-function normalizeIndex(item) {
-  const raw = String(
-    item.index ||
-    item.underlying ||
-    item.underlying_name ||
-    item.indexName ||
-    item.symbol ||
-    ""
-  ).toUpperCase().replace(/[\s_-]/g, "");
-
-  if (raw.includes("BANKNIFTY")) return "BANKNIFTY";
-  if (raw.includes("FINNIFTY")) return "FINNIFTY";
-  if (raw.includes("MIDCPNIFTY") || raw.includes("MIDCAPNIFTY")) {
+  if(raw.includes("BANKNIFTY")) return "BANKNIFTY";
+  if(raw.includes("FINNIFTY")) return "FINNIFTY";
+  if(raw.includes("MIDCPNIFTY") || raw.includes("MIDCAPNIFTY"))
     return "MIDCPNIFTY";
-  }
-  if (raw.includes("SENSEX")) return "SENSEX";
-  if (raw.includes("NIFTY")) return "NIFTY";
+  if(raw.includes("SENSEX")) return "SENSEX";
+  if(raw.includes("NIFTY")) return "NIFTY";
 
   return raw;
 }
 
-function normalizeSide(item) {
-  const raw = String(
-    item.option_type ||
-    item.optionType ||
-    item.side ||
-    item.signal ||
-    item.direction ||
-    ""
+function getSide(item){
+  const raw=String(
+    item.option_type || item.optionType ||
+    item.side || item.signal || item.direction || ""
   ).toUpperCase();
 
-  if (raw === "CE" || raw.includes("CALL")) return "CALL";
-  if (raw === "PE" || raw.includes("PUT")) return "PUT";
-
+  if(raw==="CE" || raw.includes("CALL")) return "CALL";
+  if(raw==="PE" || raw.includes("PUT")) return "PUT";
   return "";
 }
 
-function normalizeRows(data) {
-  let rows = [];
+function getRows(data){
+  if(Array.isArray(data.alerts)) return data.alerts;
+  if(Array.isArray(data.signals)) return data.signals;
+  if(Array.isArray(data.data)) return data.data;
 
-  if (Array.isArray(data.alerts)) {
-    rows = data.alerts;
-  } else if (Array.isArray(data.signals)) {
-    rows = data.signals;
-  } else if (Array.isArray(data.results)) {
-    rows = data.results.flatMap(result => {
-      if (Array.isArray(result.alerts)) {
-        return result.alerts.map(alert => ({
-          ...alert,
-          underlying: alert.underlying || result.underlying
-        }));
-      }
-
-      return [];
+  if(Array.isArray(data.results)){
+    return data.results.flatMap(result=>{
+      const alerts=Array.isArray(result.alerts)?result.alerts:[];
+      return alerts.map(item=>({
+        ...item,
+        underlying:item.underlying || result.underlying
+      }));
     });
-  } else if (Array.isArray(data.data)) {
-    rows = data.data;
   }
 
-  return rows.map(item => {
-    const checks = item.checks || item.conditions || {};
-
-    return {
-      ...item,
-
-      index: normalizeIndex(item),
-      side: normalizeSide(item),
-
-      rsi: safeNumber(item.rsi14, item.rsi, item.RSI),
-      strength: safeNumber(
-        item.buyStrength,
-        item.strengthPercent,
-        item.strength,
-        item.score
-      ),
-
-      price: safeNumber(item.ltp, item.optionPrice, item.price),
-      strike: safeNumber(item.strike_price, item.strikePrice, item.strike),
-
-      vwapPass: safeBoolean(
-        item.vwapCross,
-        item.vwapConfirmation,
-        checks.vwapCross,
-        checks.vwap
-      ),
-
-      pricePass: safeBoolean(
-        item.priceIncrease,
-        item.priceConfirmation,
-        checks.priceIncrease
-      ),
-
-      oiPass: safeBoolean(
-        item.oiIncrease,
-        item.oiConfirmation,
-        checks.oiIncrease
-      ),
-
-      volumePass: safeBoolean(
-        item.volumeIncrease,
-        item.volumeConfirmation,
-        checks.volumeIncrease
-      ),
-
-      candleClosed: safeBoolean(
-        item.candleClosed,
-        item.isClosedCandle,
-        item.completedCandle
-      )
-    };
-  });
+  return [];
 }
 
-function qualifies(item) {
-  if (!REQUIRED_INDEXES.includes(item.index)) return false;
+function normalize(item){
+  const c=item.checks || item.conditions || {};
 
-  if (!["CALL", "PUT"].includes(item.side)) return false;
+  return {
+    ...item,
+    index:getIndex(item),
+    side:getSide(item),
+    rsi:num(item.rsi14,item.rsi,item.RSI),
+    strength:num(item.strengthPercent,item.buyStrength,item.strength,item.score),
+    price:num(item.ltp,item.premium,item.optionPrice,item.price),
+    strike:num(item.strike_price,item.strikePrice,item.strike),
+    vwapPass:bool(item.vwapCross,item.vwapConfirmation,c.vwapCross,c.vwap),
+    pricePass:bool(item.priceIncrease,item.priceConfirmation,c.priceIncrease),
+    oiPass:bool(item.oiIncrease,item.oiConfirmation,c.oiIncrease),
+    volumePass:bool(item.volumeIncrease,item.volumeConfirmation,c.volumeIncrease),
+    closed:bool(item.candleClosed,item.isClosedCandle,item.completedCandle)
+  };
+}
 
-  if (item.rsi === null || item.rsi <= MIN_RSI) return false;
+function qualifies(s){
+  if(!INDEXES.includes(s.index)) return false;
+  if(!["CALL","PUT"].includes(s.side)) return false;
+  if(s.rsi===null || s.rsi<=MIN_RSI) return false;
 
-  if (item.strength === null ||
-      item.strength < MIN_STRENGTH) return false;
+  const minimum=Number(document.getElementById("minStrength").value);
+  if(s.strength===null || s.strength<minimum) return false;
 
-  if (
-    item.vwapPass !== true ||
-    item.pricePass !== true ||
-    item.oiPass !== true ||
-    item.volumePass !== true
-  ) return false;
+  if(s.vwapPass!==true || s.pricePass!==true ||
+     s.oiPass!==true || s.volumePass!==true) return false;
 
-  if (item.candleClosed === false) return false;
+  if(s.closed===false) return false;
 
   return true;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[c]);
+function fmt(value,d=2){
+  return value===null || value===undefined || !Number.isFinite(Number(value))
+    ? "--" : Number(value).toFixed(d);
 }
 
-function numberValue(value, digits = 2) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(digits) : "--";
+function filteredSignals(){
+  const index=document.getElementById("indexFilter").value;
+  const side=document.getElementById("sideFilter").value;
+
+  return (lastData ? getRows(lastData):[])
+    .map(normalize)
+    .filter(qualifies)
+    .filter(s=>(index==="ALL" || s.index===index))
+    .filter(s=>(side==="ALL" || s.side===side));
 }
 
-function renderResults(data) {
-  const rows = normalizeRows(data);
-  const alerts = rows.filter(qualifies);
+function render(){
+  const signals=filteredSignals();
 
-  lastData = data;
-
-  document.getElementById("indexCount").textContent =
-    REQUIRED_INDEXES.length;
-
-  document.getElementById("optionCount").textContent =
-    safeNumber(data.options_scanned, data.total_scanned) ??
-    rows.length;
-
-  document.getElementById("alertCount").textContent =
-    alerts.length;
-
-  document.getElementById("lastScan").textContent =
+  document.getElementById("indexCount").textContent=INDEXES.length;
+  document.getElementById("optionCount").textContent=
+    num(lastData?.options_scanned,lastData?.total_scanned) ?? getRows(lastData||{}).length;
+  document.getElementById("alertCount").textContent=signals.length;
+  document.getElementById("lastScan").textContent=
     new Date().toLocaleTimeString("en-IN");
 
-  renderAlerts(alerts);
-  renderIndexes(data.results || []);
+  const box=document.getElementById("alerts");
 
-  if (alerts.length) {
-    setMessage(
-      alerts.length +
-      " qualified signals found. Verify the option contract and risk before trading."
-    );
-  } else {
-    setMessage(
-      "No signals met all required conditions. No signal will be fabricated."
-    );
-  }
-}
+  if(!signals.length){
+    box.textContent=
+      "No signal satisfies every required condition. Check backend fields and index coverage.";
+  }else{
+    box.innerHTML=signals.map(s=>{
+      const put=s.side==="PUT";
+      const id=s.instrument_key || [s.index,s.strike,s.side,s.expiry].join("_");
 
-function renderAlerts(alerts) {
-  const container = document.getElementById("alerts");
+      return `
+      <div class="signal ${put?"put":""}">
+        <div class="signal-title">
+          <span>${esc(s.index)} ${esc(s.strike ?? "--")} ${esc(s.side)}</span>
+          <span class="${put?"red":"green"}">${s.side} BUY · ${fmt(s.strength,0)}%</span>
+        </div>
 
-  if (!alerts.length) {
-    container.innerHTML =
-      "No qualifying CALL/PUT signals. Check backend index coverage and returned condition fields.";
-    return;
-  }
+        <div class="bar"><div style="width:${Math.min(100,s.strength)}%"></div></div>
 
-  container.innerHTML = alerts.map(item => {
-    const bearish = item.side === "PUT";
-    const badgeClass = bearish ? "badge bearish" : "badge";
-
-    return `
-      <div class="alert ${bearish ? "bearish" : ""}">
-        <div class="alert-title">
-          <span>
-            ${escapeHtml(item.index)}
-            ${escapeHtml(item.strike ?? "--")}
-            ${escapeHtml(item.side)}
-          </span>
-
-          <span class="${badgeClass}">
-            ${item.side} BUY · ${numberValue(item.strength, 0)}%
-          </span>
+        <div class="metrics">
+          <div class="metric"><span>Option premium</span><strong>₹${fmt(s.price)}</strong></div>
+          <div class="metric"><span>RSI</span><strong>${fmt(s.rsi)}</strong></div>
+          <div class="metric"><span>Stop loss</span><strong>₹${fmt(s.price*(1-Number(document.getElementById("slPercent").value)/100))}</strong></div>
+          <div class="metric"><span>Target</span><strong>₹${fmt(s.price*(1+Number(document.getElementById("tpPercent").value)/100))}</strong></div>
         </div>
 
         <div class="details">
-          Option Premium: ₹${numberValue(item.price)}<br>
-          RSI(14): ${numberValue(item.rsi)}<br>
-          Price Change: ${numberValue(item.price_change_percent)}%<br>
-          Volume Change: ${numberValue(item.volume_change_percent)}%<br>
-          OI Change: ${numberValue(item.oi_change_percent)}%<br>
           VWAP: Confirmed<br>
-          Price Direction: Confirmed<br>
-          OI Increase: Confirmed<br>
-          Volume Increase: Confirmed<br>
-          Expiry: ${escapeHtml(item.expiry || "--")}<br>
-          Instrument: ${escapeHtml(item.instrument_key || "--")}
+          Price direction: Confirmed<br>
+          OI increase: Confirmed<br>
+          Volume increase: Confirmed<br>
+          Instrument: ${esc(s.instrument_key || "--")}<br>
+          Expiry: ${esc(s.expiry || "--")}
         </div>
-      </div>
-    `;
-  }).join("");
-}
 
-function renderIndexes(results) {
-  const container = document.getElementById("indexResults");
-
-  if (!Array.isArray(results) || !results.length) {
-    container.textContent =
-      "Backend did not return per-index scan results.";
-    return;
+        <button class="secondary" onclick="watchSignal('${esc(id)}')">
+          Monitor SL / TP
+        </button>
+      </div>`;
+    }).join("");
   }
 
-  container.innerHTML = `
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Index</th>
-            <th>Expiry</th>
-            <th>Scanned</th>
-            <th>Alerts</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${results.map(item => `
-            <tr>
-              <td>${escapeHtml(item.underlying || item.index || "--")}</td>
-              <td>${escapeHtml(item.expiry || "--")}</td>
-              <td>${numberValue(item.scanned, 0)}</td>
-              <td>${numberValue(item.alert_count, 0)}</td>
-              <td class="${item.error ? "red" : "green"}">
-                ${escapeHtml(item.error || "OK")}
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
+  const results=Array.isArray(lastData?.results)?lastData.results:[];
+  const table=document.getElementById("indexResults");
+
+  if(!results.length){
+    table.textContent="Backend did not return per-index scan results.";
+  }else{
+    table.innerHTML=`
+      <div class="table-wrap"><table>
+      <thead><tr><th>Index</th><th>Scanned</th><th>Alerts</th><th>Status</th></tr></thead>
+      <tbody>${results.map(r=>`
+        <tr>
+          <td>${esc(r.underlying || r.index || "--")}</td>
+          <td>${fmt(num(r.scanned),0)}</td>
+          <td>${fmt(num(r.alert_count),0)}</td>
+          <td class="${r.error?"red":"green"}">${esc(r.error || "OK")}</td>
+        </tr>`).join("")}
+      </tbody></table></div>`;
+  }
 }
 
-async function runScan() {
-  if (scanning) return;
+async function runScan(){
+  if(scanning) return;
 
-  scanning = true;
+  scanning=true;
+  const button=document.getElementById("scanBtn");
+  button.disabled=true;
+  button.textContent="Scanning...";
 
-  const button = document.getElementById("scanBtn");
-  button.disabled = true;
-  button.textContent = "Scanning...";
+  msg("Requesting option scan...");
 
-  setMessage("Requesting option scan from backend...");
+  try{
+    const data=await apiGet("/api/options/auto-scan");
 
-  try {
-    const data = await apiGet("/api/options/auto-scan");
-
-    if (data.success === false) {
+    if(data.success===false)
       throw new Error(data.error || "Scan failed");
-    }
 
-    renderResults(data);
-  } catch (error) {
-    setMessage("Scan error: " + error.message);
-  } finally {
-    scanning = false;
-    button.disabled = false;
-    button.textContent = "🔎 Scan Options";
+    lastData=data;
+    render();
+
+    msg("Scan completed. Verify signal conditions before trading.");
+  }catch(error){
+    msg("Scan error: "+error.message);
+  }finally{
+    scanning=false;
+    button.disabled=false;
+    button.textContent="🔎 Scan Now";
   }
 }
 
-function toggleAuto() {
-  const button = document.getElementById("autoBtn");
+function toggleAuto(){
+  const button=document.getElementById("autoBtn");
 
-  if (autoTimer) {
+  if(autoTimer){
     clearInterval(autoTimer);
-    autoTimer = null;
-    button.textContent = "▶ Start Auto Scan";
-    setMessage("Automatic scanning stopped.");
+    autoTimer=null;
+    button.textContent="▶ Auto Scan OFF";
+    msg("Auto scan stopped.");
     return;
   }
 
-  const seconds =
-    Number(document.getElementById("interval").value) || 60;
-
-  button.textContent = "■ Stop Auto Scan";
-
+  button.textContent="■ Stop Auto Scan";
   runScan();
 
-  autoTimer = setInterval(() => {
-    if (!scanning) runScan();
-  }, seconds * 1000);
+  autoTimer=setInterval(()=>{
+    if(!scanning) runScan();
+  },Number(document.getElementById("interval").value)*1000);
 }
 
-function clearResults() {
-  document.getElementById("alerts").textContent = "No results.";
-  document.getElementById("indexResults").textContent =
-    "Waiting for scan...";
-
-  ["indexCount", "optionCount", "alertCount"].forEach(id => {
-    document.getElementById(id).textContent = "0";
-  });
-
-  document.getElementById("lastScan").textContent = "--";
-  document.getElementById("rsiResult").textContent =
-    "Enter an instrument key to check RSI.";
-
-  lastData = null;
-}
-
-async function loadRSI() {
-  const key =
-    document.getElementById("instrumentKey").value.trim();
-
-  const output = document.getElementById("rsiResult");
-
-  if (!key) {
-    output.textContent = "Enter an Upstox instrument key.";
+async function enableNotifications(){
+  if(!("Notification" in window)){
+    alert("This browser does not support notifications.");
     return;
   }
 
-  output.textContent = "Loading candle data...";
+  const permission=await Notification.requestPermission();
 
-  try {
-    const data = await apiGet(
-      "/api/market/candles?instrument_key=" +
-      encodeURIComponent(key) +
-      "&interval=5"
-    );
-
-    output.innerHTML = `
-      <div class="metric">
-        <span>RSI(14)</span>
-        <strong class="blue">${numberValue(data.rsi14)}</strong>
-        <div class="details">
-          Candles received: ${numberValue(data.candle_count, 0)}<br>
-          Closed candles: ${numberValue(data.closed_candle_count, 0)}<br>
-          Latest closed candle:
-          ${escapeHtml(data.latest_closed_candle?.[0] || "--")}
-        </div>
-      </div>
-    `;
-  } catch (error) {
-    output.textContent = "RSI error: " + error.message;
+  if(permission==="granted"){
+    alert("Browser notifications enabled.");
+  }else{
+    alert("Allow notifications in browser settings.");
   }
 }
 
+function notifyOnce(key,title,body){
+  if(notifiedEvents.has(key)) return;
+  notifiedEvents.add(key);
+
+  if("Notification" in window && Notification.permission==="granted"){
+    new Notification(title,{body});
+  }
+}
+
+function watchSignal(id){
+  const s=filteredSignals().find(x=>
+    (x.instrument_key || [x.index,x.strike,x.side,x.expiry].join("_"))===id
+  );
+
+  if(!s || s.price===null || s.price<=0){
+    alert("Valid option premium is not available.");
+    return;
+  }
+
+  const slPct=Number(document.getElementById("slPercent").value);
+  const tpPct=Number(document.getElementById("tpPercent").value);
+
+  if(!(slPct>0 && tpPct>0)){
+    alert("Enter valid SL and TP percentages.");
+    return;
+  }
+
+  watchedTrades.set(id,{
+    id,
+    index:s.index,
+    side:s.side,
+    instrument_key:s.instrument_key,
+    entry:s.price,
+    sl:s.price*(1-slPct/100),
+    tp:s.price*(1+tpPct/100),
+    state:"WATCHING"
+  });
+
+  renderRiskAlerts();
+}
+
+function renderRiskAlerts(){
+  const box=document.getElementById("riskAlerts");
+
+  if(!watchedTrades.size){
+    box.textContent="No option premium is being monitored.";
+    return;
+  }
+
+  box.innerHTML=[...watchedTrades.values()].map(t=>`
+    <div class="signal ${t.side==="PUT"?"put":""}">
+      <strong>${esc(t.index)} ${esc(t.side)} — ${esc(t.state)}</strong>
+      <div class="details">
+        Entry: ₹${fmt(t.entry)}<br>
+        SL: ₹${fmt(t.sl)}<br>
+        TP: ₹${fmt(t.tp)}<br>
+        ${esc(t.instrument_key || "")}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function monitorRisk(){
+  if(!watchedTrades.size) return;
+
+  for(const t of watchedTrades.values()){
+    if(t.state!=="WATCHING" || !t.instrument_key) continue;
+
+    try{
+      const data=await apiGet(
+        "/api/market/quote?instrument_key="+encodeURIComponent(t.instrument_key)
+      );
+
+      const q=data.data || data.quote || data;
+      const price=num(q.ltp,q.last_price,q.lastPrice,q.price);
+
+      if(price===null || price<=0) continue;
+
+      t.current=price;
+
+      if(price<=t.sl){
+        t.state="STOP LOSS HIT";
+        notifyOnce(t.id+"_SL","Stop Loss Alert",t.index+" "+t.side+" premium ₹"+fmt(price));
+      }else if(price>=t.tp){
+        t.state="TARGET HIT";
+        notifyOnce(t.id+"_TP","Target Alert",t.index+" "+t.side+" premium ₹"+fmt(price));
+      }
+    }catch(error){
+      console.warn("Risk monitoring failed:",error.message);
+    }
+  }
+
+  renderRiskAlerts();
+}
+
+document.getElementById("indexFilter").addEventListener("change",render);
+document.getElementById("sideFilter").addEventListener("change",render);
+document.getElementById("minStrength").addEventListener("change",render);
+
 checkBackend();
+
+riskTimer=setInterval(monitorRisk,15000);
+</script>
+</body>
+  </html>
