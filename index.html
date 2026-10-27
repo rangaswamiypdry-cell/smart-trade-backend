@@ -7,602 +7,626 @@
 <title>Smart Market Scanner</title>
 
 <style>
-* {
-  box-sizing: border-box;
+:root {
+  --bg: #07111f;
+  --card: #101e30;
+  --border: #24364c;
+  --text: #f2f6fc;
+  --muted: #94a7bf;
+  --green: #00d68f;
+  --red: #ff5263;
+  --blue: #55a6ff;
+  --yellow: #ffd166;
 }
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
-  padding: 16px;
-  background: #07111f;
-  color: #ffffff;
+  padding: 15px;
+  background: var(--bg);
+  color: var(--text);
   font-family: Arial, sans-serif;
 }
 
+header {
+  padding: 12px 0 18px;
+}
+
 h1 {
-  color: #31d6a0;
-  font-size: 25px;
+  margin: 0;
+  font-size: 24px;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 7px;
+}
+
+.status {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background: #153d35;
+  color: var(--green);
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 15px;
+  margin-bottom: 14px;
 }
 
 h2 {
-  font-size: 20px;
-  margin-top: 24px;
+  font-size: 17px;
+  margin: 0 0 14px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
 }
 
 button, select, input {
   width: 100%;
-  padding: 13px;
-  border-radius: 9px;
-  font-size: 16px;
-  margin: 6px 0;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #091626;
+  color: white;
+  font-size: 14px;
 }
 
 button {
-  background: #16b981;
-  color: white;
+  background: var(--blue);
+  color: #07111f;
   border: none;
   font-weight: bold;
+  cursor: pointer;
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: .5;
 }
 
-select, input {
-  background: #142338;
+.secondary {
+  background: #263951;
   color: white;
-  border: 1px solid #344b66;
 }
 
-.card {
-  background: #142338;
-  padding: 15px;
-  margin: 12px 0;
-  border-radius: 12px;
-  overflow-wrap: anywhere;
+.full {
+  grid-column: 1 / -1;
 }
 
-.bull {
-  border-left: 5px solid #31d6a0;
-}
-
-.bear {
-  border-left: 5px solid #ff6262;
-}
-
-.wait {
-  border-left: 5px solid #f5bd4f;
-}
-
-.metric {
-  color: #31d6a0;
-  font-size: 25px;
-  font-weight: bold;
-}
-
-.row {
-  margin: 8px 0;
-  overflow-wrap: anywhere;
-}
-
-small {
-  color: #a5b7ce;
-}
-
-.tag {
-  display: inline-block;
-  padding: 7px 10px;
-  background: #253b53;
-  border-radius: 7px;
-  margin: 5px 0;
-  font-weight: bold;
-}
-
-.error {
-  color: #ff7777;
-}
-
-.muted {
-  color: #a5b7ce;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.grid {
+.metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
-pre {
-  white-space: pre-wrap;
+.metric {
+  background: #091626;
+  padding: 13px;
+  border-radius: 9px;
+}
+
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 20px;
+}
+
+.green { color: var(--green); }
+.red { color: var(--red); }
+.yellow { color: var(--yellow); }
+.blue { color: var(--blue); }
+
+.alert {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--green);
+  background: #0a1928;
+  border-radius: 9px;
+  margin-bottom: 10px;
+}
+
+.alert.bearish {
+  border-left-color: var(--red);
+}
+
+.alert-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: bold;
+  margin-bottom: 9px;
+}
+
+.badge {
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  background: #164333;
+  color: var(--green);
+}
+
+.badge.bearish {
+  background: #48202a;
+  color: var(--red);
+}
+
+.details {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.9;
   overflow-wrap: anywhere;
-  color: #b9d2ec;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  min-width: 660px;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+th { color: var(--muted); }
+
+.message {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 15px 0;
+}
+
+label {
+  color: var(--muted);
+  font-size: 12px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.field { margin-bottom: 10px; }
+
+@media (min-width: 650px) {
+  body {
+    max-width: 1050px;
+    margin: auto;
+  }
+  .metrics {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 </style>
 </head>
 
 <body>
 
-<h1>📈 Smart Market Scanner</h1>
+<header>
+  <h1>📊 Smart Market Scanner</h1>
+  <div class="subtitle">
+    Index Options • Momentum • OI • Volume • Closed Candles
+  </div>
+  <div class="status" id="connectionStatus">
+    ● Checking backend...
+  </div>
+</header>
 
-<p class="muted">
-NSE Stock Options | High Momentum | Long Build-Up
-</p>
+<section class="panel">
+  <h2>⚙️ Scanner Settings</h2>
 
-<div class="card">
-  <h3>⚙️ Scanner Settings</h3>
-
-  <label for="minPremium">Minimum Option Premium (₹)</label>
-  <input
-    id="minPremium"
-    type="number"
-    value="1"
-    min="0"
-    step="0.05"
-  >
-
-  <label for="maxPremium">Maximum Option Premium (₹)</label>
-  <input
-    id="maxPremium"
-    type="number"
-    value="50"
-    min="0"
-    step="0.05"
-  >
-
-  <label for="optionType">Option Type</label>
-  <select id="optionType">
-    <option value="">CE + PE</option>
-    <option value="CE">CE Only</option>
-    <option value="PE">PE Only</option>
-  </select>
-
-  <button id="scanButton" onclick="loadScanner()">
-    🔍 Scan Stock Options
-  </button>
-
-  <p class="muted">
-    Premium filter, CE/PE filter ಮತ್ತು Backend‌ನ
-    High Momentum signals ಆಧರಿಸಿ ಫಲಿತಾಂಶ ತೋರಿಸಲಾಗುತ್ತದೆ.
-  </p>
-</div>
-
-<div id="status" class="card">
-  Connecting to backend...
-</div>
-
-<div class="grid">
-  <div class="card">
-    <div>Stocks Checked</div>
-    <div id="stocksChecked" class="metric">0</div>
+  <div class="field">
+    <label for="apiBase">Backend API URL</label>
+    <input id="apiBase"
+      value="https://smart-trade-backend-ig6l.onrender.com"
+      placeholder="https://your-backend.onrender.com">
   </div>
 
-  <div class="card">
-    <div>Momentum Signals</div>
-    <div id="signalsCount" class="metric">0</div>
+  <div class="controls">
+    <button id="healthBtn" class="secondary"
+      onclick="checkBackend()">Check Backend</button>
+
+    <button id="scanBtn" onclick="runScan()">
+      🔎 Scan Options
+    </button>
+
+    <button id="autoBtn" class="secondary"
+      onclick="toggleAuto()">▶ Start Auto Scan</button>
+
+    <button class="secondary"
+      onclick="clearResults()">Clear Results</button>
+
+    <div class="field full">
+      <label for="interval">Auto scan interval</label>
+      <select id="interval">
+        <option value="30">30 seconds</option>
+        <option value="60">60 seconds</option>
+        <option value="120">2 minutes</option>
+      </select>
+    </div>
   </div>
-</div>
 
-<div id="summary"></div>
+  <div class="message" id="statusMessage">
+    Connect to your backend to begin.
+  </div>
+</section>
 
-<h2>🚨 High Momentum Options</h2>
-<div id="results"></div>
+<section class="panel">
+  <h2>📈 Scanner Summary</h2>
+  <div class="metrics">
+    <div class="metric">
+      <span>Indexes Scanned</span>
+      <strong id="indexCount">0</strong>
+    </div>
+    <div class="metric">
+      <span>Options Scanned</span>
+      <strong id="optionCount">0</strong>
+    </div>
+    <div class="metric">
+      <span>Alerts Found</span>
+      <strong id="alertCount" class="yellow">0</strong>
+    </div>
+    <div class="metric">
+      <span>Last Scan</span>
+      <strong id="lastScan" style="font-size:14px">--</strong>
+    </div>
+  </div>
+</section>
 
-<h2>📋 Scanner Diagnostics</h2>
-<div id="diagnostics" class="card">
-  Scanner not started.
-</div>
+<section class="panel">
+  <h2>🚨 Strong Momentum Alerts</h2>
+  <div id="alerts" class="message">
+    Press Scan Options to begin.
+  </div>
+</section>
+
+<section class="panel">
+  <h2>📋 Index Scan Results</h2>
+  <div id="indexResults" class="message">
+    Waiting for scan...
+  </div>
+</section>
+
+<section class="panel">
+  <h2>🕯️ 5-Minute Candle RSI</h2>
+
+  <div class="field">
+    <label for="instrumentKey">Upstox Instrument Key</label>
+    <input id="instrumentKey"
+      placeholder="Example: NSE_INDEX|Nifty 50">
+  </div>
+
+  <button onclick="loadRSI()">Get Closed Candle RSI</button>
+
+  <div id="rsiResult" class="message">
+    Enter an instrument key to check RSI.
+  </div>
+</section>
+
+<footer>
+  Smart Market Scanner • Informational signals only • Not investment advice
+</footer>
 
 <script>
 "use strict";
 
-// ========================================
-// BACKEND CONFIGURATION
-// ========================================
+let autoTimer = null;
+let scanning = false;
+let lastData = null;
 
-const API =
-  "https://smart-trade-backend-ig6l.onrender.com";
+function apiBase() {
+  return document.getElementById("apiBase")
+    .value.trim().replace(/\/+$/, "");
+}
 
-const SCANNER_API =
-  API + "/api/options/nse-stocks/scan";
+function setMessage(message) {
+  document.getElementById("statusMessage").textContent = message;
+}
 
-// ========================================
-// HELPERS
-// ========================================
+async function apiGet(path) {
+  const response = await fetch(apiBase() + path, {
+    method: "GET",
+    headers: { "Accept": "application/json" }
+  });
 
-function formatTime(value) {
-  if (!value) return "Not available";
+  const text = await response.text();
 
-  const date = new Date(value);
+  let data;
 
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("Backend returned invalid JSON");
   }
 
-  return date.toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    dateStyle: "medium",
-    timeStyle: "medium"
-  });
-}
-
-function number(value, digits = 2) {
-  const n = Number(value);
-
-  if (value === null ||
-      value === undefined ||
-      value === "" ||
-      !Number.isFinite(n)) {
-    return "N/A";
+  if (!response.ok) {
+    throw new Error(data.error || "HTTP " + response.status);
   }
 
-  return n.toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits
-  });
+  return data;
 }
 
-function makeCard(title, className = "card") {
-  const element = document.createElement("div");
-  element.className = className;
+async function checkBackend() {
+  const status = document.getElementById("connectionStatus");
 
-  const heading = document.createElement("h3");
-  heading.textContent = title;
+  status.textContent = "● Connecting...";
+  status.style.color = "#ffd166";
 
-  element.appendChild(heading);
+  try {
+    const data = await apiGet("/health");
 
-  return element;
-}
+    if (!data.success) {
+      throw new Error("Health check unsuccessful");
+    }
 
-function addRow(container, label, value) {
-  const element = document.createElement("div");
-  element.className = "row";
+    status.textContent = "● Backend Live";
+    status.style.color = "#00d68f";
 
-  element.textContent =
-    label + ": " +
-    (
-      value === null ||
-      value === undefined ||
-      value === ""
-        ? "N/A"
-        : String(value)
+    setMessage(
+      "Backend connected successfully. Upstox token configured: " +
+      (data.upstox_token_configured ? "Yes" : "No")
     );
-
-  container.appendChild(element);
+  } catch (error) {
+    status.textContent = "● Connection Error";
+    status.style.color = "#ff5263";
+    setMessage(error.message);
+  }
 }
 
-function addMetric(container, label, value) {
-  const card = makeCard(label);
+async function runScan() {
+  if (scanning) return;
 
-  const metric = document.createElement("div");
-  metric.className = "metric";
-  metric.textContent = String(value);
+  scanning = true;
 
-  card.appendChild(metric);
-  container.appendChild(card);
-}
+  const scanButton = document.getElementById("scanBtn");
+  scanButton.disabled = true;
+  scanButton.textContent = "Scanning...";
 
-// ========================================
-// REQUEST TIMEOUT
-// ========================================
-
-async function fetchJson(url) {
-  const controller = new AbortController();
-
-  const timeout = setTimeout(
-    () => controller.abort(),
-    90000
+  setMessage(
+    "Scanning NIFTY, BANKNIFTY and SENSEX. Please wait..."
   );
 
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-      signal: controller.signal
-    });
+    const data = await apiGet("/api/options/auto-scan");
 
-    const text = await response.text();
-
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error(
-        "Backend returned invalid JSON. HTTP " +
-        response.status
-      );
+    if (!data.success) {
+      throw new Error(data.error || "Scan failed");
     }
 
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-        "HTTP " + response.status
-      );
-    }
+    lastData = data;
 
-    if (data.success === false) {
-      throw new Error(
-        data.error || "Scanner failed"
-      );
-    }
+    renderResults(data);
 
-    return data;
-
+    setMessage(
+      "Scan completed at " +
+      new Date().toLocaleTimeString() +
+      ". Check the returned signals before making any decision."
+    );
+  } catch (error) {
+    setMessage("Scan error: " + error.message);
   } finally {
-    clearTimeout(timeout);
+    scanning = false;
+    scanButton.disabled = false;
+    scanButton.textContent = "🔎 Scan Options";
   }
 }
 
-// ========================================
-// OPTION CARD
-// ========================================
-
-function renderOption(option, index) {
-  const premium = Number(option.premium);
-
-  const card = makeCard(
-    (index + 1) + ". " +
-    (option.symbol || option.trading_symbol || "Stock"),
-    "card bull"
-  );
-
-  const tag = document.createElement("div");
-  tag.className = "tag";
-  tag.textContent =
-    option.signal || "HIGH_MOMENTUM";
-
-  card.appendChild(tag);
-
-  addRow(card, "Stock",
-    option.symbol);
-
-  addRow(card, "Trading Symbol",
-    option.trading_symbol);
-
-  addRow(card, "Option Type",
-    option.option_type);
-
-  addRow(card, "Strike Price",
-    number(option.strike_price));
-
-  addRow(card, "Expiry",
-    option.expiry);
-
-  addRow(card, "Option Premium",
-    "₹" + number(premium));
-
-  addRow(card, "Volume",
-    number(option.volume, 0));
-
-  addRow(card, "Open Interest",
-    number(option.oi, 0));
-
-  addRow(card, "Price Increasing",
-    option.price_up ? "YES" : "NO");
-
-  addRow(card, "Volume Increasing",
-    option.volume_up ? "YES" : "NO");
-
-  addRow(card, "OI Increasing",
-    option.oi_up ? "YES" : "NO");
-
-  addRow(card, "Long Build-Up",
-    option.long_build_up ? "YES" : "NO");
-
-  // Illustrative risk levels only.
-  // These are not verified support/resistance levels.
-  if (Number.isFinite(premium) && premium > 0) {
-    addRow(card, "Reference Premium",
-      "₹" + number(premium));
-
-    addRow(card, "Illustrative 10% Stop",
-      "₹" + number(premium * 0.90));
-
-    addRow(card, "Illustrative 20% Target",
-      "₹" + number(premium * 1.20));
-  }
-
-  addRow(card, "Instrument Key",
-    option.instrument_key);
-
-  const time = document.createElement("small");
-  time.textContent =
-    "Signal Time: " + formatTime(option.signal_time);
-
-  card.appendChild(time);
-
-  return card;
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 }
 
-// ========================================
-// MAIN SCANNER
-// ========================================
+function numberValue(value, digits = 2) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(digits) : "--";
+}
 
-async function loadScanner() {
-  const button =
-    document.getElementById("scanButton");
+function renderResults(data) {
+  const results = Array.isArray(data.results) ? data.results : [];
+  const alerts = Array.isArray(data.alerts) ? data.alerts : [];
 
-  const status =
-    document.getElementById("status");
+  document.getElementById("indexCount").textContent =
+    results.length;
 
-  const results =
-    document.getElementById("results");
+  document.getElementById("optionCount").textContent =
+    results.reduce((sum, item) => sum + Number(item.scanned || 0), 0);
 
-  const summary =
-    document.getElementById("summary");
+  document.getElementById("alertCount").textContent =
+    alerts.length;
 
-  const diagnostics =
-    document.getElementById("diagnostics");
+  document.getElementById("lastScan").textContent =
+    new Date().toLocaleTimeString();
 
-  const minPremium = Number(
-    document.getElementById("minPremium").value
-  );
+  renderAlerts(alerts);
+  renderIndexes(results);
+}
 
-  const maxPremium = Number(
-    document.getElementById("maxPremium").value
-  );
+function renderAlerts(alerts) {
+  const container = document.getElementById("alerts");
 
-  const optionType =
-    document.getElementById("optionType").value;
-
-  if (
-    !Number.isFinite(minPremium) ||
-    !Number.isFinite(maxPremium) ||
-    minPremium < 0 ||
-    maxPremium < minPremium
-  ) {
-    status.className = "card error";
-    status.textContent =
-      "Invalid premium range. Please check the settings.";
+  if (!alerts.length) {
+    container.innerHTML =
+      "No matching alerts returned by the backend. This does not mean the market has no opportunities.";
     return;
   }
 
-  button.disabled = true;
-  button.textContent = "⏳ Scanning...";
+  container.innerHTML = alerts.map(item => {
+    const bearish = item.signal === "BEARISH";
+    const badgeClass = bearish ? "badge bearish" : "badge";
 
-  status.className = "card";
-  status.textContent =
-    "Connecting to backend and scanning stock options...";
+    return `
+      <div class="alert ${bearish ? "bearish" : ""}">
+        <div class="alert-title">
+          <span>${escapeHtml(item.underlying_name || item.underlying || "--")}
+            ${escapeHtml(item.strike_price ?? "")}
+            ${escapeHtml(item.option_type || "")}</span>
+          <span class="${badgeClass}">
+            ${escapeHtml(item.signal || "ALERT")}
+          </span>
+        </div>
 
-  results.replaceChildren();
-  summary.replaceChildren();
-
-  document.getElementById("stocksChecked")
-    .textContent = "0";
-
-  document.getElementById("signalsCount")
-    .textContent = "0";
-
-  diagnostics.textContent =
-    "Waiting for API response...";
-
-  try {
-    const params = new URLSearchParams({
-      min_premium: String(minPremium),
-      max_premium: String(maxPremium)
-    });
-
-    if (optionType) {
-      params.set("type", optionType);
-    }
-
-    const data = await fetchJson(
-      SCANNER_API + "?" + params.toString()
-    );
-
-    const signals = Array.isArray(data.signals)
-      ? data.signals
-      : [];
-
-    document.getElementById("stocksChecked")
-      .textContent =
-        number(data.stocks_checked, 0);
-
-    document.getElementById("signalsCount")
-      .textContent =
-        number(signals.length, 0);
-
-    status.textContent =
-      "✅ Backend Connected | Scan Time: " +
-      formatTime(data.timestamp);
-
-    addMetric(
-      summary,
-      "Premium Range",
-      "₹" + minPremium + " – ₹" + maxPremium
-    );
-
-    addMetric(
-      summary,
-      "Option Type",
-      optionType || "CE + PE"
-    );
-
-    if (signals.length === 0) {
-      const empty = makeCard(
-        "No Confirmed High Momentum Options",
-        "card wait"
-      );
-
-      empty.appendChild(
-        document.createTextNode(
-          "ಈ Scan ನಲ್ಲಿ matching signal ಸಿಕ್ಕಿಲ್ಲ. " +
-          "ಇದು API ಕೆಲಸ ಮಾಡುತ್ತಿಲ್ಲ ಎಂಬುದಕ್ಕೆ ಸ್ವತಃ ಸಾಕ್ಷಿಯಲ್ಲ. " +
-          "Contract count, quote data ಮತ್ತು backend logs ಪರಿಶೀಲಿಸಿ."
-        )
-      );
-
-      results.appendChild(empty);
-
-    } else {
-      signals.forEach((signal, index) => {
-        results.appendChild(
-          renderOption(signal, index)
-        );
-      });
-    }
-
-    diagnostics.textContent = JSON.stringify({
-      success: data.success,
-      scanner: data.scanner,
-      premium_min: data.premium_min,
-      premium_max: data.premium_max,
-      option_type: data.option_type,
-      stocks_checked: data.stocks_checked,
-      signals_count: signals.length,
-      timestamp: data.timestamp
-    }, null, 2);
-
-  } catch (error) {
-    status.className = "card error";
-
-    status.textContent =
-      "❌ Scanner Error: " + error.message;
-
-    const errorCard = makeCard(
-      "Connection / API Error",
-      "card wait"
-    );
-
-    errorCard.appendChild(
-      document.createTextNode(
-        "Render Backend status, Upstox token, " +
-        "instrument contracts ಮತ್ತು API response ಪರಿಶೀಲಿಸಿ."
-      )
-    );
-
-    results.appendChild(errorCard);
-
-    diagnostics.textContent = error.stack || error.message;
-
-  } finally {
-    button.disabled = false;
-    button.textContent = "🔍 Scan Stock Options";
-  }
+        <div class="details">
+          LTP: ₹${numberValue(item.ltp)}<br>
+          RSI: ${numberValue(item.rsi14)}<br>
+          Price Change: ${numberValue(item.price_change_percent)}%<br>
+          Volume Change: ${numberValue(item.volume_change_percent)}%<br>
+          OI Change: ${numberValue(item.oi_change_percent)}%<br>
+          Expiry: ${escapeHtml(item.expiry || "--")}<br>
+          Instrument: ${escapeHtml(item.instrument_key || "--")}
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
-// ========================================
-// INITIAL STATUS CHECK
-// ========================================
+function renderIndexes(results) {
+  const container = document.getElementById("indexResults");
 
-async function checkBackend() {
-  const status =
-    document.getElementById("status");
+  if (!results.length) {
+    container.textContent = "No index results returned.";
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Index</th>
+            <th>Expiry</th>
+            <th>Scanned</th>
+            <th>Alerts</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results.map(item => `
+            <tr>
+              <td>${escapeHtml(item.underlying || "--")}</td>
+              <td>${escapeHtml(item.expiry || "--")}</td>
+              <td>${numberValue(item.scanned, 0)}</td>
+              <td>${numberValue(item.alert_count, 0)}</td>
+              <td class="${item.error ? "red" : "green"}">
+                ${escapeHtml(item.error || "OK")}
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function toggleAuto() {
+  const button = document.getElementById("autoBtn");
+
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    button.textContent = "▶ Start Auto Scan";
+    setMessage("Automatic scanning stopped.");
+    return;
+  }
+
+  button.textContent = "■ Stop Auto Scan";
+
+  runScan();
+
+  const seconds = Number(
+    document.getElementById("interval").value
+  ) || 30;
+
+  autoTimer = setInterval(() => {
+    if (!scanning) runScan();
+  }, seconds * 1000);
+
+  setMessage("Automatic scanning enabled.");
+}
+
+function clearResults() {
+  document.getElementById("alerts").textContent = "No results.";
+  document.getElementById("indexResults").textContent = "No results.";
+  document.getElementById("indexCount").textContent = "0";
+  document.getElementById("optionCount").textContent = "0";
+  document.getElementById("alertCount").textContent = "0";
+  document.getElementById("lastScan").textContent = "--";
+  document.getElementById("rsiResult").textContent =
+    "Enter an instrument key to check RSI.";
+  lastData = null;
+}
+
+async function loadRSI() {
+  const instrumentKey =
+    document.getElementById("instrumentKey").value.trim();
+
+  const output = document.getElementById("rsiResult");
+
+  if (!instrumentKey) {
+    output.textContent = "Please enter an instrument key.";
+    return;
+  }
+
+  output.textContent = "Loading closed candles...";
 
   try {
-    const data = await fetchJson(API + "/health");
+    const path =
+      "/api/market/candles?instrument_key=" +
+      encodeURIComponent(instrumentKey) +
+      "&interval=5";
 
-    status.textContent =
-      "✅ Backend Online: " +
-      (data.message || "Server running") +
-      " | " + formatTime(data.timestamp);
+    const data = await apiGet(path);
 
+    output.innerHTML = `
+      <div class="metric">
+        <span>5-Minute RSI(14)</span>
+        <strong class="blue">${numberValue(data.rsi14)}</strong>
+        <div class="details">
+          Candles received: ${numberValue(data.candle_count, 0)}<br>
+          Closed candles: ${numberValue(data.closed_candle_count, 0)}<br>
+          Latest closed candle:
+          ${escapeHtml(
+            data.latest_closed_candle
+              ? data.latest_closed_candle[0]
+              : "Not available"
+          )}
+        </div>
+      </div>
+    `;
   } catch (error) {
-    status.className = "card error";
-    status.textContent =
-      "Backend check failed: " + error.message;
+    output.textContent = "RSI error: " + error.message;
   }
 }
 
