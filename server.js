@@ -1041,15 +1041,3 @@ server.listen(PORT, "0.0.0.0", () => {
     `Smart Market Scanner server listening on port ${PORT}`
   );
 });
-
-// ----------------------------------------------
-// GRACEFUL SHUTDOWN
-// ----------------------------------------------
-process.on("SIGTERM", () => {
-  console.log("SIGTERM received. Closing server...");
-
-  server.close(() => {
-    console.log("Server closed.");
-    process.exit(0);
-  });
-});
