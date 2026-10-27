@@ -774,15 +774,15 @@ async function scanZeroHeroAndMomentum(url) {
         Array.isArray(contractsResponse?.data)
           ? contractsResponse.data
           : [];
-
       if (!rawContracts.length) {
         errors.push({
           index: indexName,
-          error:error.message
-      });
-    }
-  }
+          error: "No option contracts found"
+        });
 
+        continue;
+      }
+      
   return {
     success: true,
     scanner: "ZERO_HERO_AND_STRONG_MOMENTUM",
