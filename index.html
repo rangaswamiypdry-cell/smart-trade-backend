@@ -1,707 +1,715 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="kn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#07111f">
-<title>Smart Market Scanner Pro</title>
+<title>Smart Market Scanner</title>
 
 <style>
-:root {
-  --bg:#07111f;
-  --card:#101e30;
-  --border:#263b53;
-  --text:#f2f6fc;
-  --muted:#9aacc1;
-  --green:#00d68f;
-  --red:#ff5263;
-  --blue:#55a6ff;
-  --yellow:#ffd166;
+* {
+  box-sizing: border-box;
 }
-*{box-sizing:border-box}
-body{
-  margin:0;
-  padding:14px;
-  background:var(--bg);
-  color:var(--text);
-  font-family:Arial,sans-serif;
+
+body {
+  margin: 0;
+  background: #07111f;
+  color: #eef5ff;
+  font: 14px system-ui, Arial;
+  padding: 14px;
 }
-header,.panel{
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:13px;
-  padding:15px;
-  margin-bottom:13px;
+
+h1 {
+  font-size: 22px;
+  margin: 4px 0;
 }
-h1{font-size:23px;margin:0 0 8px}
-h2{font-size:16px;margin:0 0 13px}
-.subtitle,.muted{
-  color:var(--muted);
-  font-size:12px;
-  line-height:1.7;
+
+small, .muted {
+  color: #91a4bb;
 }
-.status{margin-top:10px;font-size:12px;color:var(--yellow)}
-.controls{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:9px;
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
-input,select,button{
-  width:100%;
-  padding:12px;
-  border:1px solid var(--border);
-  border-radius:8px;
-  background:#091626;
-  color:white;
-  font-size:13px;
+
+.card {
+  background: #101e30;
+  border: 1px solid #263b53;
+  border-radius: 14px;
+  padding: 14px;
+  margin: 12px 0;
 }
-button{
-  background:var(--blue);
-  color:#07111f;
-  font-weight:bold;
-  border:0;
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
 }
-button:disabled{opacity:.5}
-.secondary{background:#263951;color:white}
-.full{grid-column:1/-1}
-.metrics{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:9px;
+
+label {
+  display: block;
+  color: #a8bdd3;
+  font-size: 12px;
+  margin: 5px 0;
 }
-.metric{
-  background:#091626;
-  border-radius:8px;
-  padding:12px;
-  overflow-wrap:anywhere;
+
+select, input, button {
+  background: #192d43;
+  border: 1px solid #35516c;
+  color: white;
+  padding: 11px;
+  border-radius: 9px;
+  width: 100%;
+  font: inherit;
 }
-.metric span{
-  display:block;
-  color:var(--muted);
-  font-size:11px;
+
+button {
+  background: #1767dd;
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
 }
-.metric strong{display:block;margin-top:7px;font-size:19px}
-.signal{
-  background:#091626;
-  border:1px solid var(--border);
-  border-left:4px solid var(--green);
-  border-radius:9px;
-  padding:13px;
-  margin-bottom:10px;
+
+button:disabled {
+  opacity: .55;
 }
-.signal.put{border-left-color:var(--red)}
-.signal-title{
-  display:flex;
-  justify-content:space-between;
-  gap:8px;
-  font-weight:bold;
-  flex-wrap:wrap;
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
 }
-.green{color:var(--green)}
-.red{color:var(--red)}
-.yellow{color:var(--yellow)}
-.details{
-  margin-top:10px;
-  font-size:12px;
-  color:var(--muted);
-  line-height:1.9;
-  overflow-wrap:anywhere;
+
+.tag {
+  padding: 5px 9px;
+  border-radius: 7px;
+  background: #203248;
 }
-.bar{
-  height:7px;
-  background:#263951;
-  margin:10px 0;
-  border-radius:8px;
-  overflow:hidden;
+
+.buy {
+  color: #35df9b;
 }
-.bar div{height:100%;background:var(--green)}
-.put .bar div{background:var(--red)}
-.message{
-  color:var(--muted);
-  font-size:12px;
-  line-height:1.8;
-  overflow-wrap:anywhere;
+
+.sell {
+  color: #ff6b80;
 }
-table{
-  width:100%;
-  min-width:540px;
-  border-collapse:collapse;
-  font-size:12px;
+
+.warn {
+  color: #ffcf72;
 }
-th,td{
-  text-align:left;
-  padding:9px;
-  border-bottom:1px solid var(--border);
+
+.signal {
+  border-left: 4px solid #4a6077;
 }
-th{color:var(--muted)}
-.table-wrap{overflow-x:auto}
-label{
-  display:block;
-  color:var(--muted);
-  font-size:12px;
-  margin-bottom:6px;
+
+.signal.bull {
+  border-left-color: #35df9b;
 }
-.field{margin-bottom:11px}
-footer{
-  color:var(--muted);
-  font-size:11px;
-  text-align:center;
-  padding:15px 0;
+
+.signal.bear {
+  border-left-color: #ff6b80;
 }
-@media(min-width:650px){
-  body{max-width:1000px;margin:auto}
-  .metrics{grid-template-columns:repeat(4,1fr)}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.metric {
+  background: #0b1726;
+  padding: 9px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 3px;
+}
+
+#status {
+  overflow-wrap: anywhere;
 }
 </style>
 </head>
 
 <body>
 
-<header>
-  <h1>📊 Smart Market Scanner Pro</h1>
-  <div class="subtitle">
-    NIFTY • BANKNIFTY • SENSEX • FINNIFTY • MIDCPNIFTY<br>
-    RSI 65+ • VWAP • OI • Volume • 5-Minute Candles
-  </div>
-  <div class="status" id="connectionStatus">● Checking backend...</div>
-</header>
-
-<section class="panel">
-  <h2>⚙️ Scanner Settings</h2>
-
-  <div class="field">
-    <label for="apiBase">Render Backend URL</label>
-    <input id="apiBase"
-      value="https://smart-trade-backend-ig6l.onrender.com">
+<div class="top">
+  <div>
+    <h1>📊 Smart Market Scanner</h1>
+    <small>
+      5-minute closed candle • Index & option signals
+    </small>
   </div>
 
-  <div class="controls">
-    <button id="scanBtn" onclick="runScan()">🔎 Scan Now</button>
-    <button id="autoBtn" class="secondary" onclick="toggleAuto()">▶ Auto Scan OFF</button>
+  <span class="tag" id="connection">
+    Checking…
+  </span>
+</div>
+
+<div class="card">
+
+  <div class="grid">
 
     <div>
-      <label for="indexFilter">Index</label>
-      <select id="indexFilter">
+      <label>Index</label>
+
+      <select id="index">
         <option value="ALL">All Indexes</option>
         <option>NIFTY</option>
         <option>BANKNIFTY</option>
         <option>SENSEX</option>
         <option>FINNIFTY</option>
-        <option>MIDCPNIFTY</option>
+        <option>MIDCAPNIFTY</option>
       </select>
     </div>
 
     <div>
-      <label for="sideFilter">Signal Side</label>
-      <select id="sideFilter">
-        <option value="ALL">CALL + PUT</option>
-        <option value="CALL">CALL BUY</option>
-        <option value="PUT">PUT BUY</option>
+      <label>Signal filter</label>
+
+      <select id="filter">
+        <option value="ALL">All</option>
+        <option value="CALL">CALL / Bullish</option>
+        <option value="PUT">PUT / Bearish</option>
+        <option value="ZERO">Zero Hero</option>
       </select>
     </div>
 
-    <div>
-      <label for="interval">Auto scan</label>
-      <select id="interval">
-        <option value="60">60 seconds</option>
-        <option value="120">2 minutes</option>
-        <option value="300">5 minutes</option>
-      </select>
-    </div>
-
-    <div>
-      <label for="minStrength">Minimum strength</label>
-      <select id="minStrength">
-        <option value="75">75%</option>
-        <option value="80">80%</option>
-        <option value="90">90%</option>
-      </select>
-    </div>
   </div>
 
-  <div class="message" id="statusMessage">
-    Ready to connect.
-  </div>
-</section>
+  <div class="grid" style="margin-top:12px">
 
-<section class="panel">
-  <h2>📈 Summary</h2>
-  <div class="metrics">
-    <div class="metric"><span>Indexes</span><strong id="indexCount">0</strong></div>
-    <div class="metric"><span>Options scanned</span><strong id="optionCount">0</strong></div>
-    <div class="metric"><span>Qualified signals</span><strong id="alertCount">0</strong></div>
-    <div class="metric"><span>Last scan</span><strong id="lastScan" style="font-size:13px">--</strong></div>
-  </div>
-</section>
+    <button id="scanBtn">
+      🔎 Scan Now
+    </button>
 
-<section class="panel">
-  <h2>🚨 Qualified CALL / PUT Signals</h2>
-  <div id="alerts" class="message">Press Scan Now.</div>
-</section>
+    <button
+      id="autoBtn"
+      style="background:#344c66"
+    >
+      ▶ Auto Scan OFF
+    </button>
 
-<section class="panel">
-  <h2>🛡️ Stop Loss & Target Alerts</h2>
-
-  <div class="field">
-    <label for="slPercent">Stop Loss (%)</label>
-    <input id="slPercent" type="number" value="20" min="1" max="80">
   </div>
 
-  <div class="field">
-    <label for="tpPercent">Target (%)</label>
-    <input id="tpPercent" type="number" value="30" min="1" max="200">
+  <p id="status" class="muted">
+    Ready. Click Scan Now.
+  </p>
+
+</div>
+
+<div class="grid">
+
+  <div class="card">
+    <small>Signals</small>
+    <h1 id="count">0</h1>
   </div>
 
-  <button class="secondary" onclick="enableNotifications()">
-    🔔 Enable Browser Notifications
-  </button>
+  <div class="card">
+    <small>Last updated</small>
 
-  <div id="riskAlerts" class="message">
-    SL/TP monitoring begins after valid signals are received.
+    <h1
+      id="updated"
+      style="font-size:17px"
+    >—</h1>
   </div>
 
-  <div class="message">
-    SL/TP are based on the option premium at signal time.
-    Monitoring works only while this page remains open and
-    fresh prices are returned by the backend.
-  </div>
-</section>
+</div>
 
-<section class="panel">
-  <h2>📋 Index Scan Results</h2>
-  <div id="indexResults" class="message">Waiting for scan...</div>
-</section>
+<div id="signals"></div>
 
-<footer>
-  Informational scanner only. No automatic orders are placed.
-  Verify signals and manage risk independently.
-</footer>
-
+<div class="card">
+  <small>
+    Note: Signal confirmation depends on backend response
+    and available market data. No signal means no confirmed
+    setup or unavailable data. Verify option prices and risk
+    before trading.
+  </small>
+</div>
 <script>
-"use strict";
+const BASE =
+  "https://smart-trade-backend-ig6l.onrender.com";
 
-const INDEXES = [
-  "NIFTY",
-  "BANKNIFTY",
-  "SENSEX",
-  "FINNIFTY",
-  "MIDCPNIFTY"
-];
+const $ = id => document.getElementById(id);
 
-const MIN_RSI = 65;
 let autoTimer = null;
-let scanning = false;
-let riskTimer = null;
-let lastData = null;
 
-/* Active option premium monitoring */
-const watchedTrades = new Map();
-const notifiedEvents = new Set();
+const esc = v =>
+  String(v ?? "—").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[c]));
 
-function apiBase(){
-  return document.getElementById("apiBase")
-    .value.trim().replace(/\/+$/,"");
-}
+const num = v =>
+  v === null || v === undefined || v === ""
+    ? "—"
+    : typeof v === "number"
+      ? v.toLocaleString("en-IN", {
+          maximumFractionDigits: 2
+        })
+      : esc(v);
 
-function msg(text){
-  document.getElementById("statusMessage").textContent=text;
-}
 
-function esc(value){
-  return String(value ?? "").replace(/[&<>"']/g,c=>({
-    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-  })[c]);
-}
+// =====================================
+// BACKEND API CONNECTION
+// =====================================
 
-function num(...values){
-  for(const value of values){
-    if(value!==null && value!==undefined && value!=="" &&
-       Number.isFinite(Number(value))) return Number(value);
-  }
-  return null;
-}
+async function get(path, timeout = 65000) {
 
-function bool(...values){
-  for(const value of values){
-    if(typeof value==="boolean") return value;
-    if(typeof value==="string"){
-      const v=value.toLowerCase();
-      if(["true","yes","pass"].includes(v)) return true;
-      if(["false","no","fail"].includes(v)) return false;
-    }
-  }
-  return null;
-}
+  const ctrl = new AbortController();
 
-async function apiGet(path){
-  const response=await fetch(apiBase()+path,{
-    method:"GET",
-    headers:{"Accept":"application/json"},
-    cache:"no-store"
-  });
+  const t = setTimeout(
+    () => ctrl.abort(),
+    timeout
+  );
 
-  const text=await response.text();
-  let data;
+  try {
 
-  try{data=JSON.parse(text);}
-  catch{throw new Error("Backend did not return JSON");}
-
-  if(!response.ok)
-    throw new Error(data.error || "HTTP "+response.status);
-
-  return data;
-}
-
-async function checkBackend(){
-  const status=document.getElementById("connectionStatus");
-
-  try{
-    const data=await apiGet("/health");
-
-    if(!data.success) throw new Error("Health check failed");
-
-    status.textContent="● Backend Live";
-    status.style.color="#00d68f";
-  }catch(error){
-    status.textContent="● Backend Error";
-    status.style.color="#ff5263";
-    msg(error.message);
-  }
-}
-
-function getIndex(item){
-  const raw=String(
-    item.index || item.underlying || item.underlying_name ||
-    item.indexName || item.symbol || ""
-  ).toUpperCase().replace(/[\s_-]/g,"");
-
-  if(raw.includes("BANKNIFTY")) return "BANKNIFTY";
-  if(raw.includes("FINNIFTY")) return "FINNIFTY";
-  if(raw.includes("MIDCPNIFTY") || raw.includes("MIDCAPNIFTY"))
-    return "MIDCPNIFTY";
-  if(raw.includes("SENSEX")) return "SENSEX";
-  if(raw.includes("NIFTY")) return "NIFTY";
-
-  return raw;
-}
-
-function getSide(item){
-  const raw=String(
-    item.option_type || item.optionType ||
-    item.side || item.signal || item.direction || ""
-  ).toUpperCase();
-
-  if(raw==="CE" || raw.includes("CALL")) return "CALL";
-  if(raw==="PE" || raw.includes("PUT")) return "PUT";
-  return "";
-}
-
-function getRows(data){
-  if(Array.isArray(data.alerts)) return data.alerts;
-  if(Array.isArray(data.signals)) return data.signals;
-  if(Array.isArray(data.data)) return data.data;
-
-  if(Array.isArray(data.results)){
-    return data.results.flatMap(result=>{
-      const alerts=Array.isArray(result.alerts)?result.alerts:[];
-      return alerts.map(item=>({
-        ...item,
-        underlying:item.underlying || result.underlying
-      }));
+    const r = await fetch(BASE + path, {
+      signal: ctrl.signal,
+      headers: {
+        "Accept": "application/json"
+      }
     });
+
+    const data = await r.json();
+
+    if (!r.ok) {
+      throw Error(
+        data.error ||
+        data.message ||
+        "HTTP " + r.status
+      );
+    }
+
+    return data;
+
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+
+// =====================================
+// CHECK BACKEND STATUS
+// =====================================
+
+async function check() {
+
+  try {
+
+    await get("/health");
+
+    $("connection").textContent =
+      "🟢 Online";
+
+  } catch (e) {
+
+    $("connection").textContent =
+      "🔴 Offline";
+  }
+}
+
+
+// =====================================
+// READ SIGNAL DATA
+// =====================================
+
+function unwrap(data) {
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  const a = [
+    data?.signals,
+    data?.results,
+    data?.data?.signals,
+    data?.data?.results,
+    data?.data?.items,
+    data?.items,
+    data?.data
+  ];
+
+  for (const v of a) {
+
+    if (Array.isArray(v)) {
+      return v;
+    }
   }
 
   return [];
 }
 
-function normalize(item){
-  const c=item.checks || item.conditions || {};
 
-  return {
-    ...item,
-    index:getIndex(item),
-    side:getSide(item),
-    rsi:num(item.rsi14,item.rsi,item.RSI),
-    strength:num(item.strengthPercent,item.buyStrength,item.strength,item.score),
-    price:num(item.ltp,item.premium,item.optionPrice,item.price),
-    strike:num(item.strike_price,item.strikePrice,item.strike),
-    vwapPass:bool(item.vwapCross,item.vwapConfirmation,c.vwapCross,c.vwap),
-    pricePass:bool(item.priceIncrease,item.priceConfirmation,c.priceIncrease),
-    oiPass:bool(item.oiIncrease,item.oiConfirmation,c.oiIncrease),
-    volumePass:bool(item.volumeIncrease,item.volumeConfirmation,c.volumeIncrease),
-    closed:bool(item.candleClosed,item.isClosedCandle,item.completedCandle)
-  };
-}
+// =====================================
+// DISPLAY SIGNALS
+// =====================================
 
-function qualifies(s){
-  if(!INDEXES.includes(s.index)) return false;
-  if(!["CALL","PUT"].includes(s.side)) return false;
-  if(s.rsi===null || s.rsi<=MIN_RSI) return false;
+function render(data) {
 
-  const minimum=Number(document.getElementById("minStrength").value);
-  if(s.strength===null || s.strength<minimum) return false;
+  const arr = unwrap(data);
 
-  if(s.vwapPass!==true || s.pricePass!==true ||
-     s.oiPass!==true || s.volumePass!==true) return false;
+  const filter = $("filter").value;
+  const idx = $("index").value;
 
-  if(s.closed===false) return false;
+  const filtered = arr.filter(s => {
 
-  return true;
-}
+    const name = String(
+      s.index ||
+      s.indexName ||
+      s.underlying ||
+      s.symbol ||
+      s.name ||
+      ""
+    ).toUpperCase();
 
-function fmt(value,d=2){
-  return value===null || value===undefined || !Number.isFinite(Number(value))
-    ? "--" : Number(value).toFixed(d);
-}
+    const kind = String(
+      s.signal ||
+      s.type ||
+      s.direction ||
+      s.action ||
+      s.option_type ||
+      s.optionType ||
+      ""
+    ).toUpperCase();
 
-function filteredSignals(){
-  const index=document.getElementById("indexFilter").value;
-  const side=document.getElementById("sideFilter").value;
+    const indexOk =
+      idx === "ALL" ||
+      name.includes(idx);
 
-  return (lastData ? getRows(lastData):[])
-    .map(normalize)
-    .filter(qualifies)
-    .filter(s=>(index==="ALL" || s.index===index))
-    .filter(s=>(side==="ALL" || s.side===side));
-}
+    const kindOk =
+      filter === "ALL" ||
 
-function render(){
-  const signals=filteredSignals();
+      (
+        filter === "CALL" &&
+        /CALL|CE|BUY|BULL/.test(kind)
+      ) ||
 
-  document.getElementById("indexCount").textContent=INDEXES.length;
-  document.getElementById("optionCount").textContent=
-    num(lastData?.options_scanned,lastData?.total_scanned) ?? getRows(lastData||{}).length;
-  document.getElementById("alertCount").textContent=signals.length;
-  document.getElementById("lastScan").textContent=
-    new Date().toLocaleTimeString("en-IN");
+      (
+        filter === "PUT" &&
+        /PUT|PE|SELL|BEAR/.test(kind)
+      ) ||
 
-  const box=document.getElementById("alerts");
-
-  if(!signals.length){
-    box.textContent=
-      "No signal satisfies every required condition. Check backend fields and index coverage.";
-  }else{
-    box.innerHTML=signals.map(s=>{
-      const put=s.side==="PUT";
-      const id=s.instrument_key || [s.index,s.strike,s.side,s.expiry].join("_");
-
-      return `
-      <div class="signal ${put?"put":""}">
-        <div class="signal-title">
-          <span>${esc(s.index)} ${esc(s.strike ?? "--")} ${esc(s.side)}</span>
-          <span class="${put?"red":"green"}">${s.side} BUY · ${fmt(s.strength,0)}%</span>
-        </div>
-
-        <div class="bar"><div style="width:${Math.min(100,s.strength)}%"></div></div>
-
-        <div class="metrics">
-          <div class="metric"><span>Option premium</span><strong>₹${fmt(s.price)}</strong></div>
-          <div class="metric"><span>RSI</span><strong>${fmt(s.rsi)}</strong></div>
-          <div class="metric"><span>Stop loss</span><strong>₹${fmt(s.price*(1-Number(document.getElementById("slPercent").value)/100))}</strong></div>
-          <div class="metric"><span>Target</span><strong>₹${fmt(s.price*(1+Number(document.getElementById("tpPercent").value)/100))}</strong></div>
-        </div>
-
-        <div class="details">
-          VWAP: Confirmed<br>
-          Price direction: Confirmed<br>
-          OI increase: Confirmed<br>
-          Volume increase: Confirmed<br>
-          Instrument: ${esc(s.instrument_key || "--")}<br>
-          Expiry: ${esc(s.expiry || "--")}
-        </div>
-
-        <button class="secondary" onclick="watchSignal('${esc(id)}')">
-          Monitor SL / TP
-        </button>
-      </div>`;
-    }).join("");
-  }
-
-  const results=Array.isArray(lastData?.results)?lastData.results:[];
-  const table=document.getElementById("indexResults");
-
-  if(!results.length){
-    table.textContent="Backend did not return per-index scan results.";
-  }else{
-    table.innerHTML=`
-      <div class="table-wrap"><table>
-      <thead><tr><th>Index</th><th>Scanned</th><th>Alerts</th><th>Status</th></tr></thead>
-      <tbody>${results.map(r=>`
-        <tr>
-          <td>${esc(r.underlying || r.index || "--")}</td>
-          <td>${fmt(num(r.scanned),0)}</td>
-          <td>${fmt(num(r.alert_count),0)}</td>
-          <td class="${r.error?"red":"green"}">${esc(r.error || "OK")}</td>
-        </tr>`).join("")}
-      </tbody></table></div>`;
-  }
-}
-
-async function runScan(){
-  if(scanning) return;
-
-  scanning=true;
-  const button=document.getElementById("scanBtn");
-  button.disabled=true;
-  button.textContent="Scanning...";
-
-  msg("Requesting option scan...");
-
-  try{
-    const data=await apiGet("/api/options/auto-scan");
-
-    if(data.success===false)
-      throw new Error(data.error || "Scan failed");
-
-    lastData=data;
-    render();
-
-    msg("Scan completed. Verify signal conditions before trading.");
-  }catch(error){
-    msg("Scan error: "+error.message);
-  }finally{
-    scanning=false;
-    button.disabled=false;
-    button.textContent="🔎 Scan Now";
-  }
-}
-
-function toggleAuto(){
-  const button=document.getElementById("autoBtn");
-
-  if(autoTimer){
-    clearInterval(autoTimer);
-    autoTimer=null;
-    button.textContent="▶ Auto Scan OFF";
-    msg("Auto scan stopped.");
-    return;
-  }
-
-  button.textContent="■ Stop Auto Scan";
-  runScan();
-
-  autoTimer=setInterval(()=>{
-    if(!scanning) runScan();
-  },Number(document.getElementById("interval").value)*1000);
-}
-
-async function enableNotifications(){
-  if(!("Notification" in window)){
-    alert("This browser does not support notifications.");
-    return;
-  }
-
-  const permission=await Notification.requestPermission();
-
-  if(permission==="granted"){
-    alert("Browser notifications enabled.");
-  }else{
-    alert("Allow notifications in browser settings.");
-  }
-}
-
-function notifyOnce(key,title,body){
-  if(notifiedEvents.has(key)) return;
-  notifiedEvents.add(key);
-
-  if("Notification" in window && Notification.permission==="granted"){
-    new Notification(title,{body});
-  }
-}
-
-function watchSignal(id){
-  const s=filteredSignals().find(x=>
-    (x.instrument_key || [x.index,x.strike,x.side,x.expiry].join("_"))===id
-  );
-
-  if(!s || s.price===null || s.price<=0){
-    alert("Valid option premium is not available.");
-    return;
-  }
-
-  const slPct=Number(document.getElementById("slPercent").value);
-  const tpPct=Number(document.getElementById("tpPercent").value);
-
-  if(!(slPct>0 && tpPct>0)){
-    alert("Enter valid SL and TP percentages.");
-    return;
-  }
-
-  watchedTrades.set(id,{
-    id,
-    index:s.index,
-    side:s.side,
-    instrument_key:s.instrument_key,
-    entry:s.price,
-    sl:s.price*(1-slPct/100),
-    tp:s.price*(1+tpPct/100),
-    state:"WATCHING"
-  });
-
-  renderRiskAlerts();
-}
-
-function renderRiskAlerts(){
-  const box=document.getElementById("riskAlerts");
-
-  if(!watchedTrades.size){
-    box.textContent="No option premium is being monitored.";
-    return;
-  }
-
-  box.innerHTML=[...watchedTrades.values()].map(t=>`
-    <div class="signal ${t.side==="PUT"?"put":""}">
-      <strong>${esc(t.index)} ${esc(t.side)} — ${esc(t.state)}</strong>
-      <div class="details">
-        Entry: ₹${fmt(t.entry)}<br>
-        SL: ₹${fmt(t.sl)}<br>
-        TP: ₹${fmt(t.tp)}<br>
-        ${esc(t.instrument_key || "")}
-      </div>
-    </div>
-  `).join("");
-}
-
-async function monitorRisk(){
-  if(!watchedTrades.size) return;
-
-  for(const t of watchedTrades.values()){
-    if(t.state!=="WATCHING" || !t.instrument_key) continue;
-
-    try{
-      const data=await apiGet(
-        "/api/market/quote?instrument_key="+encodeURIComponent(t.instrument_key)
+      (
+        filter === "ZERO" &&
+        /ZERO|HERO/.test(
+          kind + " " +
+          String(
+            s.strategy || s.setup || ""
+          ).toUpperCase()
+        )
       );
 
-      const q=data.data || data.quote || data;
-      const price=num(q.ltp,q.last_price,q.lastPrice,q.price);
+    return indexOk && kindOk;
+  });
 
-      if(price===null || price<=0) continue;
 
-      t.current=price;
+  $("count").textContent =
+    filtered.length;
 
-      if(price<=t.sl){
-        t.state="STOP LOSS HIT";
-        notifyOnce(t.id+"_SL","Stop Loss Alert",t.index+" "+t.side+" premium ₹"+fmt(price));
-      }else if(price>=t.tp){
-        t.state="TARGET HIT";
-        notifyOnce(t.id+"_TP","Target Alert",t.index+" "+t.side+" premium ₹"+fmt(price));
-      }
-    }catch(error){
-      console.warn("Risk monitoring failed:",error.message);
-    }
-  }
+  $("updated").textContent =
+    new Date().toLocaleTimeString("en-IN");
 
-  renderRiskAlerts();
+
+  $("signals").innerHTML = filtered.length
+
+    ? filtered.map(s => {
+
+        const kind = String(
+          s.signal ||
+          s.type ||
+          s.direction ||
+          s.action ||
+          s.option_type ||
+          s.optionType ||
+          "WAIT"
+        ).toUpperCase();
+
+        const bull =
+          /CALL|CE|BUY|BULL/.test(kind);
+
+        const bear =
+          /PUT|PE|SELL|BEAR/.test(kind);
+
+        const name =
+          s.index ||
+          s.indexName ||
+          s.underlying ||
+          s.symbol ||
+          s.name ||
+          "INDEX";
+
+        const strike =
+          s.strike_price ??
+          s.strikePrice ??
+          s.strike ??
+          s.option?.strike_price;
+
+        const price =
+          s.price ??
+          s.ltp ??
+          s.last_price ??
+          s.option?.ltp;
+
+        const volume =
+          s.volume ??
+          s.volumeChange ??
+          s.volume_change;
+
+        const oi =
+          s.oi ??
+          s.open_interest ??
+          s.openInterest ??
+          s.oiChange;
+
+        const rsi =
+          s.rsi ??
+          s.RSI;
+
+        const vwap =
+          s.vwap ??
+          s.VWAP;
+
+        const score =
+          s.confidence ??
+          s.score ??
+          s.strength;
+
+        const time =
+          s.signal_time ??
+          s.signalTime ??
+          s.timestamp ??
+          "—";
+
+
+        return `
+          <div class="card signal ${
+            bull ? "bull" :
+            bear ? "bear" : ""
+          }">
+
+            <div class="row">
+
+              <strong>${esc(name)}</strong>
+
+              <span class="tag ${
+                bull ? "buy" :
+                bear ? "sell" : "warn"
+              }">
+                ${esc(kind)}
+              </span>
+
+            </div>
+
+            <p>
+              <strong>
+                Strike: ${num(strike)}
+              </strong>
+
+              · ${esc(
+                s.strategy ||
+                s.setup ||
+                "5m Scanner"
+              )}
+            </p>
+
+            <div class="metrics">
+
+              ${
+                [
+                  ["Price", price],
+                  ["Volume / Change", volume],
+                  ["OI / Change", oi],
+                  ["RSI", rsi],
+                  ["VWAP", vwap],
+                  ["Strength", score]
+                ].map(([k, v]) => `
+                  <div class="metric">
+
+                    <small>${k}</small>
+
+                    <strong>${num(v)}</strong>
+
+                  </div>
+                `).join("")
+              }
+
+            </div>
+
+            <p class="muted">
+              Time: ${esc(time)}
+            </p>
+
+          </div>
+        `;
+
+      }).join("")
+
+    : `
+      <div class="card muted">
+        No matching signals.
+        ${esc(
+          data?.message ||
+          "Backend returned no matching records."
+        )}
+      </div>
+    `;
 }
 
-document.getElementById("indexFilter").addEventListener("change",render);
-document.getElementById("sideFilter").addEventListener("change",render);
-document.getElementById("minStrength").addEventListener("change",render);
 
-checkBackend();
+// =====================================
+// SCAN INDEX OPTIONS
+// =====================================
 
-riskTimer=setInterval(monitorRisk,15000);
+async function scan() {
+
+  $("scanBtn").disabled = true;
+
+  $("status").textContent =
+    "Scanning… free server may take 50+ seconds to wake.";
+
+  try {
+
+    const idx = $("index").value;
+
+    const paths = [
+
+      "/api/options/auto-scan" +
+
+      (
+        idx === "ALL"
+          ? ""
+          : "?indexes=" +
+            encodeURIComponent(idx)
+      ),
+
+      "/api/options/nse-stocks/scan"
+    ];
+
+    let data;
+    const errors = [];
+
+    for (const path of paths) {
+
+      try {
+
+        const result = await get(path);
+
+        data = result;
+
+        break;
+
+      } catch (e) {
+
+        errors.push(
+          path + ": " + e.message
+        );
+      }
+    }
+
+    if (!data) {
+      throw Error(errors.join(" | "));
+    }
+
+    render(data);
+
+    const arr = unwrap(data);
+
+    $("status").textContent =
+      "Scan completed • " +
+      arr.length +
+      " raw record(s)." +
+
+      (
+        Array.isArray(data.errors) &&
+        data.errors.length
+          ? " Errors: " +
+            JSON.stringify(data.errors).slice(0, 450)
+          : ""
+      );
+
+  } catch (e) {
+
+    $("status").textContent =
+      "Scan error: " + e.message;
+
+    $("signals").innerHTML = `
+      <div class="card warn">
+        ${esc(e.message)}
+      </div>
+    `;
+
+  } finally {
+
+    $("scanBtn").disabled = false;
+  }
+}
+
+
+// =====================================
+// SCAN BUTTON
+// =====================================
+
+$("scanBtn").onclick = scan;
+
+
+// =====================================
+// AUTO SCAN EVERY 60 SECONDS
+// =====================================
+
+$("autoBtn").onclick = () => {
+
+  if (autoTimer) {
+
+    clearInterval(autoTimer);
+
+    autoTimer = null;
+
+    $("autoBtn").textContent =
+      "▶ Auto Scan OFF";
+
+  } else {
+
+    scan();
+
+    autoTimer = setInterval(() => {
+
+      if (!$("scanBtn").disabled) {
+        scan();
+      }
+
+    }, 60000);
+
+    $("autoBtn").textContent =
+      "⏸ Auto Scan ON";
+  }
+};
+
+
+// =====================================
+// FILTER CHANGE
+// =====================================
+
+$("filter").onchange = () => scan();
+
+
+// =====================================
+// START
+// =====================================
+
+check();
+
 </script>
 </body>
-  </html>
+</html>
