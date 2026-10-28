@@ -7,134 +7,146 @@
 <title>Smart Market Scanner</title>
 
 <style>
-* {
-  box-sizing: border-box;
+*{box-sizing:border-box}
+
+body{
+ margin:0;
+ background:#07111f;
+ color:#eef5ff;
+ font:14px system-ui,Arial;
+ padding:14px
 }
 
-body {
-  margin: 0;
-  background: #07111f;
-  color: #eef5ff;
-  font: 14px system-ui, Arial;
-  padding: 14px;
+h1{font-size:22px;margin:4px 0}
+
+small,.muted{color:#91a4bb}
+
+.top{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:10px
 }
 
-h1 {
-  font-size: 22px;
-  margin: 4px 0;
+.card{
+ background:#101e30;
+ border:1px solid #263b53;
+ border-radius:14px;
+ padding:14px;
+ margin:12px 0
 }
 
-small, .muted {
-  color: #91a4bb;
+.grid{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:9px
 }
 
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+label{
+ display:block;
+ color:#a8bdd3;
+ font-size:12px;
+ margin:5px 0
 }
 
-.card {
-  background: #101e30;
-  border: 1px solid #263b53;
-  border-radius: 14px;
-  padding: 14px;
-  margin: 12px 0;
+select,input,button{
+ background:#192d43;
+ border:1px solid #35516c;
+ color:white;
+ padding:11px;
+ border-radius:9px;
+ width:100%;
+ font:inherit
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+button{
+ background:#1767dd;
+ border:0;
+ font-weight:700;
+ cursor:pointer
 }
 
-label {
-  display: block;
-  color: #a8bdd3;
-  font-size: 12px;
-  margin: 5px 0;
+button:disabled{opacity:.55}
+
+.row{
+ display:flex;
+ justify-content:space-between;
+ gap:8px;
+ align-items:center
 }
 
-select, input, button {
-  background: #192d43;
-  border: 1px solid #35516c;
-  color: white;
-  padding: 11px;
-  border-radius: 9px;
-  width: 100%;
-  font: inherit;
+.tag{
+ padding:5px 9px;
+ border-radius:7px;
+ background:#203248
 }
 
-button {
-  background: #1767dd;
-  border: 0;
-  font-weight: 700;
-  cursor: pointer;
+.buy{color:#35df9b}
+.sell{color:#ff6b80}
+.warn{color:#ffcf72}
+
+.signal{
+ border-left:4px solid #4a6077
 }
 
-button:disabled {
-  opacity: .55;
+.signal.bull{border-left-color:#35df9b}
+.signal.bear{border-left-color:#ff6b80}
+
+.metrics{
+ display:grid;
+ grid-template-columns:repeat(2,1fr);
+ gap:8px;
+ margin-top:10px
 }
 
-.row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
+.metric{
+ background:#0b1726;
+ padding:9px;
+ border-radius:8px;
+ overflow-wrap:anywhere
 }
 
-.tag {
-  padding: 5px 9px;
-  border-radius: 7px;
-  background: #203248;
+.metric strong{
+ display:block;
+ margin-top:3px
 }
 
-.buy {
-  color: #35df9b;
+#status{overflow-wrap:anywhere}
+
+.rising-title{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:8px
 }
 
-.sell {
-  color: #ff6b80;
+.rising-card{
+ border-left:4px solid #35df9b
 }
 
-.warn {
-  color: #ffcf72;
+.rising-card.put{
+ border-left-color:#ff6b80
 }
 
-.signal {
-  border-left: 4px solid #4a6077;
+.pct{
+ font-size:24px;
+ font-weight:800;
+ color:#35df9b
 }
 
-.signal.bull {
-  border-left-color: #35df9b;
+.pct.put{color:#ff6b80}
+
+.pill{
+ display:inline-block;
+ padding:5px 8px;
+ border-radius:8px;
+ background:#203248;
+ font-size:12px
 }
 
-.signal.bear {
-  border-left-color: #ff6b80;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.metric {
-  background: #0b1726;
-  padding: 9px;
-  border-radius: 8px;
-  overflow-wrap: anywhere;
-}
-
-.metric strong {
-  display: block;
-  margin-top: 3px;
-}
-
-#status {
-  overflow-wrap: anywhere;
+@media(max-width:420px){
+ .grid{grid-template-columns:1fr}
+ .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
 </head>
@@ -142,571 +154,695 @@ button:disabled {
 <body>
 
 <div class="top">
-  <div>
-    <h1>📊 Smart Market Scanner</h1>
-    <small>
-      5-minute closed candle • Index & option signals
-    </small>
-  </div>
-
-  <span class="tag" id="connection">
-    Checking…
-  </span>
+ <div>
+  <h1>📊 Smart Market Scanner</h1>
+  <small>5-minute closed candle • Index & option signals</small>
+ </div>
+ <span class="tag" id="connection">Checking…</span>
 </div>
 
 <div class="card">
 
-  <div class="grid">
-
-    <div>
-      <label>Index</label>
-
-      <select id="index">
-        <option value="ALL">All Indexes</option>
-        <option>NIFTY</option>
-        <option>BANKNIFTY</option>
-        <option>SENSEX</option>
-        <option>FINNIFTY</option>
-        <option>MIDCAPNIFTY</option>
-      </select>
-    </div>
-
-    <div>
-      <label>Signal filter</label>
-
-      <select id="filter">
-        <option value="ALL">All</option>
-        <option value="CALL">CALL / Bullish</option>
-        <option value="PUT">PUT / Bearish</option>
-        <option value="ZERO">Zero Hero</option>
-      </select>
-    </div>
-
+ <div class="grid">
+  <div>
+   <label>Index</label>
+   <select id="index">
+    <option value="ALL">All Indexes</option>
+    <option>NIFTY</option>
+    <option>BANKNIFTY</option>
+    <option>SENSEX</option>
+    <option>FINNIFTY</option>
+    <option>MIDCAPNIFTY</option>
+   </select>
   </div>
 
-  <div class="grid" style="margin-top:12px">
-
-    <button id="scanBtn">
-      🔎 Scan Now
-    </button>
-
-    <button
-      id="autoBtn"
-      style="background:#344c66"
-    >
-      ▶ Auto Scan OFF
-    </button>
-
+  <div>
+   <label>Signal Filter</label>
+   <select id="filter">
+    <option value="ALL">All</option>
+    <option value="CALL">CALL / Bullish</option>
+    <option value="PUT">PUT / Bearish</option>
+    <option value="ZERO">Zero Hero</option>
+   </select>
   </div>
+ </div>
 
-  <p id="status" class="muted">
-    Ready. Click Scan Now.
-  </p>
+ <div class="grid" style="margin-top:12px">
+  <button id="scanBtn">🔎 Scan Now</button>
+  <button id="autoBtn" style="background:#344c66">
+   ▶ Auto Scan OFF
+  </button>
+ </div>
+
+ <p id="status" class="muted">
+  Ready. Click Scan Now.
+ </p>
 
 </div>
 
 <div class="grid">
 
-  <div class="card">
-    <small>Signals</small>
-    <h1 id="count">0</h1>
-  </div>
+ <div class="card">
+  <small>Signals</small>
+  <h1 id="count">0</h1>
+ </div>
 
-  <div class="card">
-    <small>Last updated</small>
-
-    <h1
-      id="updated"
-      style="font-size:17px"
-    >—</h1>
-  </div>
+ <div class="card">
+  <small>Last Updated</small>
+  <h1 id="updated" style="font-size:17px">—</h1>
+ </div>
 
 </div>
+
+<!-- RISING OPTIONS ALERT SECTION -->
+
+<section class="card">
+
+ <div class="rising-title">
+  <div>
+   <h2 style="font-size:18px;margin:0">
+    🚀 Rising Stock Options Alerts
+   </h2>
+   <small>Premium Change Alert</small>
+  </div>
+
+  <div style="min-width:100px">
+   <label for="premiumThreshold">Alert At</label>
+   <select id="premiumThreshold">
+    <option value="75">+75%</option>
+    <option value="80">+80%</option>
+   </select>
+  </div>
+ </div>
+
+ <div class="grid" style="margin-top:10px">
+
+  <div class="metric">
+   <small>CALL Alerts</small>
+   <strong id="callRisingCount">0</strong>
+  </div>
+
+  <div class="metric">
+   <small>PUT Alerts</small>
+   <strong id="putRisingCount">0</strong>
+  </div>
+
+ </div>
+
+ <div id="risingSignals">
+  <div class="muted" style="padding:8px 0">
+   Scan to load option alerts.
+  </div>
+ </div>
+
+ <small class="muted">
+  Alerts require actual premium percentage-change data
+  from the backend.
+ </small>
+
+</section>
 
 <div id="signals"></div>
 
 <div class="card">
-  <small>
-    Note: Signal confirmation depends on backend response
-    and available market data. No signal means no confirmed
-    setup or unavailable data. Verify option prices and risk
-    before trading.
-  </small>
+ <small>
+  Verify market data and risk before trading.
+  High premium changes do not guarantee future profits.
+ </small>
 </div>
-<script>
-const BASE =
-  "https://smart-trade-backend-ig6l.onrender.com";
+
+<script>const BASE =
+ "https://smart-trade-backend-ig6l.onrender.com";
 
 const $ = id => document.getElementById(id);
 
 let autoTimer = null;
 
 const esc = v =>
-  String(v ?? "—").replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[c]));
+ String(v ?? "—").replace(/[&<>"']/g, c => ({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;",
+  "'":"&#39;"
+ }[c]));
 
 const num = v =>
-  v === null || v === undefined || v === ""
-    ? "—"
-    : typeof v === "number"
-      ? v.toLocaleString("en-IN", {
-          maximumFractionDigits: 2
-        })
-      : esc(v);
+ v === null || v === undefined || v === ""
+  ? "—"
+  : typeof v === "number"
+    ? v.toLocaleString("en-IN", {
+       maximumFractionDigits:2
+      })
+    : esc(v);
 
+async function get(path, timeout=65000){
 
-// =====================================
-// BACKEND API CONNECTION
-// =====================================
+ const ctrl = new AbortController();
 
-async function get(path, timeout = 65000) {
+ const timer = setTimeout(
+  () => ctrl.abort(),
+  timeout
+ );
 
-  const ctrl = new AbortController();
+ try{
 
-  const t = setTimeout(
-    () => ctrl.abort(),
-    timeout
+  const response = await fetch(BASE + path,{
+   signal:ctrl.signal,
+   headers:{"Accept":"application/json"}
+  });
+
+  const data = await response.json();
+
+  if(!response.ok){
+   throw Error(
+    data.error ||
+    data.message ||
+    "HTTP " + response.status
+   );
+  }
+
+  return data;
+
+ }finally{
+  clearTimeout(timer);
+ }
+}
+
+async function check(){
+
+ try{
+  await get("/health");
+  $("connection").textContent = "🟢 Online";
+
+ }catch(error){
+
+  $("connection").textContent = "🔴 Offline";
+ }
+}
+
+function unwrap(data){
+
+ if(Array.isArray(data)) return data;
+
+ const candidates = [
+  data?.signals,
+  data?.results,
+  data?.data?.signals,
+  data?.data?.results,
+  data?.data?.items,
+  data?.items,
+  data?.data
+ ];
+
+ for(const value of candidates){
+  if(Array.isArray(value)) return value;
+ }
+
+ return [];
+}
+
+// Read premium percentage supplied by backend.
+// Do not invent a percentage if it is unavailable.
+
+function getPremiumChangePercent(s){
+
+ const candidates = [
+  s.premium_change_percent,
+  s.premiumChangePercent,
+  s.price_change_percent,
+  s.priceChangePercent,
+  s.change_percent,
+  s.changePercent,
+  s.percent_change,
+  s.percentageChange,
+  s.day_change_percent,
+  s.dayChangePercent,
+  s.change_percentage
+ ];
+
+ for(const value of candidates){
+
+  if(
+   value !== null &&
+   value !== undefined &&
+   value !== "" &&
+   Number.isFinite(Number(value))
+  ){
+   return Number(value);
+  }
+ }
+
+ return null;
+}
+
+// RISING OPTIONS CARDS
+
+function renderRising(arr){
+
+ const threshold =
+  Number($("premiumThreshold").value);
+
+ const rising = arr
+  .map(s => ({
+   ...s,
+   _premiumPct:getPremiumChangePercent(s)
+  }))
+  .filter(s =>
+   s._premiumPct !== null &&
+   s._premiumPct >= threshold
   );
 
-  try {
+ function optionType(s){
 
-    const r = await fetch(BASE + path, {
-      signal: ctrl.signal,
-      headers: {
-        "Accept": "application/json"
-      }
-    });
+  return String(
+   s.option_type ||
+   s.optionType ||
+   s.instrument_type ||
+   s.type ||
+   s.signal ||
+   s.symbol ||
+   s.trading_symbol ||
+   ""
+  ).toUpperCase();
+ }
 
-    const data = await r.json();
+ const calls = rising.filter(s =>
+  /CE|CALL/.test(optionType(s))
+ );
 
-    if (!r.ok) {
-      throw Error(
-        data.error ||
-        data.message ||
-        "HTTP " + r.status
-      );
-    }
+ const puts = rising.filter(s =>
+  /PE|PUT/.test(optionType(s))
+ );
 
-    return data;
+ $("callRisingCount").textContent = calls.length;
+ $("putRisingCount").textContent = puts.length;
 
-  } finally {
-    clearTimeout(t);
-  }
+ const cards = rising
+  .sort((a,b) =>
+   b._premiumPct - a._premiumPct
+  )
+  .map(s => {
+
+   const rawType = optionType(s);
+
+   const isPut = /PE|PUT/.test(rawType);
+
+   const kind = isPut
+    ? "PUT / PE"
+    : "CALL / CE";
+
+   const name =
+    s.underlying ||
+    s.index ||
+    s.indexName ||
+    s.name ||
+    s.symbol ||
+    s.trading_symbol ||
+    "Option";
+
+   const strike =
+    s.strike_price ??
+    s.strikePrice ??
+    s.strike ??
+    "—";
+
+   const price =
+    s.price ??
+    s.ltp ??
+    s.last_price ??
+    "—";
+
+   const expiry =
+    s.expiry ||
+    s.expiry_date ||
+    "—";
+
+   const volume =
+    s.volume ??
+    s.currentVolume ??
+    s.volume_traded ??
+    "—";
+
+   const oi =
+    s.oi ??
+    s.open_interest ??
+    s.openInterest ??
+    "—";
+
+   const time =
+    s.signal_time ||
+    s.timestamp ||
+    "—";
+
+   return `
+    <div class="card rising-card ${isPut ? "put" : ""}">
+
+     <div class="row">
+      <strong>${esc(name)}</strong>
+      <span class="pill">${kind}</span>
+     </div>
+
+     <div class="row" style="margin-top:8px">
+
+      <div>
+       <small>Premium Change</small>
+
+       <div class="pct ${isPut ? "put" : ""}">
+        +${s._premiumPct.toFixed(2)}%
+       </div>
+      </div>
+
+      <div style="text-align:right">
+       <small>Option Premium</small>
+       <h2 style="margin:4px 0">
+        ₹${num(price)}
+       </h2>
+      </div>
+
+     </div>
+
+     <div class="metrics">
+
+      ${[
+       ["Strike",strike],
+       ["Expiry",expiry],
+       ["Volume",volume],
+       ["Open Interest",oi]
+      ].map(([key,value]) => `
+       <div class="metric">
+        <small>${key}</small>
+        <strong>${num(value)}</strong>
+       </div>
+      `).join("")}
+
+     </div>
+
+     <p class="muted">
+      Alert threshold: +${threshold}%
+      · ${esc(time)}
+     </p>
+
+    </div>
+   `;
+  });
+
+ $("risingSignals").innerHTML =
+  cards.length
+   ? cards.join("")
+   : `
+    <div class="card muted">
+     No +${threshold}% rising option alerts
+     in the returned data.
+
+     The backend must provide the actual daily
+     premium percentage change.
+    </div>
+   `;
+}
+  function render(data){
+
+ const arr = unwrap(data);
+
+ const filter = $("filter").value;
+ const idx = $("index").value;
+
+ renderRising(arr);
+
+ const filtered = arr.filter(s => {
+
+  const name = String(
+   s.index ||
+   s.indexName ||
+   s.underlying ||
+   s.symbol ||
+   s.name ||
+   ""
+  ).toUpperCase();
+
+  const kind = String(
+   s.signal ||
+   s.type ||
+   s.direction ||
+   s.action ||
+   s.option_type ||
+   s.optionType ||
+   ""
+  ).toUpperCase();
+
+  const indexOk =
+   idx === "ALL" ||
+   name.includes(idx);
+
+  const kindOk =
+   filter === "ALL" ||
+   (
+    filter === "CALL" &&
+    /CALL|CE|BUY|BULL/.test(kind)
+   ) ||
+   (
+    filter === "PUT" &&
+    /PUT|PE|SELL|BEAR/.test(kind)
+   ) ||
+   (
+    filter === "ZERO" &&
+    /ZERO|HERO/.test(
+     kind + " " +
+     String(s.strategy || s.setup || "")
+      .toUpperCase()
+    )
+   );
+
+  return indexOk && kindOk;
+ });
+
+ $("count").textContent = filtered.length;
+
+ $("updated").textContent =
+  new Date().toLocaleTimeString("en-IN");
+
+ $("signals").innerHTML = filtered.length
+  ? filtered.map(s => {
+
+   const kind = String(
+    s.signal ||
+    s.type ||
+    s.direction ||
+    s.action ||
+    s.option_type ||
+    s.optionType ||
+    "WAIT"
+   ).toUpperCase();
+
+   const bull =
+    /CALL|CE|BUY|BULL/.test(kind);
+
+   const bear =
+    /PUT|PE|SELL|BEAR/.test(kind);
+
+   const name =
+    s.index ||
+    s.indexName ||
+    s.underlying ||
+    s.symbol ||
+    s.name ||
+    "INDEX";
+
+   const strike =
+    s.strike_price ??
+    s.strikePrice ??
+    s.strike ??
+    s.option?.strike_price;
+
+   const price =
+    s.price ??
+    s.ltp ??
+    s.last_price ??
+    s.option?.ltp;
+
+   const volume =
+    s.volume ??
+    s.volumeChange ??
+    s.volume_change;
+
+   const oi =
+    s.oi ??
+    s.open_interest ??
+    s.openInterest ??
+    s.oiChange;
+
+   const rsi = s.rsi ?? s.RSI;
+   const vwap = s.vwap ?? s.VWAP;
+
+   const score =
+    s.confidence ??
+    s.score ??
+    s.strength;
+
+   const time =
+    s.signal_time ??
+    s.signalTime ??
+    s.timestamp ??
+    "—";
+
+   return `
+    <div class="card signal ${
+     bull ? "bull" : bear ? "bear" : ""
+    }">
+
+     <div class="row">
+      <strong>${esc(name)}</strong>
+
+      <span class="tag ${
+       bull ? "buy" : bear ? "sell" : "warn"
+      }">
+       ${esc(kind)}
+      </span>
+     </div>
+
+     <p>
+      <strong>Strike: ${num(strike)}</strong>
+      · ${esc(s.strategy || s.setup || "5m Scanner")}
+     </p>
+
+     <div class="metrics">
+
+      ${[
+       ["Price",price],
+       ["Volume / Change",volume],
+       ["OI / Change",oi],
+       ["RSI",rsi],
+       ["VWAP",vwap],
+       ["Strength",score]
+      ].map(([key,value]) => `
+       <div class="metric">
+        <small>${key}</small>
+        <strong>${num(value)}</strong>
+       </div>
+      `).join("")}
+
+     </div>
+
+     <p class="muted">
+      Time: ${esc(time)}
+     </p>
+
+    </div>
+   `;
+  }).join("")
+  : `
+   <div class="card muted">
+    No matching signals.
+    ${esc(data?.message || "Backend returned no matching records.")}
+   </div>
+  `;
 }
 
+async function scan(){
 
-// =====================================
-// CHECK BACKEND STATUS
-// =====================================
+ $("scanBtn").disabled = true;
 
-async function check() {
+ $("status").textContent =
+  "Scanning… server may take time to wake up.";
 
-  try {
+ try{
 
-    await get("/health");
+  const idx = $("index").value;
 
-    $("connection").textContent =
-      "🟢 Online";
+  const paths = [
+   "/api/options/auto-scan" +
+    (idx === "ALL"
+     ? ""
+     : "?indexes=" + encodeURIComponent(idx)),
 
-  } catch (e) {
-
-    $("connection").textContent =
-      "🔴 Offline";
-  }
-}
-
-
-// =====================================
-// READ SIGNAL DATA
-// =====================================
-
-function unwrap(data) {
-
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  const a = [
-    data?.signals,
-    data?.results,
-    data?.data?.signals,
-    data?.data?.results,
-    data?.data?.items,
-    data?.items,
-    data?.data
+   "/api/options/nse-stocks/scan"
   ];
 
-  for (const v of a) {
+  let data;
+  const errors = [];
 
-    if (Array.isArray(v)) {
-      return v;
-    }
+  for(const path of paths){
+
+   try{
+
+    data = await get(path);
+    break;
+
+   }catch(error){
+
+    errors.push(path + ": " + error.message);
+   }
   }
 
-  return [];
-}
+  if(!data){
+   throw Error(errors.join(" | "));
+  }
 
-
-// =====================================
-// DISPLAY SIGNALS
-// =====================================
-
-function render(data) {
+  render(data);
 
   const arr = unwrap(data);
 
-  const filter = $("filter").value;
-  const idx = $("index").value;
+  $("status").textContent =
+   "Scan completed • " +
+   arr.length +
+   " raw record(s)." +
+   (
+    Array.isArray(data.errors) &&
+    data.errors.length
+     ? " Errors: " +
+       JSON.stringify(data.errors).slice(0,450)
+     : ""
+   );
 
-  const filtered = arr.filter(s => {
-
-    const name = String(
-      s.index ||
-      s.indexName ||
-      s.underlying ||
-      s.symbol ||
-      s.name ||
-      ""
-    ).toUpperCase();
-
-    const kind = String(
-      s.signal ||
-      s.type ||
-      s.direction ||
-      s.action ||
-      s.option_type ||
-      s.optionType ||
-      ""
-    ).toUpperCase();
-
-    const indexOk =
-      idx === "ALL" ||
-      name.includes(idx);
-
-    const kindOk =
-      filter === "ALL" ||
-
-      (
-        filter === "CALL" &&
-        /CALL|CE|BUY|BULL/.test(kind)
-      ) ||
-
-      (
-        filter === "PUT" &&
-        /PUT|PE|SELL|BEAR/.test(kind)
-      ) ||
-
-      (
-        filter === "ZERO" &&
-        /ZERO|HERO/.test(
-          kind + " " +
-          String(
-            s.strategy || s.setup || ""
-          ).toUpperCase()
-        )
-      );
-
-    return indexOk && kindOk;
-  });
-
-
-  $("count").textContent =
-    filtered.length;
-
-  $("updated").textContent =
-    new Date().toLocaleTimeString("en-IN");
-
-
-  $("signals").innerHTML = filtered.length
-
-    ? filtered.map(s => {
-
-        const kind = String(
-          s.signal ||
-          s.type ||
-          s.direction ||
-          s.action ||
-          s.option_type ||
-          s.optionType ||
-          "WAIT"
-        ).toUpperCase();
-
-        const bull =
-          /CALL|CE|BUY|BULL/.test(kind);
-
-        const bear =
-          /PUT|PE|SELL|BEAR/.test(kind);
-
-        const name =
-          s.index ||
-          s.indexName ||
-          s.underlying ||
-          s.symbol ||
-          s.name ||
-          "INDEX";
-
-        const strike =
-          s.strike_price ??
-          s.strikePrice ??
-          s.strike ??
-          s.option?.strike_price;
-
-        const price =
-          s.price ??
-          s.ltp ??
-          s.last_price ??
-          s.option?.ltp;
-
-        const volume =
-          s.volume ??
-          s.volumeChange ??
-          s.volume_change;
-
-        const oi =
-          s.oi ??
-          s.open_interest ??
-          s.openInterest ??
-          s.oiChange;
-
-        const rsi =
-          s.rsi ??
-          s.RSI;
-
-        const vwap =
-          s.vwap ??
-          s.VWAP;
-
-        const score =
-          s.confidence ??
-          s.score ??
-          s.strength;
-
-        const time =
-          s.signal_time ??
-          s.signalTime ??
-          s.timestamp ??
-          "—";
-
-
-        return `
-          <div class="card signal ${
-            bull ? "bull" :
-            bear ? "bear" : ""
-          }">
-
-            <div class="row">
-
-              <strong>${esc(name)}</strong>
-
-              <span class="tag ${
-                bull ? "buy" :
-                bear ? "sell" : "warn"
-              }">
-                ${esc(kind)}
-              </span>
-
-            </div>
-
-            <p>
-              <strong>
-                Strike: ${num(strike)}
-              </strong>
-
-              · ${esc(
-                s.strategy ||
-                s.setup ||
-                "5m Scanner"
-              )}
-            </p>
-
-            <div class="metrics">
-
-              ${
-                [
-                  ["Price", price],
-                  ["Volume / Change", volume],
-                  ["OI / Change", oi],
-                  ["RSI", rsi],
-                  ["VWAP", vwap],
-                  ["Strength", score]
-                ].map(([k, v]) => `
-                  <div class="metric">
-
-                    <small>${k}</small>
-
-                    <strong>${num(v)}</strong>
-
-                  </div>
-                `).join("")
-              }
-
-            </div>
-
-            <p class="muted">
-              Time: ${esc(time)}
-            </p>
-
-          </div>
-        `;
-
-      }).join("")
-
-    : `
-      <div class="card muted">
-        No matching signals.
-        ${esc(
-          data?.message ||
-          "Backend returned no matching records."
-        )}
-      </div>
-    `;
-}
-
-
-// =====================================
-// SCAN INDEX OPTIONS
-// =====================================
-
-async function scan() {
-
-  $("scanBtn").disabled = true;
+ }catch(error){
 
   $("status").textContent =
-    "Scanning… free server may take 50+ seconds to wake.";
+   "Scan error: " + error.message;
 
-  try {
+  $("signals").innerHTML = `
+   <div class="card warn">
+    ${esc(error.message)}
+   </div>
+  `;
 
-    const idx = $("index").value;
+ }finally{
 
-    const paths = [
-
-      "/api/options/auto-scan" +
-
-      (
-        idx === "ALL"
-          ? ""
-          : "?indexes=" +
-            encodeURIComponent(idx)
-      ),
-
-      "/api/options/nse-stocks/scan"
-    ];
-
-    let data;
-    const errors = [];
-
-    for (const path of paths) {
-
-      try {
-
-        const result = await get(path);
-
-        data = result;
-
-        break;
-
-      } catch (e) {
-
-        errors.push(
-          path + ": " + e.message
-        );
-      }
-    }
-
-    if (!data) {
-      throw Error(errors.join(" | "));
-    }
-
-    render(data);
-
-    const arr = unwrap(data);
-
-    $("status").textContent =
-      "Scan completed • " +
-      arr.length +
-      " raw record(s)." +
-
-      (
-        Array.isArray(data.errors) &&
-        data.errors.length
-          ? " Errors: " +
-            JSON.stringify(data.errors).slice(0, 450)
-          : ""
-      );
-
-  } catch (e) {
-
-    $("status").textContent =
-      "Scan error: " + e.message;
-
-    $("signals").innerHTML = `
-      <div class="card warn">
-        ${esc(e.message)}
-      </div>
-    `;
-
-  } finally {
-
-    $("scanBtn").disabled = false;
-  }
+  $("scanBtn").disabled = false;
+ }
 }
-
-
-// =====================================
-// SCAN BUTTON
-// =====================================
 
 $("scanBtn").onclick = scan;
 
-
-// =====================================
-// AUTO SCAN EVERY 60 SECONDS
-// =====================================
-
 $("autoBtn").onclick = () => {
 
-  if (autoTimer) {
+ if(autoTimer){
 
-    clearInterval(autoTimer);
+  clearInterval(autoTimer);
+  autoTimer = null;
 
-    autoTimer = null;
+  $("autoBtn").textContent =
+   "▶ Auto Scan OFF";
 
-    $("autoBtn").textContent =
-      "▶ Auto Scan OFF";
+ }else{
 
-  } else {
+  scan();
 
+  autoTimer = setInterval(() => {
+
+   if(!$("scanBtn").disabled){
     scan();
+   }
 
-    autoTimer = setInterval(() => {
+  },60000);
 
-      if (!$("scanBtn").disabled) {
-        scan();
-      }
-
-    }, 60000);
-
-    $("autoBtn").textContent =
-      "⏸ Auto Scan ON";
-  }
+  $("autoBtn").textContent =
+   "⏸ Auto Scan ON";
+ }
 };
-
-
-// =====================================
-// FILTER CHANGE
-// =====================================
 
 $("filter").onchange = () => scan();
 
-
-// =====================================
-// START
-// =====================================
+$("premiumThreshold").onchange = () => scan();
 
 check();
 
