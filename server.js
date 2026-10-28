@@ -152,6 +152,46 @@ function calculateVWAP(candles) {
 
   return totalVolume > 0 ? totalPV / totalVolume : null;
                           }
+function extractPrice(quote) {
+return Number(
+quote?.last_price ??
+quote?.ltp ??
+quote?.last_traded_price ??
+quote?.lastTradedPrice ??
+0
+);
+}
+
+function extractPreviousClose(quote) {
+const close = Number(
+quote?.ohlc?.close ??
+quote?.close_price ??
+quote?.previous_close ??
+quote?.previousClose ??
+0
+);
+
+return Number.isFinite(close) && close > 0
+? close
+: null;
+}
+
+function calculatePremiumChangePercent(quote) {
+const price = extractPrice(quote);
+const previousClose = extractPreviousClose(quote);
+
+if (
+!Number.isFinite(price) ||
+price <= 0 ||
+previousClose === null
+) {
+return null;
+}
+
+return Number(
+(((price - previousClose) / previousClose) * 100).toFixed(2)
+);
+}
 // ================================================
 // PART 2: MARKET ANALYSIS + ENTRY / SL / TARGETS
 // ================================================
