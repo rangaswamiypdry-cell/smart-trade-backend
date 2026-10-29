@@ -942,14 +942,10 @@ const server = http.createServer(async (req, res) => {
     });
   }
 });
-
-server.listen(PORT, () => {
-  console.log(`Smart Market Scanner running on port ${PORT}`);
-});
 // ================================================
 // START SERVER
 // ================================================
 
-const server = http.createServer(async (req, res) => {
-  //  request handling code
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Smart Market Scanner running on port ${PORT}`);
 });
