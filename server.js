@@ -1169,6 +1169,36 @@ return sendJson(res, 200, {
   candles
 });
 }
+    // ==========================================
+// AUTOMATIC OPTION SCANNER API
+// ==========================================
+
+if (
+  req.method === "GET" &&
+  url.pathname === "/api/options/auto-scan"
+) {
+
+  const results = await automaticOptionScan();
+
+  const totalOptions = results.reduce(
+    (sum, item) => sum + (item.scanned || 0),
+    0
+  );
+
+  const totalAlerts = results.reduce(
+    (sum, item) => sum + (item.alert_count || 0),
+    0
+  );
+
+  return sendJson(res, 200, {
+    success: true,
+    scan_time: new Date().toISOString(),
+    total_options: totalOptions,
+    total_alerts: totalAlerts,
+    data: results
+  });
+
+}
     // ==================================================
     // NOT FOUND
     // ==================================================
