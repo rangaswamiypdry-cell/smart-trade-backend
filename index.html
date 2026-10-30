@@ -1,851 +1,360 @@
 <!DOCTYPE html>
-<html lang="kn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#07111f">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Smart Market Scanner</title>
 
 <style>
-*{box-sizing:border-box}
-
-body{
- margin:0;
- background:#07111f;
- color:#eef5ff;
- font:14px system-ui,Arial;
- padding:14px
+* {
+  box-sizing: border-box;
 }
 
-h1{font-size:22px;margin:4px 0}
-
-small,.muted{color:#91a4bb}
-
-.top{
- display:flex;
- justify-content:space-between;
- align-items:center;
- gap:10px
+body {
+  margin: 0;
+  padding: 20px;
+  background: #071222;
+  color: #ffffff;
+  font-family: Arial, sans-serif;
 }
 
-.card{
- background:#101e30;
- border:1px solid #263b53;
- border-radius:14px;
- padding:14px;
- margin:12px 0
+.container {
+  max-width: 850px;
+  margin: auto;
 }
 
-.grid{
- display:grid;
- grid-template-columns:repeat(2,minmax(0,1fr));
- gap:9px
+h1 {
+  color: #24d6a0;
+  font-size: 29px;
+  margin-top: 35px;
 }
 
-label{
- display:block;
- color:#a8bdd3;
- font-size:12px;
- margin:5px 0
+.subtitle {
+  font-size: 19px;
+  margin-bottom: 30px;
 }
 
-select,input,button{
- background:#192d43;
- border:1px solid #35516c;
- color:white;
- padding:11px;
- border-radius:9px;
- width:100%;
- font:inherit
+.refresh {
+  width: 100%;
+  padding: 20px;
+  background: #16bd87;
+  color: white;
+  font-size: 21px;
+  font-weight: bold;
+  border: none;
+  border-radius: 15px;
+  margin-bottom: 25px;
 }
 
-button{
- background:#1767dd;
- border:0;
- font-weight:700;
- cursor:pointer
+.status {
+  background: #16263c;
+  padding: 22px;
+  border-radius: 20px;
+  font-size: 17px;
+  margin-bottom: 25px;
 }
 
-button:disabled{opacity:.55}
-
-.row{
- display:flex;
- justify-content:space-between;
- gap:8px;
- align-items:center
+.card {
+  background: #16263c;
+  padding: 30px;
+  border-radius: 22px;
+  margin-bottom: 25px;
 }
 
-.tag{
- padding:5px 9px;
- border-radius:7px;
- background:#203248
+.card h2 {
+  font-size: 23px;
 }
 
-.buy{color:#35df9b}
-.sell{color:#ff6b80}
-.warn{color:#ffcf72}
-
-.signal{
- border-left:4px solid #4a6077
+.number {
+  color: #25d5a1;
+  font-size: 42px;
+  font-weight: bold;
 }
 
-.signal.bull{border-left-color:#35df9b}
-.signal.bear{border-left-color:#ff6b80}
-
-.metrics{
- display:grid;
- grid-template-columns:repeat(2,1fr);
- gap:8px;
- margin-top:10px
+.index-card {
+  background: #16263c;
+  padding: 25px;
+  border-radius: 22px;
+  margin-bottom: 22px;
 }
 
-.metric{
- background:#0b1726;
- padding:9px;
- border-radius:8px;
- overflow-wrap:anywhere
+.index-card h2 {
+  font-size: 25px;
 }
 
-.metric strong{
- display:block;
- margin-top:3px
+.index-card p {
+  font-size: 18px;
+  color: #e1e8f0;
 }
 
-#status{overflow-wrap:anywhere}
-
-.rising-title{
- display:flex;
- justify-content:space-between;
- align-items:center;
- gap:8px
+.green {
+  color: #25d5a1;
 }
 
-.rising-card{
- border-left:4px solid #35df9b
+.red {
+  color: #ff5252;
 }
 
-.rising-card.put{
- border-left-color:#ff6b80
+.footer {
+  text-align: center;
+  color: #8495aa;
+  padding: 25px;
+  font-size: 13px;
 }
 
-.pct{
- font-size:24px;
- font-weight:800;
- color:#35df9b
-}
-
-.pct.put{color:#ff6b80}
-
-.pill{
- display:inline-block;
- padding:5px 8px;
- border-radius:8px;
- background:#203248;
- font-size:12px
-}
-
-@media(max-width:420px){
- .grid{grid-template-columns:1fr}
- .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
 </style>
 </head>
 
 <body>
 
-<div class="top">
- <div>
-  <h1>📊 Smart Market Scanner</h1>
-  <small>5-minute closed candle • Index & option signals</small>
- </div>
- <span class="tag" id="connection">Checking…</span>
+<div class="container">
+
+<h1>📈 Smart Market Scanner</h1>
+
+<p class="subtitle">
+Live NSE / BSE Options Dashboard
+</p>
+
+<button class="refresh" onclick="refreshScanner()">
+🔄 Refresh Scanner
+</button>
+
+<div class="status" id="backendStatus">
+⏳ Connecting Backend...
 </div>
 
 <div class="card">
-
- <div class="grid">
-  <div>
-   <label>Index</label>
-   <select id="index">
-    <option value="ALL">All Indexes</option>
-    <option>NIFTY</option>
-    <option>BANKNIFTY</option>
-    <option>SENSEX</option>
-    <option>FINNIFTY</option>
-    <option>MIDCAPNIFTY</option>
-   </select>
-  </div>
-
-  <div>
-   <label>Signal Filter</label>
-   <select id="filter">
-    <option value="ALL">All</option>
-    <option value="CALL">CALL / Bullish</option>
-    <option value="PUT">PUT / Bearish</option>
-    <option value="ZERO">Zero Hero</option>
-   </select>
-  </div>
- </div>
-
- <div class="grid" style="margin-top:12px">
-  <button id="scanBtn">🔎 Scan Now</button>
-  <button id="autoBtn" style="background:#344c66">
-   ▶ Auto Scan OFF
-  </button>
- </div>
-
- <p id="status" class="muted">
-  Ready. Click Scan Now.
- </p>
-
+<h2>Total Alerts</h2>
+<div class="number" id="totalAlerts">0</div>
 </div>
-
-<div class="grid">
-
- <div class="card">
-  <small>Signals</small>
-  <h1 id="count">0</h1>
- </div>
-
- <div class="card">
-  <small>Last Updated</small>
-  <h1 id="updated" style="font-size:17px">—</h1>
- </div>
-
-</div>
-
-<!-- RISING OPTIONS ALERT SECTION -->
-
-<section class="card">
-
- <div class="rising-title">
-  <div>
-   <h2 style="font-size:18px;margin:0">
-    🚀 Rising Stock Options Alerts
-   </h2>
-   <small>Premium Change Alert</small>
-  </div>
-
-  <div style="min-width:100px">
-   <label for="premiumThreshold">Alert At</label>
-   <select id="premiumThreshold">
-    <option value="75">+75%</option>
-    <option value="80">+80%</option>
-   </select>
-  </div>
- </div>
-
- <div class="grid" style="margin-top:10px">
-
-  <div class="metric">
-   <small>CALL Alerts</small>
-   <strong id="callRisingCount">0</strong>
-  </div>
-
-  <div class="metric">
-   <small>PUT Alerts</small>
-   <strong id="putRisingCount">0</strong>
-  </div>
-
- </div>
-
- <div id="risingSignals">
-  <div class="muted" style="padding:8px 0">
-   Scan to load option alerts.
-  </div>
- </div>
-
- <small class="muted">
-  Alerts require actual premium percentage-change data
-  from the backend.
- </small>
-
-</section>
-
-<div id="signals"></div>
 
 <div class="card">
- <small>
-  Verify market data and risk before trading.
-  High premium changes do not guarantee future profits.
- </small>
+<h2>Options Scanned</h2>
+<div class="number" id="totalOptions">0</div>
 </div>
 
-<script>const BASE =
- "https://smart-trade-backend-ig6l.onrender.com";
+<div id="indexContainer">
 
-const $ = id => document.getElementById(id);
+<div class="index-card">
+<h2>📊 NIFTY</h2>
+<p>Options Scanned: N/A</p>
+<p>Signals: 0</p>
+<p>Expiry: N/A</p>
+</div>
 
-let autoTimer = null;
+<div class="index-card">
+<h2>📊 BANKNIFTY</h2>
+<p>Options Scanned: N/A</p>
+<p>Signals: 0</p>
+<p>Expiry: N/A</p>
+</div>
 
-const esc = v =>
- String(v ?? "—").replace(/[&<>"']/g, c => ({
-  "&":"&amp;",
-  "<":"&lt;",
-  ">":"&gt;",
-  '"':"&quot;",
-  "'":"&#39;"
- }[c]));
+<div class="index-card">
+<h2>📊 SENSEX</h2>
+<p>Options Scanned: N/A</p>
+<p>Signals: 0</p>
+<p>Expiry: N/A</p>
+</div>
 
-const num = v =>
- v === null || v === undefined || v === ""
-  ? "—"
-  : typeof v === "number"
-    ? v.toLocaleString("en-IN", {
-       maximumFractionDigits:2
-      })
-    : esc(v);
+<div class="index-card">
+<h2>📊 FINNIFTY</h2>
+<p>Options Scanned: N/A</p>
+<p>Signals: 0</p>
+<p>Expiry: N/A</p>
+</div>
 
-async function get(path, timeout=65000){
+<div class="index-card">
+<h2>📊 MIDCAPNIFTY</h2>
+<p>Options Scanned: N/A</p>
+<p>Signals: 0</p>
+<p>Expiry: N/A</p>
+</div>
 
- const ctrl = new AbortController();
+</div>
 
- const timer = setTimeout(
-  () => ctrl.abort(),
-  timeout
- );
+<h2 class="green">🟢 Bullish CE Signals</h2>
+<div id="bullishSignals"></div>
 
- try{
+<h2 class="red">🔴 Bearish PE Signals</h2>
+<div id="bearishSignals"></div>
 
-  const response = await fetch(BASE + path,{
-   signal:ctrl.signal,
-   headers:{"Accept":"application/json"}
-  });
+<h2 class="green">⭐ Strong Buy Alerts</h2>
+<div id="strongSignals"></div>
 
-  const data = await response.json();
+<div class="footer">
+Smart Market Scanner<br>
+5-Minute Closed Candle Scanner
+</div>
 
-  if(!response.ok){
-   throw Error(
-    data.error ||
-    data.message ||
-    "HTTP " + response.status
-   );
+</div>
+
+<script>
+
+const API_BASE =
+"https://smart-trade-backend-ig6l.onrender.com";
+
+async function refreshScanner() {
+
+  const status =
+    document.getElementById("backendStatus");
+
+  status.innerHTML = "⏳ Scanning Market...";
+
+  try {
+
+    const response = await fetch(
+      API_BASE + "/api/options/auto-scan"
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "Scanner API failed");
+    }
+
+    const indexes = result.data || [];
+
+    let totalAlerts = 0;
+    let totalOptions = 0;
+
+    indexes.forEach(item => {
+      totalAlerts += item.alert_count || 0;
+      totalOptions += item.scanned || 0;
+    });
+
+    document.getElementById("totalAlerts")
+      .textContent = totalAlerts;
+
+    document.getElementById("totalOptions")
+      .textContent = totalOptions;
+
+    document.getElementById("indexContainer")
+      .innerHTML = indexes.map(item => `
+        <div class="index-card">
+          <h2>📊 ${item.underlying}</h2>
+          <p>Options Scanned:
+            ${item.scanned ?? "N/A"}
+          </p>
+          <p>Signals:
+            <span class="green">
+              ${item.alert_count ?? 0}
+            </span>
+          </p>
+          <p>Expiry: ${item.expiry || "N/A"}</p>
+        </div>
+      `).join("");
+
+    let bullish = [];
+    let bearish = [];
+    let strong = [];
+
+    indexes.forEach(item => {
+
+      (item.alerts || []).forEach(option => {
+
+        if (option.option_type === "CE") {
+          bullish.push({
+            ...option,
+            underlying: item.underlying
+          });
+        }
+
+        if (option.option_type === "PE") {
+          bearish.push({
+            ...option,
+            underlying: item.underlying
+          });
+        }
+
+        if (option.strong) {
+          strong.push({
+            ...option,
+            underlying: item.underlying
+          });
+        }
+
+      });
+
+    });
+
+    renderSignals("bullishSignals", bullish);
+    renderSignals("bearishSignals", bearish);
+    renderSignals("strongSignals", strong);
+
+    status.innerHTML =
+      "✅ Backend Connected | Scan time: " +
+      new Date().toLocaleString("en-IN");
+
+  } catch(error) {
+
+    status.innerHTML =
+      "❌ Scanner Error: " + error.message;
+
   }
 
-  return data;
-
- }finally{
-  clearTimeout(timer);
- }
 }
 
-async function check(){
+function renderSignals(elementId, signals) {
 
- try{
-  await get("/health");
-  $("connection").textContent = "🟢 Online";
+  const container =
+    document.getElementById(elementId);
 
- }catch(error){
-
-  $("connection").textContent = "🔴 Offline";
- }
-}
-
-function unwrap(data){
-
- if(Array.isArray(data)) return data;
-
- const candidates = [
-  data?.signals,
-  data?.results,
-  data?.data?.signals,
-  data?.data?.results,
-  data?.data?.items,
-  data?.items,
-  data?.data
- ];
-
- for(const value of candidates){
-  if(Array.isArray(value)) return value;
- }
-
- return [];
-}
-
-// Read premium percentage supplied by backend.
-// Do not invent a percentage if it is unavailable.
-
-function getPremiumChangePercent(s){
-
- const candidates = [
-  s.premium_change_percent,
-  s.premiumChangePercent,
-  s.price_change_percent,
-  s.priceChangePercent,
-  s.change_percent,
-  s.changePercent,
-  s.percent_change,
-  s.percentageChange,
-  s.day_change_percent,
-  s.dayChangePercent,
-  s.change_percentage
- ];
-
- for(const value of candidates){
-
-  if(
-   value !== null &&
-   value !== undefined &&
-   value !== "" &&
-   Number.isFinite(Number(value))
-  ){
-   return Number(value);
+  if (!signals.length) {
+    container.innerHTML =
+      '<div class="index-card">No signals found.</div>';
+    return;
   }
- }
 
- return null;
-}
+  container.innerHTML = signals.map(item => `
+    <div class="index-card">
 
-// RISING OPTIONS CARDS
+      <h2>${item.underlying} ${item.option_type}</h2>
 
-function renderRising(arr){
+      <p>Strike: ${item.strike_price}</p>
 
- const threshold =
-  Number($("premiumThreshold").value);
+      <p>LTP: ${item.ltp}</p>
 
- const rising = arr
-  .map(s => ({
-   ...s,
-   _premiumPct:getPremiumChangePercent(s)
-  }))
-  .filter(s =>
-   s._premiumPct !== null &&
-   s._premiumPct >= threshold
-  );
+      <p>Price Change: ${item.price_change_percent}%</p>
 
- function optionType(s){
+      <p>Volume Change: ${item.volume_change_percent}%</p>
 
-  return String(
-   s.option_type ||
-   s.optionType ||
-   s.instrument_type ||
-   s.type ||
-   s.signal ||
-   s.symbol ||
-   s.trading_symbol ||
-   ""
-  ).toUpperCase();
- }
+      <p>OI Change: ${item.oi_change_percent}%</p>
 
- const calls = rising.filter(s =>
-  /CE|CALL/.test(optionType(s))
- );
+      <p>RSI: ${item.rsi14}</p>
 
- const puts = rising.filter(s =>
-  /PE|PUT/.test(optionType(s))
- );
-
- $("callRisingCount").textContent = calls.length;
- $("putRisingCount").textContent = puts.length;
-
- const cards = rising
-  .sort((a,b) =>
-   b._premiumPct - a._premiumPct
-  )
-  .map(s => {
-
-   const rawType = optionType(s);
-
-   const isPut = /PE|PUT/.test(rawType);
-
-   const kind = isPut
-    ? "PUT / PE"
-    : "CALL / CE";
-
-   const name =
-    s.underlying ||
-    s.index ||
-    s.indexName ||
-    s.name ||
-    s.symbol ||
-    s.trading_symbol ||
-    "Option";
-
-   const strike =
-    s.strike_price ??
-    s.strikePrice ??
-    s.strike ??
-    "—";
-
-   const price =
-    s.price ??
-    s.ltp ??
-    s.last_price ??
-    "—";
-
-   const expiry =
-    s.expiry ||
-    s.expiry_date ||
-    "—";
-
-   const volume =
-    s.volume ??
-    s.currentVolume ??
-    s.volume_traded ??
-    "—";
-
-   const oi =
-    s.oi ??
-    s.open_interest ??
-    s.openInterest ??
-    "—";
-
-   const time =
-    s.signal_time ||
-    s.timestamp ||
-    "—";
-
-   return `
-    <div class="card rising-card ${isPut ? "put" : ""}">
-
-     <div class="row">
-      <strong>${esc(name)}</strong>
-      <span class="pill">${kind}</span>
-     </div>
-
-     <div class="row" style="margin-top:8px">
-
-      <div>
-       <small>Premium Change</small>
-
-       <div class="pct ${isPut ? "put" : ""}">
-        +${s._premiumPct.toFixed(2)}%
-       </div>
-      </div>
-
-      <div style="text-align:right">
-       <small>Option Premium</small>
-       <h2 style="margin:4px 0">
-        ₹${num(price)}
-       </h2>
-      </div>
-
-     </div>
-
-     <div class="metrics">
-
-      ${[
-       ["Strike",strike],
-       ["Expiry",expiry],
-       ["Volume",volume],
-       ["Open Interest",oi]
-      ].map(([key,value]) => `
-       <div class="metric">
-        <small>${key}</small>
-        <strong>${num(value)}</strong>
-       </div>
-      `).join("")}
-
-     </div>
-
-     <p class="muted">
-      Alert threshold: +${threshold}%
-      · ${esc(time)}
-     </p>
+      <p class="green">Signal: ${item.signal}</p>
 
     </div>
-   `;
-  });
+  `).join("");
 
- $("risingSignals").innerHTML =
-  cards.length
-   ? cards.join("")
-   : `
-    <div class="card muted">
-     No +${threshold}% rising option alerts
-     in the returned data.
-
-     The backend must provide the actual daily
-     premium percentage change.
-    </div>
-   `;
-}
-  function render(data){
-
- const arr = unwrap(data);
-
- const filter = $("filter").value;
- const idx = $("index").value;
-
- renderRising(arr);
-
- const filtered = arr.filter(s => {
-
-  const name = String(
-   s.index ||
-   s.indexName ||
-   s.underlying ||
-   s.symbol ||
-   s.name ||
-   ""
-  ).toUpperCase();
-
-  const kind = String(
-   s.signal ||
-   s.type ||
-   s.direction ||
-   s.action ||
-   s.option_type ||
-   s.optionType ||
-   ""
-  ).toUpperCase();
-
-  const indexOk =
-   idx === "ALL" ||
-   name.includes(idx);
-
-  const kindOk =
-   filter === "ALL" ||
-   (
-    filter === "CALL" &&
-    /CALL|CE|BUY|BULL/.test(kind)
-   ) ||
-   (
-    filter === "PUT" &&
-    /PUT|PE|SELL|BEAR/.test(kind)
-   ) ||
-   (
-    filter === "ZERO" &&
-    /ZERO|HERO/.test(
-     kind + " " +
-     String(s.strategy || s.setup || "")
-      .toUpperCase()
-    )
-   );
-
-  return indexOk && kindOk;
- });
-
- $("count").textContent = filtered.length;
-
- $("updated").textContent =
-  new Date().toLocaleTimeString("en-IN");
-
- $("signals").innerHTML = filtered.length
-  ? filtered.map(s => {
-
-   const kind = String(
-    s.signal ||
-    s.type ||
-    s.direction ||
-    s.action ||
-    s.option_type ||
-    s.optionType ||
-    "WAIT"
-   ).toUpperCase();
-
-   const bull =
-    /CALL|CE|BUY|BULL/.test(kind);
-
-   const bear =
-    /PUT|PE|SELL|BEAR/.test(kind);
-
-   const name =
-    s.index ||
-    s.indexName ||
-    s.underlying ||
-    s.symbol ||
-    s.name ||
-    "INDEX";
-
-   const strike =
-    s.strike_price ??
-    s.strikePrice ??
-    s.strike ??
-    s.option?.strike_price;
-
-   const price =
-    s.price ??
-    s.ltp ??
-    s.last_price ??
-    s.option?.ltp;
-
-   const volume =
-    s.volume ??
-    s.volumeChange ??
-    s.volume_change;
-
-   const oi =
-    s.oi ??
-    s.open_interest ??
-    s.openInterest ??
-    s.oiChange;
-
-   const rsi = s.rsi ?? s.RSI;
-   const vwap = s.vwap ?? s.VWAP;
-
-   const score =
-    s.confidence ??
-    s.score ??
-    s.strength;
-
-   const time =
-    s.signal_time ??
-    s.signalTime ??
-    s.timestamp ??
-    "—";
-
-   return `
-    <div class="card signal ${
-     bull ? "bull" : bear ? "bear" : ""
-    }">
-
-     <div class="row">
-      <strong>${esc(name)}</strong>
-
-      <span class="tag ${
-       bull ? "buy" : bear ? "sell" : "warn"
-      }">
-       ${esc(kind)}
-      </span>
-     </div>
-
-     <p>
-      <strong>Strike: ${num(strike)}</strong>
-      · ${esc(s.strategy || s.setup || "5m Scanner")}
-     </p>
-
-     <div class="metrics">
-
-      ${[
-       ["Price",price],
-       ["Volume / Change",volume],
-       ["OI / Change",oi],
-       ["RSI",rsi],
-       ["VWAP",vwap],
-       ["Strength",score]
-      ].map(([key,value]) => `
-       <div class="metric">
-        <small>${key}</small>
-        <strong>${num(value)}</strong>
-       </div>
-      `).join("")}
-
-     </div>
-
-     <p class="muted">
-      Time: ${esc(time)}
-     </p>
-
-    </div>
-   `;
-  }).join("")
-  : `
-   <div class="card muted">
-    No matching signals.
-    ${esc(data?.message || "Backend returned no matching records.")}
-   </div>
-  `;
 }
 
-async function scan(){
+async function checkBackend() {
 
- $("scanBtn").disabled = true;
+  try {
 
- $("status").textContent =
-  "Scanning… server may take time to wake up.";
+    const response = await fetch(
+      API_BASE + "/health"
+    );
 
- try{
+    if (!response.ok) throw new Error("Backend offline");
 
-  const idx = $("index").value;
+    document.getElementById("backendStatus")
+      .innerHTML = "✅ Backend Connected";
 
-  const paths = [
-   "/api/options/auto-scan" +
-    (idx === "ALL"
-     ? ""
-     : "?indexes=" + encodeURIComponent(idx)),
+  } catch(error) {
 
-   "/api/options/nse-stocks/scan"
-  ];
+    document.getElementById("backendStatus")
+      .innerHTML = "❌ Backend Disconnected";
 
-  let data;
-  const errors = [];
-
-  for(const path of paths){
-
-   try{
-
-    data = await get(path);
-    break;
-
-   }catch(error){
-
-    errors.push(path + ": " + error.message);
-   }
   }
 
-  if(!data){
-   throw Error(errors.join(" | "));
-  }
-
-  render(data);
-
-  const arr = unwrap(data);
-
-  $("status").textContent =
-   "Scan completed • " +
-   arr.length +
-   " raw record(s)." +
-   (
-    Array.isArray(data.errors) &&
-    data.errors.length
-     ? " Errors: " +
-       JSON.stringify(data.errors).slice(0,450)
-     : ""
-   );
-
- }catch(error){
-
-  $("status").textContent =
-   "Scan error: " + error.message;
-
-  $("signals").innerHTML = `
-   <div class="card warn">
-    ${esc(error.message)}
-   </div>
-  `;
-
- }finally{
-
-  $("scanBtn").disabled = false;
- }
 }
 
-$("scanBtn").onclick = scan;
-
-$("autoBtn").onclick = () => {
-
- if(autoTimer){
-
-  clearInterval(autoTimer);
-  autoTimer = null;
-
-  $("autoBtn").textContent =
-   "▶ Auto Scan OFF";
-
- }else{
-
-  scan();
-
-  autoTimer = setInterval(() => {
-
-   if(!$("scanBtn").disabled){
-    scan();
-   }
-
-  },60000);
-
-  $("autoBtn").textContent =
-   "⏸ Auto Scan ON";
- }
-};
-
-$("filter").onchange = () => scan();
-
-$("premiumThreshold").onchange = () => scan();
-
-check();
+checkBackend();
 
 </script>
+
 </body>
 </html>
