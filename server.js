@@ -1169,7 +1169,7 @@ return sendJson(res, 200, {
   candles
 });
 }
-    // ==========================================
+   // ==========================================
 // AUTOMATIC OPTION SCANNER API
 // ==========================================
 
@@ -1180,25 +1180,34 @@ if (
 
   const results = await automaticOptionScan();
 
+  const alerts = [];
+
+  for (const result of results) {
+    if (Array.isArray(result.alerts)) {
+      alerts.push(...result.alerts);
+    }
+  }
+
+  alerts.sort((a, b) =>
+    Math.abs(b.price_change_percent || 0) -
+    Math.abs(a.price_change_percent || 0)
+  );
+
   const totalOptions = results.reduce(
     (sum, item) => sum + (item.scanned || 0),
     0
   );
 
-  const totalAlerts = results.reduce(
-    (sum, item) => sum + (item.alert_count || 0),
-    0
-  );
-
   return sendJson(res, 200, {
     success: true,
-    scan_time: new Date().toISOString(),
+    market: "NSE/BSE Options",
+    scanned_at: new Date().toISOString(),
     total_options: totalOptions,
-    total_alerts: totalAlerts,
-    data: results
+    total_alerts: alerts.length,
+    results,
+    alerts
   });
-
-}
+                          } 
     // ==================================================
     // NOT FOUND
     // ==================================================
