@@ -277,7 +277,12 @@ const completed = candles
   if (completed.length < 25) return null;
 
   const latest = completed[completed.length - 1];
+// TODAY DATE FILTER
+const latestDate = getISTDate(new Date(latest[0]));
 
+if (latestDate !== today) {
+  return null;
+}
   const previous = completed[completed.length - 2];
 
   const closes = completed.map(c => Number(c[4]));
