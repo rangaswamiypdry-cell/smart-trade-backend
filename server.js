@@ -636,8 +636,8 @@ const server = http.createServer(async (req, res) => {
       const result = await scanBTSTStocks();
 
       const strongStocks = result.results.filter(
-        item => item.signal === "STRONG_BUY );
-
+        item => item.signal === "STRONG_BUY"
+     );
       return sendJson(res, 200, {
 
         success: true,
