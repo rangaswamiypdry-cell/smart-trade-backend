@@ -257,7 +257,7 @@ function analyseBTST(candles) {
     parts.find(x => x.type === "minute").value
   );
 
-  return hour > 15 || (hour === 15 && minute >= 35);
+ return hour > 15 || (hour === 15 && minute >= 30); 
 })();
 
 const completed = candles
