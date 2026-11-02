@@ -242,13 +242,37 @@ function analyseBTST(candles) {
 
   const today = getISTDate();
 
-  const completed = candles
-    .filter(c =>
-      getISTDate(new Date(c[0])) < today
-    )
-    .sort((a, b) =>
-      new Date(a[0]) - new Date(b[0])
+   const afterMarketClose = (() => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date());
+
+  const hour = Number(
+    parts.find(x => x.type === "hour").value
+  );
+
+  const minute = Number(
+    parts.find(x => x.type === "minute").value
+  );
+
+  return hour > 15 || (hour === 15 && minute >= 35);
+})();
+
+const completed = candles
+  .filter(c => {
+    const candleDate = getISTDate(new Date(c[0]));
+
+    return (
+      candleDate < today ||
+      (afterMarketClose && candleDate === today)
     );
+  })
+  .sort((a, b) =>
+    new Date(a[0]) - new Date(b[0])
+  );
 
   if (completed.length < 25) return null;
 
