@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Smart Market Scanner</title>
 
 <style>
@@ -13,346 +12,319 @@
 
 body {
   margin: 0;
-  padding: 20px;
-  background: #071222;
-  color: #ffffff;
+  padding: 18px;
+  background: #071426;
+  color: white;
   font-family: Arial, sans-serif;
 }
 
-.container {
-  max-width: 850px;
-  margin: auto;
-}
-
 h1 {
-  color: #24d6a0;
-  font-size: 29px;
-  margin-top: 35px;
+  color: #20d6a0;
+  font-size: 28px;
 }
 
 .subtitle {
-  font-size: 19px;
-  margin-bottom: 30px;
-}
-
-.refresh {
-  width: 100%;
-  padding: 20px;
-  background: #16bd87;
-  color: white;
-  font-size: 21px;
-  font-weight: bold;
-  border: none;
-  border-radius: 15px;
-  margin-bottom: 25px;
-}
-
-.status {
-  background: #16263c;
-  padding: 22px;
-  border-radius: 20px;
-  font-size: 17px;
-  margin-bottom: 25px;
-}
-
-.card {
-  background: #16263c;
-  padding: 30px;
-  border-radius: 22px;
-  margin-bottom: 25px;
-}
-
-.card h2 {
-  font-size: 23px;
-}
-
-.number {
-  color: #25d5a1;
-  font-size: 42px;
-  font-weight: bold;
-}
-
-.index-card {
-  background: #16263c;
-  padding: 25px;
-  border-radius: 22px;
+  color: #aab8ca;
   margin-bottom: 22px;
 }
 
-.index-card h2 {
-  font-size: 25px;
+button {
+  width: 100%;
+  padding: 17px;
+  border: none;
+  border-radius: 12px;
+  background: #12bd91;
+  color: white;
+  font-size: 19px;
+  font-weight: bold;
+  margin-bottom: 18px;
 }
 
-.index-card p {
-  font-size: 18px;
-  color: #e1e8f0;
+.card {
+  background: #172a43;
+  padding: 22px;
+  border-radius: 18px;
+  margin-bottom: 18px;
 }
 
-.green {
-  color: #25d5a1;
+.card h2 {
+  margin-top: 0;
 }
 
-.red {
-  color: #ff5252;
+.number {
+  font-size: 38px;
+  color: #20d6a0;
+  font-weight: bold;
+}
+
+.stock {
+  background: #172a43;
+  padding: 18px;
+  border-radius: 15px;
+  margin-bottom: 14px;
+  border-left: 5px solid #20d6a0;
+}
+
+.stock h3 {
+  color: #20d6a0;
+  font-size: 21px;
+}
+
+.stock p {
+  font-size: 14px;
+  color: #d5dfeb;
+  line-height: 1.8;
+}
+
+.buy {
+  color: #20d6a0;
+  font-weight: bold;
+}
+
+.wait {
+  color: orange;
+}
+
+.error {
+  background: #3c1c2a;
+  padding: 15px;
+  border-radius: 12px;
+  color: #ff7373;
+  margin-bottom: 15px;
+}
+
+.section-title {
+  color: #20d6a0;
+  font-size: 23px;
+  margin-top: 30px;
 }
 
 .footer {
   text-align: center;
-  color: #8495aa;
+  color: #8393a8;
   padding: 25px;
-  font-size: 13px;
 }
-
 </style>
 </head>
 
 <body>
 
-<div class="container">
-
 <h1>📈 Smart Market Scanner</h1>
 
-<p class="subtitle">
-Live NSE / BSE Options Dashboard
-</p>
+<div class="subtitle">
+NSE F&O | BTST | Strong Momentum Scanner
+</div>
 
-<button class="refresh" onclick="refreshScanner()">
-🔄 Refresh Scanner
+<button onclick="refreshScanner()">
+🔄 REFRESH SCANNER
 </button>
 
-<div class="status" id="backendStatus">
-⏳ Connecting Backend...
+<div id="error"></div>
+
+<div class="card">
+<h2>Total Stocks Scanned</h2>
+<div class="number" id="total">0</div>
 </div>
 
 <div class="card">
-<h2>Total Alerts</h2>
-<div class="number" id="totalAlerts">0</div>
+<h2>⭐ STRONG BUY</h2>
+<div class="number" id="strong">0</div>
 </div>
 
 <div class="card">
-<h2>Options Scanned</h2>
-<div class="number" id="totalOptions">0</div>
+<h2>🟢 BUY CANDIDATES</h2>
+<div class="number" id="candidates">0</div>
 </div>
 
-<div id="indexContainer">
+<h2 class="section-title">
+⭐ STRONG BUY STOCKS
+</h2>
 
-<div class="index-card">
-<h2>📊 NIFTY</h2>
-<p>Options Scanned: N/A</p>
-<p>Signals: 0</p>
-<p>Expiry: N/A</p>
+<div id="strongStocks">
+Loading...
 </div>
 
-<div class="index-card">
-<h2>📊 BANKNIFTY</h2>
-<p>Options Scanned: N/A</p>
-<p>Signals: 0</p>
-<p>Expiry: N/A</p>
+<h2 class="section-title">
+🟢 BUY CANDIDATES
+</h2>
+
+<div id="candidateStocks">
+Loading...
 </div>
-
-<div class="index-card">
-<h2>📊 SENSEX</h2>
-<p>Options Scanned: N/A</p>
-<p>Signals: 0</p>
-<p>Expiry: N/A</p>
-</div>
-
-<div class="index-card">
-<h2>📊 FINNIFTY</h2>
-<p>Options Scanned: N/A</p>
-<p>Signals: 0</p>
-<p>Expiry: N/A</p>
-</div>
-
-<div class="index-card">
-<h2>📊 MIDCAPNIFTY</h2>
-<p>Options Scanned: N/A</p>
-<p>Signals: 0</p>
-<p>Expiry: N/A</p>
-</div>
-
-</div>
-
-<h2 class="green">🟢 Bullish CE Signals</h2>
-<div id="bullishSignals"></div>
-
-<h2 class="red">🔴 Bearish PE Signals</h2>
-<div id="bearishSignals"></div>
-
-<h2 class="green">⭐ Strong Buy Alerts</h2>
-<div id="strongSignals"></div>
 
 <div class="footer">
-Smart Market Scanner<br>
-5-Minute Closed Candle Scanner
-</div>
-
+Smart Trade India<br>
+NSE F&O BTST Scanner
 </div>
 
 <script>
 
-const API_BASE =
+const API =
 "https://smart-trade-backend-ig6l.onrender.com";
 
-async function refreshScanner() {
+function displayStocks(stocks, container) {
 
-  const status =
-    document.getElementById("backendStatus");
+  const element = document.getElementById(container);
 
-  status.innerHTML = "⏳ Scanning Market...";
+  if (!stocks || stocks.length === 0) {
 
-  try {
+    element.innerHTML =
+      '<div class="card">No Stocks Found</div>';
 
-    const response = await fetch(
-      API_BASE + "/api/options/auto-scan"
-    );
-
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || "Scanner API failed");
-    }
-
-    const indexes = result.data || [];
-
-    let totalAlerts = 0;
-    let totalOptions = 0;
-
-    indexes.forEach(item => {
-      totalAlerts += item.alert_count || 0;
-      totalOptions += item.scanned || 0;
-    });
-
-    document.getElementById("totalAlerts")
-      .textContent = totalAlerts;
-
-    document.getElementById("totalOptions")
-      .textContent = totalOptions;
-
-    document.getElementById("indexContainer")
-      .innerHTML = indexes.map(item => `
-        <div class="index-card">
-          <h2>📊 ${item.underlying}</h2>
-          <p>Options Scanned:
-            ${item.scanned ?? "N/A"}
-          </p>
-          <p>Signals:
-            <span class="green">
-              ${item.alert_count ?? 0}
-            </span>
-          </p>
-          <p>Expiry: ${item.expiry || "N/A"}</p>
-        </div>
-      `).join("");
-
-    let bullish = [];
-    let bearish = [];
-    let strong = [];
-
-    indexes.forEach(item => {
-
-      (item.alerts || []).forEach(option => {
-
-        if (option.option_type === "CE") {
-          bullish.push({
-            ...option,
-            underlying: item.underlying
-          });
-        }
-
-        if (option.option_type === "PE") {
-          bearish.push({
-            ...option,
-            underlying: item.underlying
-          });
-        }
-
-        if (option.strong) {
-          strong.push({
-            ...option,
-            underlying: item.underlying
-          });
-        }
-
-      });
-
-    });
-
-    renderSignals("bullishSignals", bullish);
-    renderSignals("bearishSignals", bearish);
-    renderSignals("strongSignals", strong);
-
-    status.innerHTML =
-      "✅ Backend Connected | Scan time: " +
-      new Date().toLocaleString("en-IN");
-
-  } catch(error) {
-
-    status.innerHTML =
-      "❌ Scanner Error: " + error.message;
-
-  }
-
-}
-
-function renderSignals(elementId, signals) {
-
-  const container =
-    document.getElementById(elementId);
-
-  if (!signals.length) {
-    container.innerHTML =
-      '<div class="index-card">No signals found.</div>';
     return;
   }
 
-  container.innerHTML = signals.map(item => `
-    <div class="index-card">
+  element.innerHTML = stocks.map(stock => `
 
-      <h2>${item.underlying} ${item.option_type}</h2>
+    <div class="stock">
 
-      <p>Strike: ${item.strike_price}</p>
+      <h3>
+        🟢 ${stock.symbol}
+      </h3>
 
-      <p>LTP: ${item.ltp}</p>
+      <p>
+        Signal:
+        <b class="buy">${stock.signal}</b>
+        <br>
 
-      <p>Price Change: ${item.price_change_percent}%</p>
+        Price:
+        ₹${stock.price}
+        <br>
 
-      <p>Volume Change: ${item.volume_change_percent}%</p>
+        Price Change:
+        ${stock.price_change_percent}%
+        <br>
 
-      <p>OI Change: ${item.oi_change_percent}%</p>
+        Volume:
+        ${Number(stock.volume).toLocaleString("en-IN")}
+        <br>
 
-      <p>RSI: ${item.rsi14}</p>
+        Volume Change:
+        ${stock.volume_change_percent}%
+        <br>
 
-      <p class="green">Signal: ${item.signal}</p>
+        Volume Ratio:
+        ${stock.volume_ratio}x
+        <br>
+
+        OI:
+        ${Number(stock.oi).toLocaleString("en-IN")}
+        <br>
+
+        OI Change:
+        ${stock.oi_change}%
+        <br>
+
+        RSI:
+        ${stock.rsi14}
+        <br>
+
+        EMA 20:
+        ₹${stock.ema20}
+        <br>
+
+        Resistance:
+        ₹${stock.resistance}
+        <br>
+
+        Breakout:
+        ${stock.breakout ? "✅ YES" : "❌ NO"}
+        <br>
+
+        Expiry:
+        ${stock.expiry}
+        <br>
+
+        Candle:
+        ${stock.candle_date}
+      </p>
 
     </div>
+
   `).join("");
 
 }
 
-async function checkBackend() {
+async function refreshScanner() {
+
+  const errorBox = document.getElementById("error");
+
+  errorBox.innerHTML = "";
+
+  document.getElementById("strongStocks").innerHTML =
+    "Scanning NSE F&O Stocks...";
+
+  document.getElementById("candidateStocks").innerHTML =
+    "Scanning...";
 
   try {
 
     const response = await fetch(
-      API_BASE + "/health"
+      API + "/api/btst/scan"
     );
 
-    if (!response.ok) throw new Error("Backend offline");
+    if (!response.ok) {
 
-    document.getElementById("backendStatus")
-      .innerHTML = "✅ Backend Connected";
+      throw new Error("HTTP ERROR " + response.status);
+
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+
+      throw new Error(data.error || "Scanner Failed");
+
+    }
+
+    const stocks = data.results || [];
+
+    const strongStocks = stocks.filter(
+      x => x.signal === "STRONG_BUY"
+    );
+
+    const candidates = stocks.filter(
+      x => x.signal === "BUY_CANDIDATE"
+    );
+
+    document.getElementById("total").innerText =
+      data.scanned;
+
+    document.getElementById("strong").innerText =
+      strongStocks.length;
+
+    document.getElementById("candidates").innerText =
+      candidates.length;
+
+    displayStocks(
+      strongStocks,
+      "strongStocks"
+    );
+
+    displayStocks(
+      candidates,
+      "candidateStocks"
+    );
 
   } catch(error) {
 
-    document.getElementById("backendStatus")
-      .innerHTML = "❌ Backend Disconnected";
+    errorBox.innerHTML = `
+      <div class="error">
+        ❌ Scanner Error: ${error.message}
+      </div>
+    `;
+
+    document.getElementById("strongStocks").innerHTML =
+      "Unable to load stocks";
+
+    document.getElementById("candidateStocks").innerHTML =
+      "Unable to load stocks";
 
   }
 
 }
 
-checkBackend();
+refreshScanner();
 
 </script>
 
