@@ -103,89 +103,109 @@ function request(url, options = {}) {
     });
 }
 
-// =====================================================
-// DOWNLOAD NSE F&O INSTRUMENTS
-// =====================================================
+// ==========================================
+// FIXED UPSTOX INSTRUMENT DOWNLOAD
+// ==========================================
 
 async function loadInstruments() {
 
     const url =
-        "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
+    "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 
-    return new Promise((resolve, reject) => {
+    console.log("Downloading Upstox Instruments...");
 
-        https.get(url, response => {
+    try {
 
-            if (response.statusCode !== 200) {
-                reject(new Error("Instrument download failed"));
-                return;
+        const response = await fetch(url, {
+            redirect: "follow",
+            headers: {
+                "User-Agent": "SmartTradeIndia/2.0",
+                "Accept": "application/json"
+            },
+            signal: AbortSignal.timeout(60000)
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                `Download HTTP Error: ${response.status}`
+            );
+        }
+
+        let buffer = Buffer.from(
+            await response.arrayBuffer()
+        );
+
+        if (
+            buffer.length >= 2 &&
+            buffer[0] === 0x1f &&
+            buffer[1] === 0x8b
+        ) {
+            buffer = zlib.gunzipSync(buffer);
+        }
+
+        const data = JSON.parse(
+            buffer.toString("utf8")
+        );
+
+        if (!Array.isArray(data)) {
+            throw new Error("Invalid instrument JSON");
+        }
+
+        const filtered = data.filter(item => {
+
+            return (
+                item.segment === "NSE_FO" &&
+                item.instrument_type === "FUT" &&
+                item.instrument_key &&
+                item.underlying_symbol
+            );
+
+        });
+
+        const nearest = new Map();
+
+        for (const item of filtered) {
+
+            const old = nearest.get(
+                item.underlying_symbol
+            );
+
+            if (
+                !old ||
+                Number(item.expiry) < Number(old.expiry)
+            ) {
+                nearest.set(
+                    item.underlying_symbol,
+                    item
+                );
+            }
+        }
+
+        instruments = [...nearest.values()]
+            .slice(0, SETTINGS.MAX_INSTRUMENTS);
+
+        console.log(
+            "F&O Instruments Loaded:",
+            instruments.length
+        );
+
+        if (!instruments.length) {
+            throw new Error("No NSE F&O instruments found");
+        }
+
+        return instruments;
+
+    } catch (error) {
+
+        console.error(
+            "INSTRUMENT ERROR:",
+            error.message
+        );
+
+        throw error;
+    }
             }
 
-            const chunks = [];
-
-            const unzip = zlib.createGunzip();
-
-            response.pipe(unzip);
-
-            unzip.on("data", chunk => chunks.push(chunk));
-
-            unzip.on("end", () => {
-
-                try {
-
-                    const data = JSON.parse(
-                        Buffer.concat(chunks).toString()
-                    );
-
-                    const filtered = data.filter(item => {
-
-                        return (
-                            item.segment === "NSE_FO" &&
-                            item.instrument_type === "FUT" &&
-                            item.underlying_type === "EQUITY" &&
-                            item.expiry &&
-                            item.instrument_key
-                        );
-
-                    });
-
-                    // Keep the nearest expiry for each stock.
-                    const nearest = new Map();
-
-                    for (const item of filtered) {
-
-                        const old = nearest.get(item.underlying_symbol);
-
-                        if (
-                            !old ||
-                            new Date(item.expiry) < new Date(old.expiry)
-                        ) {
-                            nearest.set(item.underlying_symbol, item);
-                        }
-                    }
-
-                    instruments = [...nearest.values()]
-                        .slice(0, SETTINGS.MAX_INSTRUMENTS);
-
-                    console.log(
-                        "F&O Instruments Loaded:",
-                        instruments.length
-                    );
-
-                    resolve(instruments);
-
-                } catch (error) {
-                    reject(error);
-                }
-
-            });
-
-            unzip.on("error", reject);
-
-        }).on("error", reject);
-
-    });
-}
 
 // =====================================================
 // MARKET QUOTE V3
