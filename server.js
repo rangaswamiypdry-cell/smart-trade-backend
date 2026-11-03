@@ -829,20 +829,70 @@ async function loadUniverse(force = false) {
 // =================================
 // GET 5 MINUTE CANDLES
 // =================================
+// =================================
+// HISTORICAL + INTRADAY CANDLES
+// =================================
 
 async function candlesFor(key) {
 
-  const path =
+  const today = istDate();
+
+  // 10 days historical data
+  const endDate = new Date(today + "T00:00:00Z");
+
+  endDate.setUTCDate(
+    endDate.getUTCDate() - 10
+  );
+
+  const fromDate = endDate
+    .toISOString()
+    .slice(0, 10);
+
+  // Historical 5-minute candles
+  const historicalPath =
+    "/v3/historical-candle/" +
+    encodeURIComponent(key) +
+    "/minutes/5/" +
+    today +
+    "/" +
+    fromDate;
+
+  // Current day intraday candles
+  const intradayPath =
     "/v3/historical-candle/intraday/" +
     encodeURIComponent(key) +
     "/minutes/5";
 
-  const result = await upstox(path);
+  const [historical, intraday] =
+    await Promise.all([
+      upstox(historicalPath),
+      upstox(intradayPath)
+    ]);
 
-  return getCompletedCandles(
-    result?.data?.candles || []
-  );
+  const oldCandles =
+    historical?.data?.candles || [];
+
+  const todayCandles =
+    intraday?.data?.candles || [];
+
+  // Combine and remove duplicate timestamps
+  const combined = new Map();
+
+  for (const candle of [
+    ...oldCandles,
+    ...todayCandles
+  ]) {
+    combined.set(candle[0], candle);
+  }
+
+  const merged = Array.from(combined.values())
+    .sort((a, b) =>
+      new Date(a[0]) - new Date(b[0])
+    );
+
+  return getCompletedCandles(merged);
 }
+
 
 
 // =================================
