@@ -390,16 +390,47 @@ async function getNSEFNOStocks() {
 // 5 MIN INTRADAY CANDLES
 // ==========================================
 
-async function getIntradayCandles(instrumentKey) {
-  const apiUrl =
-    `${UPSTOX_BASE}/v3/historical-candle/intraday/` +
-    `${encodeURIComponent(instrumentKey)}/minutes/5`;
+function getDateDaysAgo(days) {
+  const today = getISTDate();
+  const [y, m, d] = today.split("-").map(Number);
 
-  const result = await upstoxRequest(apiUrl);
-
-  return getCompletedCandles(result?.data?.candles || []);
+  return new Date(
+    Date.UTC(y, m - 1, d - days)
+  ).toISOString().slice(0, 10);
 }
 
+async function getIntradayCandles(instrumentKey) {
+  const key = encodeURIComponent(instrumentKey);
+
+  const today = getISTDate();
+  const fromDate = getDateDaysAgo(10);
+
+  const historicalUrl =
+    `${UPSTOX_BASE}/v3/historical-candle/` +
+    `${key}/minutes/5/${today}/${fromDate}`;
+
+  const intradayUrl =
+    `${UPSTOX_BASE}/v3/historical-candle/intraday/` +
+    `${key}/minutes/5`;
+
+  const [historical, intraday] = await Promise.all([
+    upstoxRequest(historicalUrl),
+    upstoxRequest(intradayUrl)
+  ]);
+
+  const allCandles = [
+    ...(historical?.data?.candles || []),
+    ...(intraday?.data?.candles || [])
+  ];
+
+  const unique = new Map();
+
+  for (const candle of allCandles) {
+    unique.set(candle[0], candle);
+  }
+
+  return getCompletedCandles([...unique.values()]);
+}
 // ==========================================
 // MOMENTUM ANALYSIS
 // ==========================================
