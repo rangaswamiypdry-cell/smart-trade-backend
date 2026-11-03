@@ -1,483 +1,753 @@
-// ==========================================
-// STRONG BTST + GAP UP OPEN SCANNER
-// NSE F&O FUTURES
-// ==========================================
+// =====================================================
+// SMART TRADE INDIA - PRO SCANNER V2
+// Node.js 20+ | Upstox API V3 | Render
+// =====================================================
 
-const BTST_SETTINGS = {
-  minPriceChange: 1.0,
-  minVolumeRatio: 1.5,
-  minOIChange: 2.0,
-  minRSI: 60,
-  minClosePosition: 0.75
+const http = require("http");
+const https = require("https");
+const zlib = require("zlib");
+
+const PORT = Number(process.env.PORT || 10000);
+
+const UPSTOX_BASE = "https://api.upstox.com";
+
+const TOKEN = process.env.UPSTOX_ACCESS_TOKEN || "";
+
+const SETTINGS = {
+    TIMEFRAME: 5,
+    RSI_PERIOD: 14,
+    EMA_PERIOD: 20,
+
+    VOLUME_MULTIPLIER: 1.5,
+    MIN_RSI_BUY: 60,
+    MAX_RSI_SELL: 40,
+
+    MIN_OI_CHANGE: 2,
+
+    STOP_LOSS_PERCENT: 1,
+    TARGET_PERCENT: 2,
+
+    MAX_INSTRUMENTS: 100,
+    CONCURRENCY: 5
 };
 
-const GAP_SETTINGS = {
-  minGapPercent: 1.0,
-  minPriceChange: 0.5,
-  minVolumeRatio: 1.5,
-  minOIChange: 2.0
-};
+let instruments = [];
+let lastScan = [];
+let lastScanTime = null;
 
-function percentChange(current, previous) {
-  if (!previous || previous <= 0) return 0;
+// =====================================================
+// JSON RESPONSE
+// =====================================================
 
-  return ((current - previous) / previous) * 100;
+function send(res, status, data) {
+    res.writeHead(status, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "GET, OPTIONS"
+    });
+
+    res.end(JSON.stringify(data));
 }
 
-// ==========================================
-// STRONG BTST ANALYSIS
-// ==========================================
+// =====================================================
+// HTTP REQUEST
+// =====================================================
 
-function analyseStrongBTST(daily, instrument) {
+function request(url, options = {}) {
+    return new Promise((resolve, reject) => {
 
-  if (!daily || daily.length < 22) return null;
+        const req = https.request(url, {
+            method: options.method || "GET",
+            headers: {
+                "Accept": "application/json",
+                "Authorization": `Bearer ${TOKEN}`,
+                ...options.headers
+            }
+        }, response => {
 
-  const last = daily[daily.length - 1];
-  const previous = daily[daily.length - 2];
+            let body = "";
 
-  const history = daily.slice(-21, -1);
+            response.on("data", chunk => {
+                body += chunk;
+            });
 
-  const avgVolume =
-    history.reduce((sum, c) => sum + (c.volume || 0), 0) /
-    history.length;
+            response.on("end", () => {
 
-  const volumeRatio =
-    avgVolume > 0 ? last.volume / avgVolume : 0;
+                try {
+                    const json = JSON.parse(body);
 
-  const priceChange = percentChange(
-    last.close,
-    previous.close
-  );
+                    if (response.statusCode >= 400) {
+                        return reject(
+                            new Error(
+                                json.message ||
+                                `Upstox HTTP ${response.statusCode}`
+                            )
+                        );
+                    }
 
-  const oiChange = percentChange(
-    last.oi,
-    previous.oi
-  );
+                    resolve(json);
 
-  const rsiValue = rsi(daily.map(c => c.close), 14);
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        });
 
-  const emaValue = ema(
-    daily.map(c => c.close),
-    20
-  );
+        req.on("error", reject);
+        req.setTimeout(20000, () => {
+            req.destroy(new Error("Request timeout"));
+        });
 
-  const candleRange = last.high - last.low;
-
-  const closePosition =
-    candleRange > 0
-      ? (last.close - last.low) / candleRange
-      : 0;
-
-  const conditions = {
-    priceIncrease:
-      priceChange >= BTST_SETTINGS.minPriceChange,
-
-    volumeIncrease:
-      volumeRatio >= BTST_SETTINGS.minVolumeRatio,
-
-    oiIncrease:
-      oiChange >= BTST_SETTINGS.minOIChange,
-
-    rsiStrong:
-      rsiValue >= BTST_SETTINGS.minRSI,
-
-    aboveEMA:
-      last.close > emaValue,
-
-    strongClose:
-      closePosition >= BTST_SETTINGS.minClosePosition
-  };
-
-  const strongBTST = Object.values(conditions).every(Boolean);
-
-  if (!strongBTST) return null;
-
-  return {
-    symbol: instrument.underlying,
-    instrumentKey: instrument.instrument_key,
-    signal: "STRONG_BTST",
-    price: last.close,
-    priceChange: Number(priceChange.toFixed(2)),
-    volume: last.volume,
-    volumeRatio: Number(volumeRatio.toFixed(2)),
-    oi: last.oi,
-    oiChange: Number(oiChange.toFixed(2)),
-    rsi: Number(rsiValue.toFixed(2)),
-    ema20: Number(emaValue.toFixed(2)),
-    closePosition: Number(closePosition.toFixed(2)),
-    conditions
-  };
+        req.end();
+    });
 }
 
-// ==========================================
-// STRONG GAP-UP OPEN CONFIRMATION
-// ==========================================
+// =====================================================
+// DOWNLOAD NSE F&O INSTRUMENTS
+// =====================================================
 
-function analyseStrongGapOpen(
-  previousDaily,
-  todayCandles,
-  instrument
-) {
+async function loadInstruments() {
 
-  if (!previousDaily || !todayCandles ||
-      todayCandles.length < 2) return null;
+    const url =
+        "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 
-  const previousClose = previousDaily.close;
+    return new Promise((resolve, reject) => {
 
-  const first = todayCandles[0];
-  const last = todayCandles[todayCandles.length - 1];
+        https.get(url, response => {
 
-  const gapPercent = percentChange(
-    first.open,
-    previousClose
-  );
+            if (response.statusCode !== 200) {
+                reject(new Error("Instrument download failed"));
+                return;
+            }
 
-  const priceChange = percentChange(
-    last.close,
-    first.open
-  );
+            const chunks = [];
 
-  const previousCandles = todayCandles.slice(-21, -1);
+            const unzip = zlib.createGunzip();
 
-  if (previousCandles.length < 1) return null;
+            response.pipe(unzip);
 
-  const avgVolume =
-    previousCandles.reduce(
-      (sum, c) => sum + (c.volume || 0), 0
-    ) / previousCandles.length;
+            unzip.on("data", chunk => chunks.push(chunk));
 
-  const volumeRatio =
-    avgVolume > 0 ? last.volume / avgVolume : 0;
+            unzip.on("end", () => {
 
-  const oiChange = percentChange(
-    last.oi,
-    previousCandles[previousCandles.length - 1].oi
-  );
+                try {
 
-  const conditions = {
-    gapUp:
-      gapPercent >= GAP_SETTINGS.minGapPercent,
+                    const data = JSON.parse(
+                        Buffer.concat(chunks).toString()
+                    );
 
-    priceIncrease:
-      priceChange >= GAP_SETTINGS.minPriceChange,
+                    const filtered = data.filter(item => {
 
-    volumeIncrease:
-      volumeRatio >= GAP_SETTINGS.minVolumeRatio,
+                        return (
+                            item.segment === "NSE_FO" &&
+                            item.instrument_type === "FUT" &&
+                            item.underlying_type === "EQUITY" &&
+                            item.expiry &&
+                            item.instrument_key
+                        );
 
-    oiIncrease:
-      oiChange >= GAP_SETTINGS.minOIChange,
+                    });
 
-    bullishCandle:
-      last.close > last.open
-  };
+                    // Keep the nearest expiry for each stock.
+                    const nearest = new Map();
 
-  const strongGapUp = Object.values(conditions).every(Boolean);
+                    for (const item of filtered) {
 
-  if (!strongGapUp) return null;
+                        const old = nearest.get(item.underlying_symbol);
 
-  return {
-    symbol: instrument.underlying,
-    instrumentKey: instrument.instrument_key,
-    signal: "STRONG_GAP_UP_OPEN",
-    previousClose,
-    open: first.open,
-    price: last.close,
-    gapPercent: Number(gapPercent.toFixed(2)),
-    priceChange: Number(priceChange.toFixed(2)),
-    volume: last.volume,
-    volumeRatio: Number(volumeRatio.toFixed(2)),
-    oi: last.oi,
-    oiChange: Number(oiChange.toFixed(2)),
-    conditions
-  };
-}// ==========================================
-// PART 2
-// DAILY CANDLE DATA
-// BTST + GAP-UP SCAN ENGINE
-// ==========================================
+                        if (
+                            !old ||
+                            new Date(item.expiry) < new Date(old.expiry)
+                        ) {
+                            nearest.set(item.underlying_symbol, item);
+                        }
+                    }
 
-async function dailyCandlesFor(instrumentKey) {
+                    instruments = [...nearest.values()]
+                        .slice(0, SETTINGS.MAX_INSTRUMENTS);
 
-  try {
-    const now = new Date();
+                    console.log(
+                        "F&O Instruments Loaded:",
+                        instruments.length
+                    );
 
-    const toDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kolkata"
-    }).format(now);
+                    resolve(instruments);
 
-    const from = new Date(now.getTime() - 45 * 86400000);
+                } catch (error) {
+                    reject(error);
+                }
 
-    const fromDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kolkata"
-    }).format(from);
+            });
 
-    const path =
-      `/v3/historical-candle/${encodeURIComponent(instrumentKey)}/days/1/${toDate}/${fromDate}`;
+            unzip.on("error", reject);
 
-    const response = await upstox(path);
+        }).on("error", reject);
 
-    const raw = response?.data?.candles || [];
-
-    return raw
-      .map(c => ({
-        time: c[0],
-        open: Number(c[1]),
-        high: Number(c[2]),
-        low: Number(c[3]),
-        close: Number(c[4]),
-        volume: Number(c[5] || 0),
-        oi: Number(c[6] || 0)
-      }))
-      .sort((a, b) =>
-        new Date(a.time) - new Date(b.time)
-      );
-
-  } catch (error) {
-    console.error(
-      "Daily candle error:",
-      instrumentKey,
-      error.message
-    );
-
-    return [];
-  }
-}// ==========================================
-// BTST SCANNER
-// ==========================================
-
-async function runBTSTScan(limit = 250) {
-
-  if (scanInProgress) {
-    return {
-      success: false,
-      error: "SCAN_ALREADY_RUNNING"
-    };
-  }
-
-  scanInProgress = true;
-
-  try {
-
-    const universe = await loadUniverse();
-
-    const stocks = universe.slice(
-      0,
-      Math.min(Number(limit) || 250, 250)
-    );
-
-    const results = await runWorkers(
-      stocks,
-      CFG.workers,
-      async instrument => {
-
-        const daily = await dailyCandlesFor(
-          instrument.instrument_key
-        );
-
-        if (daily.length < 22) return null;
-
-        const signal = analyseStrongBTST(
-          daily,
-          instrument
-        );
-
-        return signal;
-      }
-    );
-
-    const alerts = results
-      .filter(Boolean)
-      .sort((a, b) =>
-        b.volumeRatio - a.volumeRatio
-      );
-
-    return {
-      success: true,
-      scanner: "STRONG_BTST",
-      totalScanned: stocks.length,
-      totalSignals: alerts.length,
-      signals: alerts,
-      updatedAt: new Date().toISOString()
-    };
-
-  } catch (error) {
-
-    return {
-      success: false,
-      error: error.message
-    };
-
-  } finally {
-    scanInProgress = false;
-  }
+    });
 }
 
+// =====================================================
+// MARKET QUOTE V3
+// =====================================================
 
-// ==========================================
-// GAP-UP OPEN SCANNER
-// ==========================================
+async function getQuote(instrumentKey) {
 
-async function runGapUpScan(limit = 250) {
+    const url =
+        `${UPSTOX_BASE}/v3/market-quote/quotes?instrument_key=` +
+        encodeURIComponent(instrumentKey);
 
-  if (scanInProgress) {
-    return {
-      success: false,
-      error: "SCAN_ALREADY_RUNNING"
-    };
-  }
+    const result = await request(url);
 
-  scanInProgress = true;
+    const data = Object.values(result.data || {})[0];
 
-  try {
+    if (!data) {
+        throw new Error("Quote unavailable");
+    }
 
-    const universe = await loadUniverse();
+    return data;
+}
 
-    const stocks = universe.slice(
-      0,
-      Math.min(Number(limit) || 250, 250)
-    );
+// =====================================================
+// 5 MINUTE CANDLES
+// =====================================================
 
-    const results = await runWorkers(
-      stocks,
-      CFG.workers,
-      async instrument => {
+async function getCandles(instrumentKey) {
 
-        const daily = await dailyCandlesFor(
-          instrument.instrument_key
+    const url =
+        `${UPSTOX_BASE}/v3/historical-candle/intraday/` +
+        `${encodeURIComponent(instrumentKey)}/minutes/5`;
+
+    const result = await request(url);
+
+    return result.data?.candles || [];
+}
+
+// =====================================================
+// EMA
+// =====================================================
+
+function calculateEMA(values, period) {
+
+    if (values.length < period) return null;
+
+    const multiplier = 2 / (period + 1);
+
+    let ema = values
+        .slice(0, period)
+        .reduce((a, b) => a + b, 0) / period;
+
+    for (let i = period; i < values.length; i++) {
+
+        ema =
+            (values[i] - ema) * multiplier + ema;
+    }
+
+    return ema;
+}
+
+// =====================================================
+// RSI
+// =====================================================
+
+function calculateRSI(values, period = 14) {
+
+    if (values.length <= period) return null;
+
+    let gains = 0;
+    let losses = 0;
+
+    for (let i = 1; i <= period; i++) {
+
+        const change = values[i] - values[i - 1];
+
+        if (change > 0) gains += change;
+        else losses += Math.abs(change);
+    }
+
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+
+    for (let i = period + 1; i < values.length; i++) {
+
+        const change = values[i] - values[i - 1];
+
+        avgGain =
+            (avgGain * (period - 1) + Math.max(change, 0)) /
+            period;
+
+        avgLoss =
+            (avgLoss * (period - 1) + Math.max(-change, 0)) /
+            period;
+    }
+
+    if (avgLoss === 0) return 100;
+
+    const rs = avgGain / avgLoss;
+
+    return 100 - 100 / (1 + rs);
+}
+
+// =====================================================
+// VWAP
+// =====================================================
+
+function calculateVWAP(candles) {
+
+    let totalPV = 0;
+    let totalVolume = 0;
+
+    for (const c of candles) {
+
+        const high = Number(c[2]);
+        const low = Number(c[3]);
+        const close = Number(c[4]);
+        const volume = Number(c[5]);
+
+        const typicalPrice =
+            (high + low + close) / 3;
+
+        totalPV += typicalPrice * volume;
+        totalVolume += volume;
+    }
+
+    return totalVolume
+        ? totalPV / totalVolume
+        : null;
+}
+
+// =====================================================
+// CLOSED CANDLE FILTER
+// =====================================================
+
+function getClosedCandles(candles) {
+
+    const now = Date.now();
+
+    return candles
+        .filter(c => {
+
+            const timestamp = new Date(c[0]).getTime();
+
+            return (
+                Number.isFinite(timestamp) &&
+                timestamp + 5 * 60 * 1000 <= now
+            );
+
+        })
+        .slice()
+        .reverse();
+}
+
+// =====================================================
+// ANALYSE STOCK
+// =====================================================
+
+async function analyseStock(item) {
+
+    try {
+
+        const quote = await getQuote(item.instrument_key);
+
+        const candlesRaw = await getCandles(item.instrument_key);
+
+        const candles = getClosedCandles(candlesRaw);
+
+        if (candles.length < 21) return null;
+
+        const closes = candles.map(c => Number(c[4]));
+
+        const volumes = candles.map(c => Number(c[5]));
+
+        const latest = candles[candles.length - 1];
+
+        const previous = candles[candles.length - 2];
+
+        const close = Number(latest[4]);
+
+        const open = Number(latest[1]);
+
+        const high = Number(latest[2]);
+
+        const low = Number(latest[3]);
+
+        const volume = Number(latest[5]);
+
+        const previousVolume = Number(previous[5]);
+
+        const averageVolume = volumes
+            .slice(-21, -1)
+            .reduce((a, b) => a + b, 0) / 20;
+
+        const volumeRatio =
+            averageVolume > 0
+                ? volume / averageVolume
+                : 0;
+
+        const ema20 = calculateEMA(closes, 20);
+
+        const rsi = calculateRSI(closes, 14);
+
+        const vwap = calculateVWAP(candles);
+
+        const ltp = Number(quote.last_price);
+
+        const oi = Number(quote.oi || 0);
+
+        const previousOI = Number(
+            quote.previous_oi || 0
         );
 
-        if (daily.length < 2) return null;
+        const oiChange = previousOI > 0
+            ? ((oi - previousOI) / previousOI) * 100
+            : null;
 
-        const previousDaily =
-          daily[daily.length - 2];
+        const priceChange = close > 0
+            ? ((close - Number(previous[4])) /
+                Number(previous[4])) * 100
+            : 0;
 
-        const todayCandles = getCompletedCandles(
-          await candlesFor(instrument.instrument_key)
-        );
+        const volumePass =
+            volumeRatio >= SETTINGS.VOLUME_MULTIPLIER;
 
-        if (!todayCandles || todayCandles.length < 2) {
-          return null;
+        const oiPass =
+            oiChange !== null &&
+            oiChange >= SETTINGS.MIN_OI_CHANGE;
+
+        const bullish =
+            close > open &&
+            close > ema20 &&
+            close > vwap &&
+            rsi >= SETTINGS.MIN_RSI_BUY &&
+            volumePass &&
+            oiPass;
+
+        const bearish =
+            close < open &&
+            close < ema20 &&
+            close < vwap &&
+            rsi <= SETTINGS.MAX_RSI_SELL &&
+            volumePass &&
+            oiPass;
+
+        let signal = "WAIT";
+
+        if (bullish && priceChange > 0) {
+            signal = "STRONG BUY";
         }
 
-        return analyseStrongGapOpen(
-          previousDaily,
-          todayCandles,
-          instrument
+        if (bearish && priceChange < 0) {
+            signal = "STRONG SELL";
+        }
+
+        const resistance = Math.max(
+            ...candles.slice(-21, -1).map(c => Number(c[2]))
         );
-      }
+
+        const support = Math.min(
+            ...candles.slice(-21, -1).map(c => Number(c[3]))
+        );
+
+        const breakout = close > resistance;
+
+        const breakdown = close < support;
+
+        if (signal === "STRONG BUY" && breakout) {
+            signal = "STRONG BUY BREAKOUT";
+        }
+
+        if (signal === "STRONG SELL" && breakdown) {
+            signal = "STRONG SELL BREAKDOWN";
+        }
+
+        const entry = close;
+
+        const stopLoss =
+            signal.includes("BUY")
+                ? entry * (1 - SETTINGS.STOP_LOSS_PERCENT / 100)
+                : entry * (1 + SETTINGS.STOP_LOSS_PERCENT / 100);
+
+        const target =
+            signal.includes("BUY")
+                ? entry * (1 + SETTINGS.TARGET_PERCENT / 100)
+                : entry * (1 - SETTINGS.TARGET_PERCENT / 100);
+
+        const bullishBTST =
+            close > open &&
+            close > ema20 &&
+            close > vwap &&
+            rsi >= 60 &&
+            volumePass &&
+            oiPass;
+
+        return {
+
+            symbol: item.underlying_symbol,
+
+            instrumentKey: item.instrument_key,
+
+            expiry: item.expiry,
+
+            price: ltp,
+
+            candleClose: close,
+
+            changePercent: Number(priceChange.toFixed(2)),
+
+            volume,
+
+            volumeRatio: Number(volumeRatio.toFixed(2)),
+
+            oi,
+
+            previousOI,
+
+            oiChange: oiChange === null
+                ? null
+                : Number(oiChange.toFixed(2)),
+
+            rsi: Number(rsi.toFixed(2)),
+
+            ema20: Number(ema20.toFixed(2)),
+
+            vwap: Number(vwap.toFixed(2)),
+
+            resistance,
+
+            support,
+
+            breakout,
+
+            breakdown,
+
+            signal,
+
+            btst: bullishBTST,
+
+            entry: Number(entry.toFixed(2)),
+
+            stopLoss: Number(stopLoss.toFixed(2)),
+
+            target: Number(target.toFixed(2)),
+
+            candleTime: latest[0],
+
+            candleConfirmed: true
+
+        };
+
+    } catch (error) {
+
+        console.log(
+            "Stock Error:",
+            item.underlying_symbol,
+            error.message
+        );
+
+        return null;
+    }
+}
+
+// =====================================================
+// CONCURRENT SCANNER
+// =====================================================
+
+async function runScanner() {
+
+    if (!TOKEN) {
+        throw new Error("UPSTOX_ACCESS_TOKEN missing");
+    }
+
+    if (!instruments.length) {
+        await loadInstruments();
+    }
+
+    const results = [];
+
+    for (
+        let i = 0;
+        i < instruments.length;
+        i += SETTINGS.CONCURRENCY
+    ) {
+
+        const batch = instruments.slice(
+            i,
+            i + SETTINGS.CONCURRENCY
+        );
+
+        const data = await Promise.all(
+            batch.map(analyseStock)
+        );
+
+        results.push(
+            ...data.filter(Boolean)
+        );
+    }
+
+    lastScan = results.sort((a, b) => {
+
+        const rank = s => {
+
+            if (s.includes("STRONG BUY")) return 4;
+
+            if (s.includes("STRONG SELL")) return 3;
+
+            if (s === "WAIT") return 1;
+
+            return 0;
+        };
+
+        return rank(b.signal) - rank(a.signal);
+    });
+
+    lastScanTime = new Date().toISOString();
+
+    return lastScan;
+}
+
+// =====================================================
+// API ROUTES
+// =====================================================
+
+const server = http.createServer(async (req, res) => {
+
+    if (req.method === "OPTIONS") {
+        return send(res, 200, { success: true });
+    }
+
+    const url = new URL(
+        req.url,
+        `http://${req.headers.host}`
     );
 
-    const alerts = results
-      .filter(Boolean)
-      .sort((a, b) =>
-        b.gapPercent - a.gapPercent
-      );
+    try {
 
-    return {
-      success: true,
-      scanner: "STRONG_GAP_UP_OPEN",
-      totalScanned: stocks.length,
-      totalSignals: alerts.length,
-      signals: alerts,
-      updatedAt: new Date().toISOString()
-    };
+        // HEALTH
 
-  } catch (error) {
+        if (url.pathname === "/health") {
 
-    return {
-      success: false,
-      error: error.message
-    };
+            return send(res, 200, {
+                success: true,
+                server: "SMART TRADE INDIA V2",
+                tokenConfigured: Boolean(TOKEN),
+                instruments: instruments.length,
+                lastScanTime
+            });
+        }
 
-  } finally {
-    scanInProgress = false;
-  }
-      }// ==========================================
-// PART 3
-// BTST + GAP-UP API ROUTES
-// ==========================================
+        // UPSTOX STATUS
 
-const requestUrl = new URL(
-  req.url,
-  "http://localhost"
-);
+        if (url.pathname === "/api/upstox/status") {
 
-const pathname = requestUrl.pathname;
+            return send(res, 200, {
+                connected: Boolean(TOKEN),
+                instrumentsLoaded: instruments.length
+            });
+        }
 
-// ------------------------------------------
-// BTST SCANNER API
-// ------------------------------------------
+        // LOAD INSTRUMENTS
 
-if (
-  req.method === "GET" &&
-  pathname === "/api/btst/scan"
-) {
-  const limit = Number(
-    requestUrl.searchParams.get("limit") || 250
-  );
+        if (url.pathname === "/api/options/nse-stocks") {
 
-  const result = await runBTSTScan(limit);
+            await loadInstruments();
 
-  return json(
-    res,
-    result.success ? 200 : 500,
-    result
-  );
-}
+            return send(res, 200, {
+                success: true,
+                count: instruments.length,
+                stocks: instruments.map(x => ({
+                    symbol: x.underlying_symbol,
+                    instrumentKey: x.instrument_key,
+                    expiry: x.expiry
+                }))
+            });
+        }
 
-// ------------------------------------------
-// GAP-UP OPEN SCANNER API
-// ------------------------------------------
+        // FULL SCAN
 
-if (
-  req.method === "GET" &&
-  pathname === "/api/gap-up/scan"
-) {
-  const limit = Number(
-    requestUrl.searchParams.get("limit") || 250
-  );
+        if (url.pathname === "/api/scan") {
 
-  const result = await runGapUpScan(limit);
+            const data = await runScanner();
 
-  return json(
-    res,
-    result.success ? 200 : 500,
-    result
-  );
-}// ==========================================
-// FINAL SERVER RESPONSE
-// ==========================================
+            return send(res, 200, {
+                success: true,
+                count: data.length,
+                scanTime: lastScanTime,
+                signals: data
+            });
+        }
 
-// OPTIONS / CORS PREFLIGHT
-if (req.method === "OPTIONS") {
-  res.writeHead(204, {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization"
-  });
+        // BUY SIGNALS
 
-  return res.end();
-}
+        if (url.pathname === "/api/buy") {
 
-// API ROUTE NOT FOUND
-return json(res, 404, {
-  success: false,
-  error: "API_ROUTE_NOT_FOUND",
-  message: "Requested API route does not exist"
+            return send(res, 200, {
+                signals: lastScan.filter(
+                    x => x.signal.includes("BUY")
+                )
+            });
+        }
+
+        // SELL SIGNALS
+
+        if (url.pathname === "/api/sell") {
+
+            return send(res, 200, {
+                signals: lastScan.filter(
+                    x => x.signal.includes("SELL")
+                )
+            });
+        }
+
+        // BTST
+
+        if (url.pathname === "/api/btst") {
+
+            return send(res, 200, {
+                signals: lastScan.filter(x => x.btst)
+            });
+        }
+
+        // ALL SIGNALS
+
+        if (url.pathname === "/api/signals") {
+
+            return send(res, 200, {
+                success: true,
+                scanTime: lastScanTime,
+                signals: lastScan
+            });
+        }
+
+        return send(res, 404, {
+            success: false,
+            message: "API route not found"
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return send(res, 500, {
+            success: false,
+            error: error.message
+        });
+    }
 });
 
-});
-
-// ==========================================
-// SERVER START
-// ==========================================
+// =====================================================
+// START SERVER
+// =====================================================
 
 server.listen(PORT, () => {
-  console.log("================================");
-  console.log("SMART TRADE INDIA SERVER STARTED");
-  console.log("PORT:", PORT);
-  console.log("BTST SCANNER: ACTIVE");
-  console.log("GAP-UP SCANNER: ACTIVE");
-  console.log("NSE F&O SCANNER: ACTIVE");
-  console.log("================================");
+
+    console.log("--------------------------------");
+
+    console.log("SMART TRADE INDIA V2 STARTED");
+
+    console.log("PORT:", PORT);
+
+    console.log("UPSTOX:", Boolean(TOKEN));
+
+    console.log("--------------------------------");
+
 });
