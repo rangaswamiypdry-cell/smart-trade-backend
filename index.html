@@ -3,241 +3,206 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Smart Trade India - Intraday Scanner</title>
+
+<title>Smart Trade India</title>
 
 <style>
-* {
-  box-sizing: border-box;
+*{box-sizing:border-box}
+
+body{
+ margin:0;
+ padding:15px;
+ background:#101827;
+ color:white;
+ font-family:Arial,sans-serif;
 }
 
-body {
-  margin: 0;
-  padding: 15px;
-  background: #101827;
-  color: #ffffff;
-  font-family: Arial, sans-serif;
+.header{
+ background:#1d293b;
+ padding:25px 15px;
+ border-radius:16px;
+ text-align:center;
+ margin-bottom:15px;
 }
 
-.header {
-  background: #1d293b;
-  padding: 18px;
-  border-radius: 14px;
-  text-align: center;
-  margin-bottom: 15px;
+.header h1{
+ color:#00e5a0;
+ font-size:27px;
+ margin:5px;
 }
 
-.header h2 {
-  margin: 0;
-  color: #00e5a0;
+.header p{color:#aab7c8}
+
+.status{
+ background:#26364d;
+ padding:14px;
+ border-radius:9px;
+ text-align:center;
+ margin-bottom:15px;
+ font-size:14px;
 }
 
-.header p {
-  color: #aab7c8;
-  font-size: 13px;
+.controls{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:10px;
+ margin-bottom:15px;
 }
 
-.status {
-  padding: 10px;
-  background: #26364d;
-  border-radius: 8px;
-  text-align: center;
-  margin-bottom: 15px;
-  font-size: 13px;
+button,select{
+ width:100%;
+ padding:16px 10px;
+ border:0;
+ border-radius:9px;
+ font-weight:bold;
+ font-size:14px;
 }
 
-.controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
+button{
+ background:#00c98b;
+ color:#06251c;
 }
 
-button, select {
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
+button:disabled{opacity:.5}
+
+select{
+ background:#26364d;
+ color:white;
 }
 
-button {
-  background: #00c98b;
-  color: #061b16;
-  flex: 1;
+.stats{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:10px;
 }
 
-button:disabled {
-  opacity: 0.5;
+.stat{
+ background:#1d293b;
+ padding:20px 8px;
+ border-radius:12px;
+ text-align:center;
 }
 
-select {
-  background: #26364d;
-  color: white;
-  flex: 1;
+.stat h2{
+ margin:0;
+ font-size:28px;
 }
 
-.stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 15px;
+.stat p{
+ color:#aab7c8;
+ font-size:13px;
 }
 
-.stat {
-  background: #1d293b;
-  padding: 15px;
-  border-radius: 10px;
-  text-align: center;
+.green{color:#00e5a0}
+.red{color:#ff5364}
+
+.title{
+ margin-top:25px;
+ font-size:20px;
 }
 
-.stat h3 {
-  margin: 0;
-  font-size: 23px;
+.stock-card{
+ background:#1d293b;
+ border:1px solid #34445c;
+ padding:15px;
+ border-radius:12px;
+ margin-bottom:12px;
 }
 
-.stat p {
-  color: #aab7c8;
-  margin-bottom: 0;
-  font-size: 12px;
+.stock-top{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:8px;
 }
 
-.green {
-  color: #00e5a0;
+.stock-name{
+ font-size:19px;
+ font-weight:bold;
 }
 
-.red {
-  color: #ff5364;
+.badge{
+ padding:7px 10px;
+ border-radius:6px;
+ font-size:11px;
+ font-weight:bold;
 }
 
-.section-title {
-  margin: 20px 0 10px;
-  font-size: 17px;
+.buy{background:#064d37;color:#00ffae}
+.sell{background:#571d29;color:#ff7380}
+.wait{background:#514321;color:#ffd66b}
+
+.price{
+ font-size:25px;
+ margin:15px 0;
 }
 
-.stock-card {
-  background: #1d293b;
-  border: 1px solid #34445c;
-  padding: 15px;
-  border-radius: 12px;
-  margin-bottom: 12px;
+.grid{
+ display:grid;
+ grid-template-columns:1fr 1fr;
+ gap:9px;
 }
 
-.stock-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+.item{
+ background:#26364d;
+ padding:11px;
+ border-radius:7px;
 }
 
-.stock-name {
-  font-size: 18px;
-  font-weight: bold;
+.item small{
+ display:block;
+ color:#aab7c8;
+ font-size:11px;
+ margin-bottom:6px;
 }
 
-.badge {
-  padding: 6px 9px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: bold;
+.item b{font-size:14px}
+
+.levels{
+ background:#14263a;
+ padding:12px;
+ border-radius:8px;
+ margin-top:12px;
 }
 
-.buy {
-  background: #064d37;
-  color: #00ffae;
+.levels p{
+ margin:9px 0;
+ font-size:13px;
 }
 
-.sell {
-  background: #571d29;
-  color: #ff7380;
+.conditions{
+ display:flex;
+ flex-wrap:wrap;
+ gap:6px;
+ margin-top:12px;
 }
 
-.wait {
-  background: #514321;
-  color: #ffd66b;
+.condition{
+ background:#26364d;
+ padding:6px;
+ border-radius:5px;
+ font-size:10px;
 }
 
-.price {
-  font-size: 23px;
-  margin: 12px 0;
+.empty{
+ background:#1d293b;
+ padding:30px 15px;
+ border-radius:10px;
+ text-align:center;
+ color:#aab7c8;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 9px;
+footer{
+ text-align:center;
+ color:#8b9bb1;
+ font-size:12px;
+ margin:25px 0;
 }
 
-.item {
-  background: #26364d;
-  padding: 10px;
-  border-radius: 7px;
-}
-
-.item small {
-  color: #aab7c8;
-  display: block;
-  font-size: 11px;
-  margin-bottom: 5px;
-}
-
-.item b {
-  font-size: 14px;
-}
-
-.levels {
-  margin-top: 12px;
-  padding: 12px;
-  background: #14263a;
-  border-radius: 8px;
-}
-
-.levels p {
-  margin: 7px 0;
-  font-size: 13px;
-}
-
-.conditions {
-  margin-top: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.condition {
-  font-size: 10px;
-  padding: 5px 7px;
-  background: #26364d;
-  border-radius: 5px;
-}
-
-footer {
-  text-align: center;
-  color: #8b9bb1;
-  font-size: 11px;
-  margin-top: 25px;
-}
-
-.empty {
-  text-align: center;
-  color: #aab7c8;
-  padding: 25px;
-  background: #1d293b;
-  border-radius: 10px;
-}
-
-@media(min-width:700px) {
-  body {
-    max-width: 900px;
-    margin: auto;
-  }
-
-  .stats {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  .grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+@media(min-width:700px){
+ body{max-width:900px;margin:auto}
+ .stats{grid-template-columns:repeat(4,1fr)}
+ .grid{grid-template-columns:repeat(4,1fr)}
 }
 </style>
 </head>
@@ -245,432 +210,481 @@ footer {
 <body>
 
 <div class="header">
-  <h2>SMART TRADE INDIA</h2>
-  <p>NSE F&O | INTRADAY STRONG MOMENTUM SCANNER</p>
-  <p>5 MINUTE COMPLETED CANDLE</p>
+<h1>SMART TRADE INDIA</h1>
+<p>NSE F&O | INTRADAY STRONG MOMENTUM SCANNER</p>
+<p>5 MINUTE COMPLETED CANDLE</p>
 </div>
 
 <div class="status" id="status">
-  Connecting to Backend...
+Connecting to Backend...
 </div>
 
 <div class="controls">
 
-  <button id="scanBtn" onclick="startScan()">
-    🔍 SCAN NOW
-  </button>
+<button id="scanBtn" onclick="startScan()">
+🔍 SCAN NOW
+</button>
 
-  <select id="filter" onchange="renderResults()">
-    <option value="ALL">ALL SIGNALS</option>
-    <option value="STRONG_BUY">STRONG BUY</option>
-    <option value="STRONG_SELL">STRONG SELL</option>
-  </select>
+<select id="filter" onchange="renderResults()">
+<option value="ALL">ALL SIGNALS</option>
+<option value="STRONG_BUY">STRONG BUY</option>
+<option value="STRONG_SELL">STRONG SELL</option>
+</select>
 
-  <select id="autoRefresh">
-    <option value="0">AUTO SCAN OFF</option>
-    <option value="300000">AUTO SCAN 5 MIN</option>
-    <option value="600000">AUTO SCAN 10 MIN</option>
-  </select>
+<select id="autoRefresh">
+<option value="0">AUTO SCAN OFF</option>
+<option value="300000">AUTO SCAN 5 MIN</option>
+<option value="600000">AUTO SCAN 10 MIN</option>
+</select>
 
 </div>
 
 <div class="stats">
 
-  <div class="stat">
-    <h3 id="total">0</h3>
-    <p>Scanned Stocks</p>
-  </div>
+<div class="stat">
+<h2 id="total">0</h2>
+<p>Scanned Stocks</p>
+</div>
 
-  <div class="stat">
-    <h3 class="green" id="buyCount">0</h3>
-    <p>Strong Buy</p>
-  </div>
+<div class="stat">
+<h2 class="green" id="buyCount">0</h2>
+<p>Strong Buy</p>
+</div>
 
-  <div class="stat">
-    <h3 class="red" id="sellCount">0</h3>
-    <p>Strong Sell</p>
-  </div>
+<div class="stat">
+<h2 class="red" id="sellCount">0</h2>
+<p>Strong Sell</p>
+</div>
 
-  <div class="stat">
-    <h3 id="signals">0</h3>
-    <p>Total Signals</p>
-  </div>
+<div class="stat">
+<h2 id="signals">0</h2>
+<p>Total Signals</p>
+</div>
 
 </div>
 
-<h3 class="section-title">📊 Intraday Stock Signals</h3>
+<h3 class="title">📊 Intraday Stock Signals</h3>
 
 <div id="results">
-  <div class="empty">
-    Click SCAN NOW to find strong momentum stocks.
-  </div>
+<div class="empty">Click SCAN NOW to start scanning.</div>
 </div>
 
 <footer>
-  SMART TRADE INDIA<br>
-  Market data: Upstox API<br>
-  Signals are analytical estimates, not guaranteed trading advice.
+SMART TRADE INDIA<br>
+Market Data: Upstox API<br>
+5 Minute Intraday Scanner<br>
+Signals are analytical estimates, not guaranteed trading advice.
 </footer>
 
 <script>
 
-// =====================================
-// BACKEND URL
-// =====================================
-
 const API_BASE =
 "https://smart-trade-backend-ig6l.onrender.com";
 
-let allResults = [];
-let autoTimer = null;
+let allResults=[];
+let autoTimer=null;
+let scanRunning=false;
 
-// =====================================
+// =================================
 // BACKEND CONNECTION
-// =====================================
+// =================================
 
-async function checkBackend() {
+async function checkBackend(){
 
-  const status = document.getElementById("status");
+ const status=document.getElementById("status");
 
-  try {
+ try{
 
-    const response = await fetch(
-      API_BASE + "/health"
-    );
+  const response=await fetch(
+   API_BASE+"/health"
+  );
 
-    const data = await response.json();
+  const data=await response.json();
 
-    if (data.status === "RUNNING") {
-
-      status.innerHTML =
-        "🟢 BACKEND CONNECTED";
-
-    } else {
-
-      status.innerHTML =
-        "🟠 BACKEND NOT READY";
-    }
-
-  } catch (error) {
-
-    status.innerHTML =
-      "🔴 BACKEND CONNECTION ERROR";
+  if(response.ok){
+   status.innerHTML="🟢 BACKEND CONNECTED";
+  }else{
+   status.innerHTML="🟠 BACKEND NOT READY";
   }
+
+ }catch(error){
+
+  status.innerHTML="🔴 BACKEND CONNECTION ERROR";
+
+ }
 }
 
-// =====================================
-// START SCAN
-// =====================================
+// =================================
+// SCAN START
+// =================================
 
-async function startScan() {
+async function startScan(){
 
-  const button = document.getElementById("scanBtn");
+ if(scanRunning)return;
 
-  const status = document.getElementById("status");
+ scanRunning=true;
 
-  button.disabled = true;
-  button.innerHTML = "SCANNING...";
+ const button=document.getElementById("scanBtn");
+ const status=document.getElementById("status");
 
-  status.innerHTML =
-    "⏳ Scanning NSE F&O Stocks...";
+ button.disabled=true;
+ button.innerHTML="SCANNING...";
 
-  try {
+ status.innerHTML="⏳ Starting NSE F&O scan...";
 
-    const response = await fetch(
-      API_BASE + "/api/intraday/scan"
-    );
+ try{
 
-    const data = await response.json();
+  const response=await fetch(
+   API_BASE+"/api/intraday/scan"
+  );
 
-    if (!response.ok || !data.success) {
+  const data=await response.json();
 
-      throw new Error(
-        data.error || "Scanner failed"
-      );
-    }
-
-    allResults = data.results || [];
-
-    document.getElementById("total").innerText =
-      data.scanned || 0;
-
-    document.getElementById("buyCount").innerText =
-      data.strong_buy_count || 0;
-
-    document.getElementById("sellCount").innerText =
-      data.strong_sell_count || 0;
-
-    document.getElementById("signals").innerText =
-      (data.strong_buy_count || 0) +
-      (data.strong_sell_count || 0);
-
-    status.innerHTML =
-      "🟢 SCAN COMPLETE | " +
-      "Time: " + (data.scan_time || "--");
-
-    renderResults();
-
-  } catch (error) {
-
-    status.innerHTML =
-      "🔴 ERROR: " + error.message;
-
-    document.getElementById("results").innerHTML =
-      '<div class="empty">' +
-      escapeHTML(error.message) +
-      '</div>';
-
-  } finally {
-
-    button.disabled = false;
-    button.innerHTML = "🔍 SCAN NOW";
-  }
-}
-
-// =====================================
-// RENDER RESULTS
-// =====================================
-
-function renderResults() {
-
-  const container =
-    document.getElementById("results");
-
-  const filter =
-    document.getElementById("filter").value;
-
-  let stocks = allResults;
-
-  if (filter !== "ALL") {
-
-    stocks = stocks.filter(
-      item => item.signal === filter
-    );
+  if(!response.ok || data.success===false){
+   throw new Error(data.error || data.message || "Scan failed");
   }
 
-  if (stocks.length === 0) {
+  // Backend already running?
+  status.innerHTML="⏳ Scan started. Waiting for results...";
 
-    container.innerHTML =
-      '<div class="empty">' +
-      'No matching signals found.' +
-      '</div>';
+  await pollResults();
 
-    return;
-  }
+ }catch(error){
 
-  container.innerHTML = stocks.map(stock => {
+  status.innerHTML="🔴 "+error.message;
 
-    const isBuy =
-      stock.signal === "STRONG_BUY";
+  document.getElementById("results").innerHTML=
+   '<div class="empty">'+escapeHTML(error.message)+'</div>';
 
-    const isSell =
-      stock.signal === "STRONG_SELL";
+ }finally{
 
-    const signalClass =
-      isBuy ? "buy" :
-      isSell ? "sell" : "wait";
+  scanRunning=false;
+  button.disabled=false;
+  button.innerHTML="🔍 SCAN NOW";
 
-    const signalText =
-      isBuy ? "STRONG BUY" :
-      isSell ? "STRONG SELL" : "WAIT";
-
-    const c = stock.conditions || {};
-
-    return `
-
-    <div class="stock-card">
-
-      <div class="stock-top">
-
-        <div class="stock-name">
-          ${escapeHTML(stock.symbol || "--")}
-        </div>
-
-        <span class="badge ${signalClass}">
-          ${signalText}
-        </span>
-
-      </div>
-
-      <div class="price">
-        ₹${number(stock.entry)}
-        <small style="font-size:12px;color:#aab7c8">
-          (${number(stock.price_change_percent)}%)
-        </small>
-      </div>
-
-      <div class="grid">
-
-        <div class="item">
-          <small>RSI 14</small>
-          <b>${number(stock.rsi)}</b>
-        </div>
-
-        <div class="item">
-          <small>Volume Blast</small>
-          <b>${number(stock.volume_ratio)}x</b>
-        </div>
-
-        <div class="item">
-          <small>OI Change</small>
-          <b>${number(stock.oi_change_percent)}%</b>
-        </div>
-
-        <div class="item">
-          <small>ADX</small>
-          <b>${number(stock.adx)}</b>
-        </div>
-
-        <div class="item">
-          <small>VWAP</small>
-          <b>₹${number(stock.vwap)}</b>
-        </div>
-
-        <div class="item">
-          <small>EMA 20</small>
-          <b>₹${number(stock.ema20)}</b>
-        </div>
-
-        <div class="item">
-          <small>EMA 50</small>
-          <b>₹${number(stock.ema50)}</b>
-        </div>
-
-        <div class="item">
-          <small>ATR</small>
-          <b>${number(stock.atr)}</b>
-        </div>
-
-      </div>
-
-      <div class="levels">
-
-        <p>🎯 Entry:
-          <b>₹${number(stock.entry)}</b>
-        </p>
-
-        <p class="red">🛑 Stop Loss:
-          <b>₹${number(stock.stop_loss)}</b>
-        </p>
-
-        <p class="green">Target 1:
-          <b>₹${number(stock.target_1)}</b>
-        </p>
-
-        <p class="green">Target 2:
-          <b>₹${number(stock.target_2)}</b>
-        </p>
-
-        <p class="green">Target 3:
-          <b>₹${number(stock.target_3)}</b>
-        </p>
-
-      </div>
-
-      <div class="conditions">
-
-        ${tag("OI Increase", c.oi_increase)}
-        ${tag("Volume Blast", c.volume_blast)}
-        ${tag("VWAP Cross Up", c.vwap_cross_up)}
-        ${tag("VWAP Cross Down", c.vwap_cross_down)}
-        ${tag("EMA Bullish", c.ema_bullish)}
-        ${tag("EMA Bearish", c.ema_bearish)}
-        ${tag("ADX Strong", c.adx_strong)}
-        ${tag("Breakout", c.breakout)}
-        ${tag("Breakdown", c.breakdown)}
-
-      </div>
-
-      <p style="font-size:11px;color:#9aabc0">
-        Candle: ${escapeHTML(String(stock.candle_time || "--"))}
-      </p>
-
-    </div>
-
-    `;
-
-  }).join("");
+ }
 
 }
 
-// =====================================
-// CONDITION TAG
-// =====================================
+// =================================
+// WAIT FOR BACKEND RESULT
+// =================================
 
-function tag(label, active) {
+async function pollResults(){
+
+ let completed=false;
+
+ for(let i=0;i<30;i++){
+
+  await new Promise(resolve=>setTimeout(resolve,3000));
+
+  try{
+
+   const response=await fetch(
+    API_BASE+"/api/intraday/last"
+   );
+
+   if(!response.ok)continue;
+
+   const data=await response.json();
+
+   if(data.scanInProgress===true){
+    document.getElementById("status").innerHTML=
+     "⏳ Scanner running... Please wait";
+    continue;
+   }
+
+   const result=data.data || data.result || data;
+
+   if(
+    result &&
+    (
+     Array.isArray(result.results) ||
+     Array.isArray(result.alerts) ||
+     Array.isArray(result.signals)
+    )
+   ){
+
+    showResults(result);
+    completed=true;
+    break;
+
+   }
+
+  }catch(error){
+
+   console.log(error);
+
+  }
+
+ }
+
+ if(!completed){
+
+  document.getElementById("status").innerHTML=
+   "🟠 Scan is taking longer. Check again shortly.";
+
+ }
+
+}
+
+// =================================
+// SHOW RESULTS
+// =================================
+
+function showResults(data){
+
+ allResults=
+  data.results ||
+  data.alerts ||
+  data.signals ||
+  [];
+
+ const scanned=
+  data.scanned ??
+  data.analysed ??
+  data.scannedStocks ??
+  0;
+
+ const buys=allResults.filter(
+  x=>x.signal==="STRONG_BUY"
+ );
+
+ const sells=allResults.filter(
+  x=>x.signal==="STRONG_SELL"
+ );
+
+ document.getElementById("total").innerText=scanned;
+
+ document.getElementById("buyCount").innerText=
+  data.strong_buy_count ?? data.bullish ?? buys.length;
+
+ document.getElementById("sellCount").innerText=
+  data.strong_sell_count ?? data.bearish ?? sells.length;
+
+ document.getElementById("signals").innerText=
+  buys.length+sells.length;
+
+ const time=
+  data.scan_time ||
+  data.timestamp ||
+  data.time ||
+  "--";
+
+ document.getElementById("status").innerHTML=
+  "🟢 SCAN COMPLETE | "+escapeHTML(time);
+
+ renderResults();
+
+}
+
+// =================================
+// RENDER CARDS
+// =================================
+
+function renderResults(){
+
+ const container=document.getElementById("results");
+
+ const filter=document.getElementById("filter").value;
+
+ let stocks=allResults;
+
+ if(filter!=="ALL"){
+  stocks=stocks.filter(x=>x.signal===filter);
+ }
+
+ if(stocks.length===0){
+
+  container.innerHTML=
+   '<div class="empty">No matching signals found.</div>';
+
+  return;
+
+ }
+
+ container.innerHTML=stocks.map(stock=>{
+
+  const buy=stock.signal==="STRONG_BUY";
+  const sell=stock.signal==="STRONG_SELL";
+
+  const badge=buy?"buy":sell?"sell":"wait";
+
+  const signal=buy?"STRONG BUY":sell?"STRONG SELL":"WAIT";
+
+  const price=stock.entry ?? stock.ltp ?? stock.price;
+
+  const c=stock.conditions || {};
 
   return `
-    <span class="condition"
-      style="color:${active ? '#00e5a0' : '#9aabc0'}">
-      ${active ? "✓" : "○"} ${label}
+
+  <div class="stock-card">
+
+   <div class="stock-top">
+
+    <div class="stock-name">
+     ${escapeHTML(stock.symbol || stock.underlying || "--")}
+    </div>
+
+    <span class="badge ${badge}">
+     ${signal}
     </span>
+
+   </div>
+
+   <div class="price">
+    ₹${number(price)}
+   </div>
+
+   <div class="grid">
+
+    ${item("RSI 14",stock.rsi)}
+    ${item("Volume Ratio",stock.volume_ratio ?? stock.volumeRatio)}
+    ${item("OI Change %",stock.oi_change_percent ?? stock.oiChangePercent)}
+    ${item("ADX",stock.adx)}
+    ${item("VWAP",stock.vwap)}
+    ${item("EMA 20",stock.ema20)}
+    ${item("EMA 50",stock.ema50)}
+    ${item("ATR",stock.atr)}
+
+   </div>
+
+   <div class="levels">
+
+    <p>🎯 Entry: <b>₹${number(stock.entry ?? price)}</b></p>
+
+    <p class="red">
+     🛑 Stop Loss: <b>₹${number(stock.stop_loss ?? stock.stopLoss)}</b>
+    </p>
+
+    <p class="green">
+     Target 1: <b>₹${number(stock.target_1 ?? stock.target1)}</b>
+    </p>
+
+    <p class="green">
+     Target 2: <b>₹${number(stock.target_2 ?? stock.target2)}</b>
+    </p>
+
+    <p class="green">
+     Target 3: <b>₹${number(stock.target_3 ?? stock.target3)}</b>
+    </p>
+
+   </div>
+
+   <div class="conditions">
+
+    ${tag("OI Increase",c.oi_increase ?? c.oiIncrease)}
+    ${tag("Volume Blast",c.volume_blast ?? c.volumePass)}
+    ${tag("VWAP Cross Up",c.vwap_cross_up ?? c.vwapCrossUp)}
+    ${tag("VWAP Cross Down",c.vwap_cross_down ?? c.vwapCrossDown)}
+    ${tag("EMA Bullish",c.ema_bullish ?? c.emaBullish)}
+    ${tag("EMA Bearish",c.ema_bearish ?? c.emaBearish)}
+    ${tag("ADX Strong",c.adx_strong ?? c.adxStrong)}
+    ${tag("Breakout",c.breakout)}
+    ${tag("Breakdown",c.breakdown)}
+
+   </div>
+
+   <p style="font-size:11px;color:#9aabc0">
+    Candle: ${escapeHTML(String(stock.candle_time || stock.candleTime || "--"))}
+   </p>
+
+  </div>
+
   `;
+
+ }).join("");
+
 }
 
-// =====================================
-// SAFE NUMBER
-// =====================================
+// =================================
+// ITEM
+// =================================
 
-function number(value) {
+function item(label,value){
 
-  if (
-    value === null ||
-    value === undefined ||
-    !Number.isFinite(Number(value))
-  ) {
-    return "--";
-  }
+ return `
+ <div class="item">
+  <small>${label}</small>
+  <b>${number(value)}</b>
+ </div>
+ `;
 
-  return Number(value).toFixed(2);
 }
 
-// =====================================
-// SAFE HTML
-// =====================================
+// =================================
+// CONDITION TAG
+// =================================
 
-function escapeHTML(value) {
+function tag(label,active){
 
-  return String(value).replace(
-    /[&<>"']/g,
-    char => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    })[char]
-  );
+ return `
+ <span class="condition" style="color:${active?'#00e5a0':'#9aabc0'}">
+ ${active?'✓':'○'} ${label}
+ </span>
+ `;
+
 }
 
-// =====================================
+// =================================
+// NUMBER FORMAT
+// =================================
+
+function number(value){
+
+ if(value===null || value===undefined || value===""){
+  return "--";
+ }
+
+ const n=Number(value);
+
+ return Number.isFinite(n)?n.toFixed(2):"--";
+
+}
+
+// =================================
+// HTML SECURITY
+// =================================
+
+function escapeHTML(value){
+
+ return String(value).replace(/[&<>"']/g,char=>({
+  "&":"&amp;",
+  "<":"&lt;",
+  ">":"&gt;",
+  '"':"&quot;",
+  "'":"&#39;"
+ })[char]);
+
+}
+
+// =================================
 // AUTO SCAN
-// =====================================
+// =================================
 
-document
-  .getElementById("autoRefresh")
-  .addEventListener("change", function() {
+document.getElementById("autoRefresh")
+.addEventListener("change",function(){
 
-    if (autoTimer) {
+ if(autoTimer){
+  clearInterval(autoTimer);
+  autoTimer=null;
+ }
 
-      clearInterval(autoTimer);
+ const interval=Number(this.value);
 
-      autoTimer = null;
-    }
+ if(interval>0){
 
-    const interval = Number(this.value);
+  autoTimer=setInterval(()=>{
+   if(!scanRunning)startScan();
+  },interval);
 
-    if (interval > 0) {
+ }
 
-      autoTimer = setInterval(
-        startScan,
-        interval
-      );
-    }
-  });
+});
 
-// =====================================
+// =================================
 // INITIALIZE
-// =====================================
+// =================================
 
 checkBackend();
 
