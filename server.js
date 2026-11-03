@@ -96,37 +96,68 @@ function get(url, headers = {}, timeout = 15000) {
   });
 }
 
-
 // =================================
-// DOWNLOAD INSTRUMENT MASTER
+// DOWNLOAD INSTRUMENT MASTER - FIX
 // =================================
 
-function downloadBuffer(url) {
+function downloadBuffer(url, redirects = 5) {
 
   return new Promise((resolve, reject) => {
 
-    https.get(url, { timeout: 30000 }, r => {
+    const req = https.get(url, {
+      timeout: 30000,
+      headers: {
+        "User-Agent": "SmartMarketScanner/1.0",
+        "Accept": "*/*"
+      }
+    }, res => {
 
-      if (r.statusCode < 200 || r.statusCode >= 300) {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
+
+        const location = res.headers.location;
+
+        if (!location || redirects <= 0) {
+          res.resume();
+          return reject(new Error("Too many redirects"));
+        }
+
+        res.resume();
+
+        const nextUrl = new URL(location, url).toString();
+
+        return resolve(
+          downloadBuffer(nextUrl, redirects - 1)
+        );
+
+      }
+
+      if (res.statusCode !== 200) {
+        res.resume();
         return reject(
-          new Error("Master download failed")
+          new Error("Master download HTTP " + res.statusCode)
         );
       }
 
       const chunks = [];
 
-      r.on("data", c => chunks.push(c));
+      res.on("data", chunk => chunks.push(chunk));
 
-      r.on("end", () => {
+      res.on("end", () => {
         resolve(Buffer.concat(chunks));
       });
 
-    }).on("timeout", function () {
-      this.destroy(new Error("Download timeout"));
-    }).on("error", reject);
+    });
+
+    req.on("timeout", () => {
+      req.destroy(new Error("Download timeout"));
+    });
+
+    req.on("error", reject);
 
   });
+
 }
+
 
 
 // =================================
