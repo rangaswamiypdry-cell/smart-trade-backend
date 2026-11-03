@@ -3,645 +3,700 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMART TRADE INDIA V2</title>
+<title>Smart Trade India - 52 Week Scanner</title>
 
 <style>
-*{box-sizing:border-box}
-
-body{
- margin:0;
- background:#071121;
- color:white;
- font-family:Arial,sans-serif;
- padding-bottom:30px;
+* {
+    box-sizing: border-box;
 }
 
-header{
- background:#122238;
- padding:25px 18px;
- border-bottom:1px solid #293b53;
+body {
+    margin: 0;
+    padding: 14px;
+    background: #0b1220;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
 }
 
-header h1{
- color:#00d6a0;
- font-size:27px;
- margin:0;
+.header {
+    background: linear-gradient(135deg,#123b70,#126b75);
+    padding: 20px;
+    border-radius: 15px;
+    text-align: center;
+    margin-bottom: 15px;
 }
 
-header p{
- color:#a3b2c7;
- font-size:15px;
+.header h2 {
+    margin: 0;
+    font-size: 23px;
 }
 
-.container{
- padding:18px;
+.header p {
+    color: #c9e8ff;
+    font-size: 12px;
 }
 
-.status{
- background:#103128;
- color:#00d6a0;
- padding:18px;
- border-radius:15px;
- margin-bottom:20px;
- font-size:16px;
+.status {
+    text-align: center;
+    font-size: 12px;
+    color: #9caec5;
+    margin-bottom: 12px;
 }
 
-.stats{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:12px;
+.controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
 }
 
-.stat{
- background:#15253b;
- border:2px solid #263a53;
- border-radius:20px;
- padding:25px;
+button, select {
+    border: none;
+    border-radius: 9px;
+    padding: 13px 8px;
+    font-weight: bold;
+    font-size: 13px;
 }
 
-.stat small{
- color:#9aaac0;
- font-size:15px;
+select {
+    flex: 1;
+    background: #1e293b;
+    color: white;
 }
 
-.stat h2{
- margin:15px 0 0;
- font-size:35px;
+button {
+    background: #00b894;
+    color: white;
+    cursor: pointer;
 }
 
-.blue{color:#50a9ff}
-.green{color:#00d6a0}
-.red{color:#ff5279}
-.yellow{color:#ffce57}
-
-button{
- border:0;
- border-radius:14px;
- padding:18px;
- font-size:18px;
- font-weight:bold;
- cursor:pointer;
+.refresh {
+    background: #2563eb;
 }
 
-.scan{
- width:100%;
- background:#00bd8b;
- color:#061b19;
- margin:22px 0;
- font-size:22px;
- padding:23px;
+.summary {
+    display: grid;
+    grid-template-columns: repeat(2,1fr);
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
-.search{
- width:100%;
- padding:20px;
- background:#15253b;
- border:2px solid #293d57;
- border-radius:15px;
- color:white;
- font-size:17px;
- margin-bottom:20px;
+.box {
+    background: #172338;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #293b55;
 }
 
-.filters{
- display:flex;
- flex-wrap:wrap;
- gap:10px;
- margin-bottom:25px;
+.box small {
+    color: #aabbd0;
 }
 
-.filter{
- background:#263951;
- color:white;
+.box h2 {
+    margin: 8px 0 0;
+    font-size: 25px;
 }
 
-.filter.active{
- background:#00b88b;
+.green {
+    color: #00e6a0;
 }
 
-.section-title{
- font-size:23px;
- margin:25px 0 18px;
+.red {
+    color: #ff6262;
 }
 
-.card{
- background:#15253b;
- border:2px solid #263b56;
- border-radius:22px;
- padding:22px;
- margin-bottom:18px;
+.yellow {
+    color: #ffc857;
 }
 
-.card-head{
- display:flex;
- justify-content:space-between;
- align-items:center;
+.tabs {
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    margin-bottom: 15px;
 }
 
-.card-head h2{
- font-size:25px;
- margin:0;
+.tabs button {
+    background: #26364e;
+    white-space: nowrap;
 }
 
-.badge{
- background:#463a19;
- color:#ffd45e;
- padding:12px;
- border-radius:10px;
- font-weight:bold;
+.tabs button.active {
+    background: #087f5b;
 }
 
-.badge.buy{
- background:#064b3c;
- color:#00e2a4;
+.search {
+    width: 100%;
+    padding: 13px;
+    border-radius: 9px;
+    border: 1px solid #34465f;
+    background: #172338;
+    color: white;
+    margin-bottom: 14px;
 }
 
-.badge.sell{
- background:#511d32;
- color:#ff6385;
+.stock {
+    background: #172338;
+    border: 1px solid #30415a;
+    border-radius: 13px;
+    padding: 15px;
+    margin-bottom: 13px;
 }
 
-.price{
- font-size:34px;
- font-weight:bold;
- margin:22px 0;
+.stock-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
 }
 
-.metrics{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:12px;
+.stock-name {
+    font-size: 17px;
+    font-weight: bold;
 }
 
-.metric{
- background:#0c192c;
- border-radius:14px;
- padding:17px;
- min-width:0;
+.badge {
+    font-size: 11px;
+    font-weight: bold;
+    padding: 7px 9px;
+    border-radius: 7px;
 }
 
-.metric small{
- display:block;
- color:#91a3ba;
- margin-bottom:10px;
- font-size:14px;
+.strong {
+    background: #064e3b;
+    color: #4dffb0;
 }
 
-.metric strong{
- font-size:19px;
- overflow-wrap:anywhere;
+.watch {
+    background: #59410a;
+    color: #ffd166;
 }
 
-.footer{
- text-align:center;
- color:#8494aa;
- margin-top:45px;
- line-height:1.6;
+.wait {
+    background: #344054;
+    color: #cbd5e1;
 }
 
-.empty{
- background:#15253b;
- padding:35px 10px;
- text-align:center;
- border-radius:15px;
- color:#9baac0;
- font-size:19px;
+.stock-info {
+    display: grid;
+    grid-template-columns: repeat(2,1fr);
+    gap: 12px;
 }
 
-@media(max-width:380px){
- .stat{padding:17px}
- .metric{padding:12px}
- .price{font-size:28px}
+.info {
+    background: #101b2c;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.info small {
+    display: block;
+    color: #94a8c1;
+    font-size: 11px;
+    margin-bottom: 5px;
+}
+
+.info strong {
+    font-size: 14px;
+}
+
+.target {
+    color: #00e6a0;
+}
+
+.stop {
+    color: #ff7070;
+}
+
+.high {
+    color: #ffd166;
+}
+
+.footer {
+    text-align: center;
+    color: #71839d;
+    font-size: 11px;
+    margin: 20px 0;
+}
+
+.loading {
+    text-align: center;
+    padding: 30px;
+    color: #64b5ff;
+}
+
+.error {
+    color: #ff7070;
+    text-align: center;
+    padding: 15px;
+}
+
+@media(min-width:700px) {
+    body {
+        max-width: 900px;
+        margin: auto;
+    }
+
+    .stock-info {
+        grid-template-columns: repeat(4,1fr);
+    }
+
+    .summary {
+        grid-template-columns: repeat(4,1fr);
+    }
 }
 </style>
 </head>
 
 <body>
 
-<header>
-<h1>🚀 SMART TRADE INDIA</h1>
-<p>PRO SCANNER V2 | NSE F&O | 5 MINUTE</p>
-</header>
-
-<div class="container">
+<div class="header">
+    <h2>🚀 SMART TRADE INDIA</h2>
+    <p>52 WEEK HIGH MOMENTUM SCANNER V2</p>
+    <p>NSE ALL STOCKS + NSE F&O</p>
+</div>
 
 <div class="status" id="status">
-🟡 Connecting to Server...
+    Connecting to scanner...
 </div>
 
-<div class="stats">
+<div class="controls">
 
-<div class="stat">
-<small>TOTAL STOCKS</small>
-<h2 class="blue" id="total">0</h2>
-</div>
+    <select id="market">
+        <option value="ALL">NSE ALL STOCKS</option>
+        <option value="FNO">NSE F&O STOCKS</option>
+    </select>
 
-<div class="stat">
-<small>STRONG BUY</small>
-<h2 class="green" id="buys">0</h2>
-</div>
-
-<div class="stat">
-<small>STRONG SELL</small>
-<h2 class="red" id="sells">0</h2>
-</div>
-
-<div class="stat">
-<small>BTST</small>
-<h2 class="yellow" id="btst">0</h2>
-</div>
+    <button class="refresh" onclick="refreshScanner()">
+        ↻ REFRESH
+    </button>
 
 </div>
 
-<button class="scan" id="scanBtn" onclick="startScan()">
-🔄 START LIVE SCAN
-</button>
+<div class="summary">
+
+    <div class="box">
+        <small>Total Scanned</small>
+        <h2 id="total">0</h2>
+    </div>
+
+    <div class="box">
+        <small>STRONG BUY</small>
+        <h2 class="green" id="strong">0</h2>
+    </div>
+
+    <div class="box">
+        <small>BUY WATCH</small>
+        <h2 class="yellow" id="watch">0</h2>
+    </div>
+
+    <div class="box">
+        <small>WAIT</small>
+        <h2 id="wait">0</h2>
+    </div>
+
+</div>
+
+<div class="tabs">
+
+    <button class="active" onclick="setFilter('ALL',this)">
+        ALL SIGNALS
+    </button>
+
+    <button onclick="setFilter('STRONG BUY',this)">
+        STRONG BUY
+    </button>
+
+    <button onclick="setFilter('BUY WATCH',this)">
+        BUY WATCH
+    </button>
+
+    <button onclick="setFilter('WAIT',this)">
+        WAIT
+    </button>
+
+    <button onclick="setFilter('TOUCH',this)">
+        52W TOUCH
+    </button>
+
+    <button onclick="setFilter('BREAKOUT',this)">
+        BREAKOUT
+    </button>
+
+</div>
 
 <input
-class="search"
-id="search"
-placeholder="🔎 Search Stock Name..."
-oninput="renderStocks()"
+    type="text"
+    id="search"
+    class="search"
+    placeholder="🔍 Search stock name..."
+    oninput="renderStocks()"
 >
 
-<div class="filters">
-
-<button class="filter active" onclick="setFilter('ALL',this)">ALL</button>
-
-<button class="filter" onclick="setFilter('BUY',this)">BUY</button>
-
-<button class="filter" onclick="setFilter('SELL',this)">SELL</button>
-
-<button class="filter" onclick="setFilter('BTST',this)">BTST</button>
-
-<button class="filter" onclick="setFilter('WAIT',this)">WAIT</button>
-
-</div>
-
-<h2 class="section-title" id="sectionTitle">
-📊 All F&O Stocks
-</h2>
-
-<div id="stocks">
-<div class="empty">Press START LIVE SCAN</div>
+<div id="results">
+    <div class="loading">Loading Stocks...</div>
 </div>
 
 <div class="footer">
-SMART TRADE INDIA V2<br>
-Market Data Powered by Upstox API
-</div>
-
+    SMART TRADE INDIA V2<br>
+    Signals are for research purposes only.
+    Verify price and risk before trading.
 </div>
 
 <script>
 
-// =================================
-// BACKEND CONNECTION
-// =================================
+// ==========================================
+// API CONFIGURATION
+// ==========================================
 
 const API_BASE =
 "https://smart-trade-backend-ig6l.onrender.com";
 
 let stocks = [];
+
 let currentFilter = "ALL";
-let scanning = false;
 
-// =================================
-// API HELPER
-// =================================
+let loading = false;
 
-async function api(path){
+// ==========================================
+// LOAD SCANNER
+// ==========================================
 
- const response = await fetch(
- API_BASE + path,
- {
-  method:"GET",
-  cache:"no-store"
- }
- );
+async function loadScanner() {
 
- const data = await response.json();
+    if (loading) return;
 
- if(!response.ok){
-  throw new Error(
-   data.error || data.message || "API Error " + response.status
-  );
- }
+    loading = true;
 
- return data;
+    document.getElementById("status").innerText =
+        "Connecting to Upstox scanner...";
+
+    document.getElementById("results").innerHTML =
+        '<div class="loading">Please wait... Scanning stocks</div>';
+
+    const market =
+        document.getElementById("market").value;
+
+    try {
+
+        const response = await fetch(
+            API_BASE +
+            "/api/scanner/52week?type=" +
+            market +
+            "&limit=100"
+        );
+
+        if (!response.ok) {
+            throw new Error("Server Error: " + response.status);
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || "Scanner failed");
+        }
+
+        stocks = data.data || [];
+
+        document.getElementById("total").innerText =
+            data.totalScanned || 0;
+
+        document.getElementById("strong").innerText =
+            data.strongBuy || 0;
+
+        document.getElementById("watch").innerText =
+            data.buyWatch || 0;
+
+        document.getElementById("wait").innerText =
+            data.wait || 0;
+
+        document.getElementById("status").innerText =
+            "✅ Connected | Last Scan: " +
+            new Date(data.updatedAt).toLocaleString("en-IN");
+
+        renderStocks();
+
+    } catch(error) {
+
+        document.getElementById("status").innerText =
+            "❌ Connection Failed";
+
+        document.getElementById("results").innerHTML =
+            '<div class="error">' +
+            error.message +
+            '<br><br>Check Render server and Upstox token.' +
+            '</div>';
+
+    } finally {
+
+        loading = false;
+
+    }
 }
 
-// =================================
-// SERVER STATUS
-// =================================
+// ==========================================
+// REFRESH SCANNER
+// ==========================================
 
-async function checkServer(){
+async function refreshScanner() {
 
- try{
+    if (loading) return;
 
-  const data = await api("/health");
+    document.getElementById("status").innerText =
+        "Refreshing scanner...";
 
-  if(!data.success){
-   throw new Error("Server unavailable");
-  }
+    try {
 
-  document.getElementById("status").innerHTML =
-  "🟢 SERVER ONLINE | Instruments: " +
-  data.instruments;
+        const response = await fetch(
+            API_BASE + "/api/scanner/refresh"
+        );
 
- }catch(error){
+        if (!response.ok) {
+            throw new Error("Refresh failed");
+        }
 
-  document.getElementById("status").innerHTML =
-  "🔴 SERVER ERROR: " + error.message;
+        await loadScanner();
 
- }
+    } catch(error) {
 
+        document.getElementById("status").innerText =
+            "Refresh failed: " + error.message;
+
+    }
 }
 
-// =================================
-// START SCANNER
-// =================================
+// ==========================================
+// FILTER BUTTONS
+// ==========================================
 
-async function startScan(){
+function setFilter(filter, button) {
 
- if(scanning) return;
+    currentFilter = filter;
 
- scanning = true;
+    document.querySelectorAll(".tabs button")
+        .forEach(btn => btn.classList.remove("active"));
 
- const btn = document.getElementById("scanBtn");
+    button.classList.add("active");
 
- btn.disabled = true;
- btn.innerText = "⏳ SCANNING...";
-
- document.getElementById("status").innerText =
- "🟡 Scanning NSE F&O stocks...";
-
- try{
-
-  const data = await api("/api/scan");
-
-  if(!data.success){
-   throw new Error(data.error || "Scan failed");
-  }
-
-  stocks = Array.isArray(data.signals)
-   ? data.signals
-   : [];
-
-  updateStats();
-
-  renderStocks();
-
-  document.getElementById("status").innerHTML =
-   "🟢 SCAN COMPLETED | Stocks: " + stocks.length;
-
- }catch(error){
-
-  document.getElementById("status").innerHTML =
-   "🔴 SCAN ERROR: " + error.message;
-
-  document.getElementById("stocks").innerHTML =
-   '<div class="empty">' +
-   error.message +
-   '</div>';
-
- }finally{
-
-  scanning = false;
-
-  btn.disabled = false;
-  btn.innerText = "🔄 REFRESH SCANNER";
-
- }
-
+    renderStocks();
 }
 
-// =================================
-// UPDATE COUNTS
-// =================================
-
-function updateStats(){
-
- document.getElementById("total").innerText =
- stocks.length;
-
- document.getElementById("buys").innerText =
- stocks.filter(x =>
- x.signal.includes("BUY")
- ).length;
-
- document.getElementById("sells").innerText =
- stocks.filter(x =>
- x.signal.includes("SELL")
- ).length;
-
- document.getElementById("btst").innerText =
- stocks.filter(x => x.btst).length;
-
-}
-
-// =================================
-// FILTER
-// =================================
-
-function setFilter(filter,button){
-
- currentFilter = filter;
-
- document.querySelectorAll(".filter")
- .forEach(b=>b.classList.remove("active"));
-
- button.classList.add("active");
-
- renderStocks();
-
-}
-
-// =================================
-// FORMAT
-// =================================
-
-function money(value){
-
- return Number(value || 0).toFixed(2);
-
-}
-
-function signalClass(signal){
-
- if(signal.includes("BUY")) return "buy";
-
- if(signal.includes("SELL")) return "sell";
-
- return "";
-
-}
-
-// =================================
+// ==========================================
 // RENDER STOCKS
-// =================================
+// ==========================================
 
-function renderStocks(){
+function renderStocks() {
 
- const search =
- document.getElementById("search")
- .value.toUpperCase();
+    const search =
+        document.getElementById("search")
+        .value.toUpperCase();
 
- let filtered = stocks.filter(x=>{
+    let filtered = stocks.filter(stock => {
 
-  const signal = x.signal || "WAIT";
+        const matchSearch =
+            (stock.symbol || "").toUpperCase().includes(search) ||
+            (stock.name || "").toUpperCase().includes(search);
 
-  const name = (x.symbol || "").toUpperCase();
+        let matchFilter = true;
 
-  const searchMatch = name.includes(search);
+        if (currentFilter === "TOUCH") {
+            matchFilter = stock.touch52Week;
+        }
 
-  let filterMatch = true;
+        else if (currentFilter === "BREAKOUT") {
+            matchFilter = stock.breakout52Week;
+        }
 
-  if(currentFilter==="BUY")
-   filterMatch = signal.includes("BUY");
+        else if (currentFilter !== "ALL") {
+            matchFilter = stock.signal === currentFilter;
+        }
 
-  if(currentFilter==="SELL")
-   filterMatch = signal.includes("SELL");
+        return matchSearch && matchFilter;
 
-  if(currentFilter==="BTST")
-   filterMatch = x.btst === true;
+    });
 
-  if(currentFilter==="WAIT")
-   filterMatch = signal === "WAIT";
+    const container =
+        document.getElementById("results");
 
-  return searchMatch && filterMatch;
+    if (!filtered.length) {
 
- });
+        container.innerHTML =
+            '<div class="loading">No stocks found</div>';
 
- document.getElementById("sectionTitle").innerText =
- currentFilter === "BTST"
- ? "🟡 BTST Stocks"
- : currentFilter === "BUY"
- ? "🟢 Strong Buy Stocks"
- : currentFilter === "SELL"
- ? "🔴 Strong Sell Stocks"
- : currentFilter === "WAIT"
- ? "🟡 Waiting Stocks"
- : "📊 All F&O Stocks";
+        return;
+    }
 
- if(!filtered.length){
+    container.innerHTML = filtered.map(stock => {
 
-  document.getElementById("stocks").innerHTML =
-  '<div class="empty">No Signals Found</div>';
+        let badge = "wait";
 
-  return;
+        if (stock.signal === "STRONG BUY") {
+            badge = "strong";
+        }
 
- }
+        else if (stock.signal === "BUY WATCH") {
+            badge = "watch";
+        }
 
- document.getElementById("stocks").innerHTML =
- filtered.map(stock=>{
+        return `
 
-  const signal = stock.signal || "WAIT";
+        <div class="stock">
 
-  return `
+            <div class="stock-header">
 
-  <div class="card">
+                <div>
+                    <div class="stock-name">
+                        ${escapeHTML(stock.symbol)}
+                    </div>
 
-   <div class="card-head">
+                    <small style="color:#91a7c3">
+                        ${escapeHTML(stock.market || "NSE")}
+                    </small>
+                </div>
 
-    <h2>${stock.symbol || "UNKNOWN"}</h2>
+                <span class="badge ${badge}">
+                    ${escapeHTML(stock.signal)}
+                </span>
 
-    <span class="badge ${signalClass(signal)}">
-     ${signal}
-    </span>
+            </div>
 
-   </div>
+            <div class="stock-info">
 
-   <div class="price">
-    ₹${money(stock.price)}
-    <span style="font-size:17px;color:${
-     stock.changePercent >= 0
-      ? "#00d6a0"
-      : "#ff5279"
-    }">
-     ${stock.changePercent >= 0 ? "+" : ""}
-     ${money(stock.changePercent)}%
-    </span>
-   </div>
+                <div class="info">
+                    <small>Current Price</small>
+                    <strong>₹${format(stock.price)}</strong>
+                </div>
 
-   <div class="metrics">
+                <div class="info">
+                    <small>52 Week High</small>
+                    <strong class="high">
+                        ₹${format(stock.high52)}
+                    </strong>
+                </div>
 
-    ${metric("RSI 14",money(stock.rsi))}
+                <div class="info">
+                    <small>Distance From High</small>
+                    <strong>${format(stock.distance52)}%</strong>
+                </div>
 
-    ${metric("EMA 20","₹"+money(stock.ema20))}
+                <div class="info">
+                    <small>RSI (14)</small>
+                    <strong>${format(stock.RSI)}</strong>
+                </div>
 
-    ${metric("VWAP","₹"+money(stock.vwap))}
+                <div class="info">
+                    <small>EMA 20</small>
+                    <strong>₹${format(stock.EMA20)}</strong>
+                </div>
 
-    ${metric("VOLUME RATIO",money(stock.volumeRatio)+"x")}
+                <div class="info">
+                    <small>Volume Ratio</small>
+                    <strong>${format(stock.volumeRatio)}x</strong>
+                </div>
 
-    ${metric("OI CHANGE",
-      stock.oiChange === null
-       ? "N/A"
-       : money(stock.oiChange)+"%"
-    )}
+                <div class="info">
+                    <small>BUY ENTRY</small>
+                    <strong>₹${format(stock.entry)}</strong>
+                </div>
 
-    ${metric("BREAKOUT",
-      stock.breakout ? "YES" : "NO"
-    )}
+                <div class="info">
+                    <small>TARGET 1</small>
+                    <strong class="target">
+                        ₹${format(stock.target1)}
+                    </strong>
+                </div>
 
-    ${metric("ENTRY","₹"+money(stock.entry))}
+                <div class="info">
+                    <small>TARGET 2</small>
+                    <strong class="target">
+                        ₹${format(stock.target2)}
+                    </strong>
+                </div>
 
-    ${metric("STOP LOSS","₹"+money(stock.stopLoss))}
+                <div class="info">
+                    <small>STOP LOSS</small>
+                    <strong class="stop">
+                        ₹${format(stock.stopLoss)}
+                    </strong>
+                </div>
 
-    ${metric("TARGET","₹"+money(stock.target))}
+                <div class="info">
+                    <small>52W TOUCH</small>
+                    <strong>
+                        ${stock.touch52Week ? "YES" : "NO"}
+                    </strong>
+                </div>
 
-    ${metric("BTST",stock.btst ? "YES" : "NO")}
+                <div class="info">
+                    <small>BREAKOUT</small>
+                    <strong>
+                        ${stock.breakout52Week ? "YES" : "NO"}
+                    </strong>
+                </div>
 
-    ${metric("SUPPORT","₹"+money(stock.support))}
+            </div>
 
-    ${metric("RESISTANCE","₹"+money(stock.resistance))}
+        </div>
 
-   </div>
+        `;
 
-   <div style="
-    margin-top:20px;
-    padding-top:15px;
-    border-top:1px solid #34465e;
-    display:flex;
-    justify-content:space-between;
-    flex-wrap:wrap;
-    gap:10px;
-   ">
-
-    <span>5 MIN CANDLE</span>
-
-    <span style="color:#00d6a0">
-     ${stock.candleConfirmed
-      ? "✅ CONFIRMED"
-      : "⏳ WAITING"}
-    </span>
-
-   </div>
-
-  </div>
-
-  `;
-
- }).join("");
+    }).join("");
 
 }
 
-function metric(label,value){
+// ==========================================
+// SAFE HTML OUTPUT
+// ==========================================
 
- return `
- <div class="metric">
-  <small>${label}</small>
-  <strong>${value}</strong>
- </div>
- `;
+function escapeHTML(value) {
 
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
-// =================================
-// INITIAL SERVER CHECK
-// =================================
+// ==========================================
+// NUMBER FORMAT
+// ==========================================
 
-checkServer();
+function format(value) {
+
+    const number = Number(value);
+
+    return Number.isFinite(number)
+        ? number.toFixed(2)
+        : "--";
+}
+
+// ==========================================
+// MARKET CHANGE
+// ==========================================
+
+document.getElementById("market")
+    .addEventListener("change", () => {
+
+        stocks = [];
+
+        currentFilter = "ALL";
+
+        document.querySelectorAll(".tabs button")
+            .forEach(btn => btn.classList.remove("active"));
+
+        document.querySelector(".tabs button")
+            .classList.add("active");
+
+        loadScanner();
+
+    });
+
+// ==========================================
+// START
+// ==========================================
+
+loadScanner();
 
 </script>
 
