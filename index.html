@@ -3,232 +3,163 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Smart Trade India - Live Swing Scanner</title>
+<title>Smart Trade India V5</title>
 
 <style>
-* {
-    box-sizing: border-box;
+*{box-sizing:border-box}
+
+body{
+ margin:0;
+ background:#07111e;
+ color:#fff;
+ font-family:Arial,sans-serif;
 }
 
-body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: #08111f;
-    color: white;
+header{
+ background:#12243a;
+ padding:18px;
+ border-bottom:2px solid #00d99a;
 }
 
-header {
-    background: #111e32;
-    padding: 25px 10px;
-    text-align: center;
-    border-bottom: 3px solid #168cff;
+header h2{
+ color:#00e5a0;
+ margin:0;
 }
 
-header h2 {
-    color: #00d5ff;
-    margin: 0;
-    font-size: 25px;
+header p{
+ color:#9eafc4;
+ font-size:12px;
 }
 
-header p {
-    color: #aab8ca;
-    margin: 12px 0 0;
+.container{
+ padding:12px;
+ max-width:1500px;
+ margin:auto;
 }
 
-.container {
-    max-width: 1400px;
-    margin: auto;
-    padding: 15px;
+button{
+ background:#00d99a;
+ color:#001b13;
+ border:0;
+ padding:12px 17px;
+ border-radius:7px;
+ font-weight:bold;
+ margin:3px;
+ cursor:pointer;
 }
 
-.status {
-    background: #14243a;
-    padding: 17px;
-    border-radius: 12px;
-    margin-bottom: 18px;
-    font-size: 17px;
+.secondary{
+ background:#263c56;
+ color:white;
 }
 
-.online {
-    color: #00e59b;
+.status{
+ background:#142940;
+ padding:13px;
+ margin:12px 0;
+ border-radius:8px;
+ font-size:13px;
 }
 
-.offline {
-    color: #ff5252;
+.grid{
+ display:grid;
+ grid-template-columns:repeat(2,1fr);
+ gap:10px;
 }
 
-.cards {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
+.card{
+ background:#142940;
+ padding:15px;
+ border:1px solid #29425d;
+ border-radius:9px;
 }
 
-.card {
-    background: #14243a;
-    padding: 22px 8px;
-    border-radius: 15px;
-    text-align: center;
+.card small{color:#aabbd0}
+
+.card h2{
+ margin:9px 0 0;
+ font-size:25px;
 }
 
-.card h3 {
-    color: #9aacc5;
-    font-size: 14px;
+.green{color:#00e5a0}
+.red{color:#ff5368}
+.yellow{color:#ffd166}
+.blue{color:#59baff}
+
+.tabs{
+ display:flex;
+ overflow-x:auto;
+ gap:5px;
+ margin:18px 0;
 }
 
-.card strong {
-    font-size: 32px;
+.tabs button{
+ white-space:nowrap;
+ background:#203750;
+ color:white;
 }
 
-.green {
-    color: #00e59b;
+.tabs button.active{
+ background:#00d99a;
+ color:#001b13;
 }
 
-.red {
-    color: #ff5252;
+.panel{display:none}
+.panel.active{display:block}
+
+.tablebox{
+ overflow-x:auto;
+ background:#142940;
+ border-radius:8px;
+ margin-top:12px;
 }
 
-.blue {
-    color: #00c8ff;
+table{
+ width:100%;
+ min-width:1050px;
+ border-collapse:collapse;
+ font-size:12px;
 }
 
-.controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 15px;
+th{
+ background:#203b57;
+ color:#00e5a0;
+ padding:12px 9px;
 }
 
-button {
-    border: none;
-    padding: 15px 18px;
-    border-radius: 9px;
-    background: #087cff;
-    color: white;
-    font-weight: bold;
-    font-size: 14px;
-    cursor: pointer;
-    flex: 1;
+td{
+ padding:11px 8px;
+ text-align:center;
+ border-bottom:1px solid #29425d;
 }
 
-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.buy{
+ color:#00e5a0;
+ font-weight:bold;
 }
 
-input {
-    width: 100%;
-    padding: 17px;
-    background: #14243a;
-    border: 1px solid #334761;
-    color: white;
-    border-radius: 10px;
-    font-size: 16px;
-    margin-bottom: 15px;
+.sell{
+ color:#ff5368;
+ font-weight:bold;
 }
 
-.message {
-    margin: 15px 0;
-    font-size: 15px;
+.watch{color:#ffd166}
+
+h3{color:#00e5a0}
+
+input{
+ accent-color:#00d99a;
 }
 
-.loading {
-    color: #00d5ff;
+footer{
+ text-align:center;
+ padding:25px;
+ color:#879bb0;
+ font-size:12px;
 }
 
-.error {
-    color: #ff5252;
-}
-
-.tablebox {
-    overflow-x: auto;
-    background: #14243a;
-    border-radius: 12px;
-    margin-top: 15px;
-}
-
-table {
-    width: 100%;
-    min-width: 1250px;
-    border-collapse: collapse;
-}
-
-th {
-    background: #203653;
-    padding: 17px 12px;
-    color: #00d5ff;
-    white-space: nowrap;
-}
-
-td {
-    padding: 15px 12px;
-    text-align: center;
-    border-bottom: 1px solid #293c54;
-    font-size: 14px;
-    white-space: nowrap;
-}
-
-tbody tr:hover {
-    background: #203653;
-}
-
-.badge {
-    padding: 7px 10px;
-    border-radius: 6px;
-    font-weight: bold;
-}
-
-.strong {
-    background: #075b39;
-    color: #00ff9d;
-}
-
-.buy {
-    background: #164d8c;
-    color: #65c5ff;
-}
-
-.watch {
-    background: #5c4610;
-    color: #ffdb70;
-}
-
-.price {
-    color: #ffffff;
-    font-weight: bold;
-}
-
-.live {
-    color: #00e59b;
-    font-size: 12px;
-}
-
-footer {
-    text-align: center;
-    padding: 25px;
-    color: #8293a9;
-}
-
-@media(max-width:600px) {
-
-    header h2 {
-        font-size: 21px;
-    }
-
-    .card {
-        padding: 20px 5px;
-    }
-
-    .card strong {
-        font-size: 29px;
-    }
-
-    button {
-        font-size: 12px;
-        padding: 15px 8px;
-    }
-
+@media(min-width:700px){
+ .grid{grid-template-columns:repeat(4,1fr)}
 }
 </style>
 </head>
@@ -236,591 +167,685 @@ footer {
 <body>
 
 <header>
-
-<h2>SMART TRADE INDIA</h2>
-
-<p>NSE F&O SHORT TERM SWING SCANNER V4</p>
-
-<p>1–5 DAYS LIVE MOMENTUM STOCK FINDER</p>
-
+<h2>⚡ SMART TRADE INDIA</h2>
+<p>INSTITUTIONAL MOMENTUM SCANNER V5</p>
+<p>NSE F&O STOCKS | FUTURES | OPTIONS</p>
 </header>
 
 <div class="container">
 
+<div>
+<button onclick="startScan()">🔍 START SCAN</button>
+<button class="secondary" onclick="refreshData()">↻ REFRESH</button>
+
+<label>
+<input type="checkbox" id="auto">
+AUTO SCAN
+</label>
+</div>
+
+<div class="status" id="status">
+🟡 Connecting to Render Server...
+</div>
+
+<div class="grid">
+
+<div class="card">
+<small>STRONG BUY</small>
+<h2 class="green" id="buyCount">0</h2>
+</div>
+
+<div class="card">
+<small>STRONG SELL</small>
+<h2 class="red" id="sellCount">0</h2>
+</div>
+
+<div class="card">
+<small>LONG BUILDUP</small>
+<h2 class="green" id="longCount">0</h2>
+</div>
+
+<div class="card">
+<small>SHORT BUILDUP</small>
+<h2 class="red" id="shortCount">0</h2>
+</div>
+
+<div class="card">
+<small>VOLUME BLAST</small>
+<h2 class="yellow" id="volumeCount">0</h2>
+</div>
+
+<div class="card">
+<small>SUDDEN MOMENTUM</small>
+<h2 class="blue" id="momentumCount">0</h2>
+</div>
+
+<div class="card">
+<small>CALL BUY</small>
+<h2 class="green" id="callCount">0</h2>
+</div>
+
+<div class="card">
+<small>PUT BUY</small>
+<h2 class="red" id="putCount">0</h2>
+</div>
+
+</div>
+
 <div class="status">
-
-Backend Status:
-<strong id="status" class="offline">
-CHECKING...
-</strong>
-
+Total Stocks: <b id="totalStocks">0</b>
+&nbsp; | &nbsp;
+Total Options: <b id="totalOptions">0</b>
 <br><br>
+Last Scan: <span id="lastScan">Waiting</span>
+</div>
 
-Market Data:
-<strong id="marketStatus" class="blue">
-WAITING
-</strong>
+<div class="tabs">
+
+<button class="active" onclick="tab('all',this)">ALL STOCKS</button>
+
+<button onclick="tab('buy',this)">STRONG BUY</button>
+
+<button onclick="tab('sell',this)">STRONG SELL</button>
+
+<button onclick="tab('long',this)">LONG BUILDUP</button>
+
+<button onclick="tab('short',this)">SHORT BUILDUP</button>
+
+<button onclick="tab('volume',this)">VOLUME BLAST</button>
+
+<button onclick="tab('options',this)">ALL OPTIONS</button>
+
+<button onclick="tab('call',this)">CALL BUY</button>
+
+<button onclick="tab('put',this)">PUT BUY</button>
+
+<button onclick="tab('order',this)">ORDER BLOCK</button>
 
 </div>
 
-<!-- DASHBOARD -->
-
-<div class="cards">
-
-<div class="card">
-<h3>TOTAL F&O STOCKS</h3>
-<strong id="total">0</strong>
+<div id="all" class="panel active">
+<h3>📊 ALL NSE F&O STOCKS</h3>
+<div id="allTable"></div>
 </div>
 
-<div class="card">
-<h3>SCANNED</h3>
-<strong id="scanned">0</strong>
+<div id="buy" class="panel">
+<h3 class="green">🟢 STRONG BUY STOCKS</h3>
+<div id="buyTable"></div>
 </div>
 
-<div class="card">
-<h3>STRONG BUY</h3>
-<strong class="green" id="strongBuy">0</strong>
+<div id="sell" class="panel">
+<h3 class="red">🔴 STRONG SELL STOCKS</h3>
+<div id="sellTable"></div>
 </div>
 
-<div class="card">
-<h3>BUY SIGNALS</h3>
-<strong class="blue" id="buy">0</strong>
+<div id="long" class="panel">
+<h3 class="green">LONG BUILDUP</h3>
+<div id="longTable"></div>
 </div>
 
+<div id="short" class="panel">
+<h3 class="red">SHORT BUILDUP</h3>
+<div id="shortTable"></div>
 </div>
 
-<!-- BUTTONS -->
-
-<div class="controls">
-
-<button onclick="checkServer()">
-CHECK SERVER
-</button>
-
-<button onclick="startScan()">
-START SCANNER
-</button>
-
-<button onclick="refreshLive()">
-LIVE REFRESH
-</button>
-
+<div id="volume" class="panel">
+<h3 class="yellow">💥 VOLUME BLAST</h3>
+<div id="volumeTable"></div>
 </div>
 
-<div class="controls">
-
-<button onclick="nextPage()" id="nextBtn" disabled>
-NEXT 100 STOCKS
-</button>
-
-<button onclick="previousPage()" id="prevBtn" disabled>
-PREVIOUS
-</button>
-
+<div id="options" class="panel">
+<h3>OPTION MOMENTUM</h3>
+<div id="optionsTable"></div>
 </div>
 
-<!-- SEARCH -->
+<div id="call" class="panel">
+<h3 class="green">CALL BUY OPTIONS</h3>
+<div id="callTable"></div>
+</div>
 
-<input
-type="text"
-id="search"
-placeholder="Search Stock Name..."
-oninput="renderTable()"
->
+<div id="put" class="panel">
+<h3 class="red">PUT BUY OPTIONS</h3>
+<div id="putTable"></div>
+</div>
 
-<div id="message" class="message"></div>
-
-<!-- RESULTS -->
-
-<div class="tablebox">
-
-<table>
-
-<thead>
-
-<tr>
-<th>STOCK</th>
-<th>SIGNAL</th>
-<th>SCORE</th>
-<th>LIVE PRICE</th>
-<th>ENTRY</th>
-<th>STOP LOSS</th>
-<th>TARGET 1</th>
-<th>TARGET 2</th>
-<th>RSI</th>
-<th>EMA20</th>
-<th>EMA50</th>
-<th>VOLUME RATIO</th>
-<th>5 DAY CHANGE</th>
-<th>BREAKOUT</th>
-</tr>
-
-</thead>
-
-<tbody id="results">
-
-<tr>
-<td colspan="14">
-CLICK START SCANNER
-</td>
-</tr>
-
-</tbody>
-
-</table>
-
+<div id="order" class="panel">
+<h3>ORDER BLOCK</h3>
+<div id="orderTable"></div>
 </div>
 
 </div>
 
 <footer>
-
-SMART TRADE INDIA © 2026
-
-<br><br>
-
-LIVE DATA: UPSTOX API V3
-
-<br>
-
-1–5 DAYS SWING SCANNER
-
+SMART TRADE INDIA V5<br>
+Analytical signals only. Trading involves risk.
 </footer>
 
 <script>
 
 // ======================================
-// BACKEND URL
+// BACKEND
 // ======================================
 
 const API =
 "https://smart-trade-backend-ig6l.onrender.com";
 
-// ======================================
-// GLOBAL VARIABLES
-// ======================================
+let stocks=[];
+let options=[];
 
-let offset = 0;
-
-let limit = 100;
-
-let nextOffset = null;
-
-let previousOffset = null;
-
-let signals = [];
-
-let scanning = false;
+let busy=false;
 
 // ======================================
-// SAFE DISPLAY
+// API REQUEST
 // ======================================
 
-function safe(value, digits = 2) {
+async function api(path){
 
-    if (
-        value === null ||
-        value === undefined ||
-        value === ""
-    ) {
-        return "-";
-    }
+ const response=await fetch(API+path,{
+  method:"GET",
+  cache:"no-store",
+  headers:{
+   "Accept":"application/json"
+  }
+ });
 
-    const number = Number(value);
+ const data=await response.json();
 
-    return Number.isFinite(number)
-        ? number.toFixed(digits)
-        : "-";
+ if(!response.ok || data.success===false){
+  throw new Error(
+   data.message ||
+   data.error ||
+   "API Error "+response.status
+  );
+ }
 
+ return data;
 }
 
 // ======================================
-// HTML ESCAPE
+// ARRAY NORMALIZER
 // ======================================
 
-function escapeHTML(value) {
+function getArray(data){
 
-    return String(value ?? "").replace(
-        /[&<>"']/g,
-        char => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;"
-        })[char]
-    );
+ if(Array.isArray(data)) return data;
 
+ if(!data || typeof data!=="object") return [];
+
+ const keys=[
+  "stocks",
+  "results",
+  "data",
+  "signals",
+  "options",
+  "items"
+ ];
+
+ for(const key of keys){
+
+  if(Array.isArray(data[key])){
+   return data[key];
+  }
+ }
+
+ return [];
 }
 
 // ======================================
-// SERVER CHECK
+// FORMAT
 // ======================================
 
-async function checkServer() {
+function fmt(v,d=2){
 
-    const status =
-        document.getElementById("status");
+ const n=Number(v);
 
-    status.innerText = "CONNECTING...";
+ return Number.isFinite(n)
+  ? n.toFixed(d)
+  : "-";
+}
 
-    try {
+function signalClass(s){
 
-        const response = await fetch(
-            API + "/health",
-            { cache: "no-store" }
-        );
+ s=String(s||"").toUpperCase();
 
-        const data = await response.json();
+ if(s.includes("BUY")) return "buy";
 
-        if (!response.ok || !data.success) {
-            throw new Error("Server unavailable");
-        }
+ if(s.includes("SELL")) return "sell";
 
-        status.innerText = "ONLINE";
-
-        status.className = "online";
-
-        document.getElementById(
-            "marketStatus"
-        ).innerText =
-            data.upstoxConnected
-                ? "UPSTOX CONNECTED"
-                : "TOKEN MISSING";
-
-    } catch(error) {
-
-        status.innerText = "OFFLINE";
-
-        status.className = "offline";
-
-        document.getElementById(
-            "marketStatus"
-        ).innerText = "CONNECTION ERROR";
-
-    }
-
+ return "watch";
 }
 
 // ======================================
-// START SCANNER
+// STOCK TABLE
 // ======================================
 
-async function startScan() {
+function stockHTML(list){
 
-    if (scanning) return;
+ if(!list.length){
+  return "<p>No stock data available.</p>";
+ }
 
-    scanning = true;
+ let html=`
+ <div class="tablebox">
+ <table>
+ <thead>
+ <tr>
+ <th>STOCK</th>
+ <th>SIGNAL</th>
+ <th>PRICE</th>
+ <th>CHANGE %</th>
+ <th>OI CHANGE %</th>
+ <th>VOLUME</th>
+ <th>VOL RATIO</th>
+ <th>RSI</th>
+ <th>VWAP</th>
+ <th>ADX</th>
+ <th>STRENGTH</th>
+ <th>ENTRY</th>
+ <th>STOP LOSS</th>
+ <th>TARGET 1</th>
+ <th>TARGET 2</th>
+ <th>ORDER BLOCK</th>
+ </tr>
+ </thead>
+ <tbody>`;
 
-    const message =
-        document.getElementById("message");
+ list.forEach(s=>{
 
-    const button =
-        document.querySelector(
-            'button[onclick="startScan()"]'
-        );
+ const ob=s.orderBlock?.type ||
+ s.orderBlock || "-";
 
-    button.disabled = true;
+ html+=`
+ <tr>
+ <td>${s.symbol||s.trading_symbol||"-"}</td>
 
-    message.innerHTML =
-        '<span class="loading">SCANNING NSE F&O STOCKS...</span>';
+ <td class="${signalClass(s.signal)}">
+ ${s.signal||"WATCH"}
+ </td>
 
-    try {
+ <td>${fmt(s.price)}</td>
 
-        const url =
-            API +
-            "/api/swing/scan?offset=" +
-            offset +
-            "&limit=" +
-            limit;
+ <td>${fmt(s.priceChange)}%</td>
 
-        const response = await fetch(
-            url,
-            { cache: "no-store" }
-        );
+ <td>${fmt(s.oiChange)}%</td>
 
-        const data = await response.json();
+ <td>${fmt(s.volume,0)}</td>
 
-        if (!response.ok || !data.success) {
+ <td>${fmt(s.volumeRatio)}x</td>
 
-            throw new Error(
-                data.error || "Scanner API Error"
-            );
+ <td>${fmt(s.rsi)}</td>
 
-        }
+ <td>${fmt(s.vwap)}</td>
 
-        signals = Array.isArray(data.signals)
-            ? data.signals
-            : [];
+ <td>${fmt(s.adx)}</td>
 
-        nextOffset = data.nextOffset;
+ <td>${fmt(s.strength,0)}/100</td>
 
-        previousOffset = data.previousOffset;
+ <td>${fmt(s.entry)}</td>
 
-        // DASHBOARD
+ <td>${fmt(s.stopLoss)}</td>
 
-        document.getElementById(
-            "total"
-        ).innerText =
-            data.totalFnoStocks || 0;
+ <td>${fmt(s.target1)}</td>
 
-        document.getElementById(
-            "scanned"
-        ).innerText =
-            data.scanned || 0;
+ <td>${fmt(s.target2)}</td>
 
-        document.getElementById(
-            "strongBuy"
-        ).innerText =
-            data.strongBuy || 0;
+ <td>${ob}</td>
+ </tr>`;
+ });
 
-        document.getElementById(
-            "buy"
-        ).innerText =
-            data.buy || 0;
+ html+=`</tbody></table></div>`;
 
-        // MARKET STATUS
-
-        document.getElementById(
-            "marketStatus"
-        ).innerText =
-            "LIVE PRICE RECEIVED";
-
-        // TABLE
-
-        renderTable();
-
-        message.innerHTML =
-            '<span class="green">SCAN COMPLETED SUCCESSFULLY</span>' +
-            '<br><br>Stocks Scanned: ' +
-            (data.scanned || 0) +
-            ' | Signals: ' +
-            signals.length;
-
-        // PAGINATION
-
-        document.getElementById(
-            "nextBtn"
-        ).disabled =
-            nextOffset === null;
-
-        document.getElementById(
-            "prevBtn"
-        ).disabled =
-            previousOffset === null;
-
-        checkServer();
-
-    } catch(error) {
-
-        message.innerHTML =
-            '<span class="error">' +
-            escapeHTML(error.message) +
-            '</span>';
-
-        document.getElementById(
-            "marketStatus"
-        ).innerText = "DATA ERROR";
-
-    } finally {
-
-        scanning = false;
-
-        button.disabled = false;
-
-    }
-
+ return html;
 }
 
 // ======================================
-// LIVE PRICE REFRESH
+// OPTIONS TABLE
 // ======================================
 
-async function refreshLive() {
+function optionHTML(list){
 
-    if (scanning) return;
+ if(!list.length){
+  return "<p>No option data available.</p>";
+ }
 
-    document.getElementById(
-        "message"
-    ).innerHTML =
-        '<span class="loading">REFRESHING LIVE MARKET DATA...</span>';
+ let html=`
+ <div class="tablebox">
+ <table>
+ <thead>
+ <tr>
+ <th>STOCK</th>
+ <th>OPTION SYMBOL</th>
+ <th>TYPE</th>
+ <th>STRIKE</th>
+ <th>EXPIRY</th>
+ <th>PREMIUM</th>
+ <th>CHANGE %</th>
+ <th>OI CHANGE %</th>
+ <th>VOLUME</th>
+ <th>DELTA</th>
+ <th>IV</th>
+ <th>SPREAD %</th>
+ <th>SIGNAL</th>
+ </tr>
+ </thead>
+ <tbody>`;
 
-    await startScan();
+ list.forEach(o=>{
 
+ html+=`
+ <tr>
+ <td>${o.stock||"-"}</td>
+ <td>${o.optionSymbol||o.trading_symbol||"-"}</td>
+ <td>${o.optionType||"-"}</td>
+ <td>${fmt(o.strike,0)}</td>
+ <td>${o.expiry||"-"}</td>
+ <td>${fmt(o.premium)}</td>
+ <td>${fmt(o.premiumChange)}%</td>
+ <td>${fmt(o.oiChange)}%</td>
+ <td>${fmt(o.volume,0)}</td>
+ <td>${fmt(o.delta)}</td>
+ <td>${fmt(o.iv)}</td>
+ <td>${fmt(o.spread)}%</td>
+ <td class="${signalClass(o.signal)}">${o.signal||"WATCH"}</td>
+ </tr>`;
+ });
+
+ html+=`</tbody></table></div>`;
+
+ return html;
 }
 
 // ======================================
-// RENDER TABLE
+// FILTERS
 // ======================================
 
-function renderTable() {
+function isBuy(s){
 
-    const tbody =
-        document.getElementById("results");
+ return String(s.signal||"")
+ .toUpperCase()==="STRONG BUY";
+}
 
-    const search =
-        document.getElementById("search")
-        .value.trim().toUpperCase();
+function isSell(s){
 
-    const filtered = signals.filter(stock => {
+ return String(s.signal||"")
+ .toUpperCase()==="STRONG SELL";
+}
 
-        return (
+function isLong(s){
 
-            String(stock.symbol || "")
-                .toUpperCase()
-                .includes(search)
+ return s.longBuildup===true;
+}
 
-            ||
+function isShort(s){
 
-            String(stock.name || "")
-                .toUpperCase()
-                .includes(search)
+ return s.shortBuildup===true;
+}
 
-        );
+function isVolume(s){
 
-    });
-
-    if (filtered.length === 0) {
-
-        tbody.innerHTML = `
-        <tr>
-        <td colspan="14">
-        NO MATCHING STOCKS FOUND
-        </td>
-        </tr>`;
-
-        return;
-
-    }
-
-    tbody.innerHTML = filtered.map(stock => {
-
-        let badge = "watch";
-
-        if (stock.signal === "STRONG BUY") {
-
-            badge = "strong";
-
-        } else if (stock.signal === "BUY") {
-
-            badge = "buy";
-
-        }
-
-        const price =
-            safe(stock.price);
-
-        return `
-
-        <tr>
-
-        <td>
-        <b>${escapeHTML(stock.symbol)}</b>
-        </td>
-
-        <td>
-        <span class="badge ${badge}">
-        ${escapeHTML(stock.signal)}
-        </span>
-        </td>
-
-        <td>${safe(stock.score, 0)}</td>
-
-        <td class="price">
-        ₹${price}
-        <br>
-        <span class="live">● LIVE</span>
-        </td>
-
-        <td class="green">
-        ₹${safe(stock.entry)}
-        </td>
-
-        <td class="red">
-        ₹${safe(stock.stopLoss)}
-        </td>
-
-        <td class="green">
-        ₹${safe(stock.target1)}
-        </td>
-
-        <td class="green">
-        ₹${safe(stock.target2)}
-        </td>
-
-        <td>${safe(stock.rsi)}</td>
-
-        <td>${safe(stock.ema20)}</td>
-
-        <td>${safe(stock.ema50)}</td>
-
-        <td>
-        ${safe(stock.volumeRatio)}x
-        </td>
-
-        <td class="${
-            Number(stock.fiveDayChange) >= 0
-            ? "green"
-            : "red"
-        }">
-        ${safe(stock.fiveDayChange)}%
-        </td>
-
-        <td class="${
-            stock.breakout
-            ? "green"
-            : "red"
-        }">
-        ${stock.breakout ? "YES" : "NO"}
-        </td>
-
-        </tr>
-
-        `;
-
-    }).join("");
-
+ return s.volumeBlast===true;
 }
 
 // ======================================
-// NEXT PAGE
+// RENDER DASHBOARD
 // ======================================
 
-async function nextPage() {
+function render(){
 
-    if (
-        nextOffset === null ||
-        scanning
-    ) return;
+ const buy=stocks.filter(isBuy);
 
-    offset = nextOffset;
+ const sell=stocks.filter(isSell);
 
-    await startScan();
+ const long=stocks.filter(isLong);
 
+ const short=stocks.filter(isShort);
+
+ const volume=stocks.filter(isVolume);
+
+ const sudden=stocks.filter(s=>
+  s.volumeBlast &&
+  Number(s.priceChange)>0.5
+ );
+
+ const call=options.filter(o=>
+  o.signal==="CALL BUY"
+ );
+
+ const put=options.filter(o=>
+  o.signal==="PUT BUY"
+ );
+
+ const order=stocks.filter(s=>
+  s.orderBlock
+ );
+
+ document.getElementById("buyCount")
+ .textContent=buy.length;
+
+ document.getElementById("sellCount")
+ .textContent=sell.length;
+
+ document.getElementById("longCount")
+ .textContent=long.length;
+
+ document.getElementById("shortCount")
+ .textContent=short.length;
+
+ document.getElementById("volumeCount")
+ .textContent=volume.length;
+
+ document.getElementById("momentumCount")
+ .textContent=sudden.length;
+
+ document.getElementById("callCount")
+ .textContent=call.length;
+
+ document.getElementById("putCount")
+ .textContent=put.length;
+
+ document.getElementById("totalStocks")
+ .textContent=stocks.length;
+
+ document.getElementById("totalOptions")
+ .textContent=options.length;
+
+ document.getElementById("lastScan")
+ .textContent=new Date().toLocaleString();
+
+ document.getElementById("allTable")
+ .innerHTML=stockHTML(stocks);
+
+ document.getElementById("buyTable")
+ .innerHTML=stockHTML(buy);
+
+ document.getElementById("sellTable")
+ .innerHTML=stockHTML(sell);
+
+ document.getElementById("longTable")
+ .innerHTML=stockHTML(long);
+
+ document.getElementById("shortTable")
+ .innerHTML=stockHTML(short);
+
+ document.getElementById("volumeTable")
+ .innerHTML=stockHTML(volume);
+
+ document.getElementById("orderTable")
+ .innerHTML=stockHTML(order);
+
+ document.getElementById("optionsTable")
+ .innerHTML=optionHTML(options);
+
+ document.getElementById("callTable")
+ .innerHTML=optionHTML(call);
+
+ document.getElementById("putTable")
+ .innerHTML=optionHTML(put);
 }
 
 // ======================================
-// PREVIOUS PAGE
+// START SCAN
 // ======================================
 
-async function previousPage() {
+async function startScan(){
 
-    if (
-        previousOffset === null ||
-        scanning
-    ) return;
+ if(busy) return;
 
-    offset = previousOffset;
+ busy=true;
 
-    await startScan();
+ document.getElementById("status")
+ .textContent="🟡 Scanning NSE F&O stocks...";
 
+ try{
+
+  // Actual route from your V5 backend
+  const stockData=await api(
+   "/api/options/nse-stocks/scan"
+  );
+
+  stocks=getArray(stockData);
+
+  // Actual options route from your V5 backend
+  const optionData=await api(
+   "/api/options/auto-scan"
+  );
+
+  options=getArray(optionData);
+
+  render();
+
+  document.getElementById("status")
+  .textContent="🟢 Scan completed successfully";
+
+ }catch(error){
+
+  document.getElementById("status")
+  .textContent="❌ "+error.message;
+
+ }finally{
+
+  busy=false;
+
+ }
 }
 
 // ======================================
-// INITIAL CONNECTION
+// REFRESH
 // ======================================
 
-checkServer();
+async function refreshData(){
+
+ if(busy) return;
+
+ busy=true;
+
+ document.getElementById("status")
+ .textContent="🟡 Loading market data...";
+
+ try{
+
+  const data=await api(
+   "/api/market/full-quotes"
+  );
+
+  const arr=getArray(data);
+
+  if(arr.length){
+
+   stocks=arr;
+
+   render();
+  }
+
+  document.getElementById("status")
+  .textContent="🟢 Market data refreshed";
+
+ }catch(error){
+
+  document.getElementById("status")
+  .textContent="❌ "+error.message;
+
+ }finally{
+
+  busy=false;
+
+ }
+}
+
+// ======================================
+// TABS
+// ======================================
+
+function tab(id,btn){
+
+ document.querySelectorAll(".panel")
+ .forEach(p=>p.classList.remove("active"));
+
+ document.getElementById(id)
+ .classList.add("active");
+
+ document.querySelectorAll(".tabs button")
+ .forEach(b=>b.classList.remove("active"));
+
+ btn.classList.add("active");
+}
+
+// ======================================
+// AUTO SCAN
+// ======================================
+
+let timer=null;
+
+document.getElementById("auto")
+.addEventListener("change",function(){
+
+ if(this.checked){
+
+  timer=setInterval(()=>{
+
+   if(!document.hidden){
+    startScan();
+   }
+
+  },300000);
+
+  document.getElementById("status")
+  .textContent="🟢 AUTO SCAN ON - 5 Minutes";
+
+ }else{
+
+  clearInterval(timer);
+
+  document.getElementById("status")
+  .textContent="🟡 AUTO SCAN OFF";
+
+ }
+
+});
+
+// ======================================
+// SERVER CONNECTION
+// ======================================
+
+async function init(){
+
+ try{
+
+  const data=await api("/health");
+
+  document.getElementById("status")
+  .textContent="🟢 SERVER CONNECTED";
+
+ }catch(error){
+
+  document.getElementById("status")
+  .textContent="❌ SERVER: "+error.message;
+
+ }
+
+}
+
+init();
 
 </script>
 
