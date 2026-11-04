@@ -3,630 +3,657 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Trade India - Swing Scanner</title><style>
-*{box-sizing:border-box}
-
-body{
- margin:0;
- padding:15px;
- background:#0b1220;
- color:#fff;
- font-family:Arial,sans-serif;
+* {
+    box-sizing: border-box;
 }
 
-.header{
- background:#17243a;
- padding:18px;
- border-radius:12px;
- margin-bottom:15px;
+body {
+    margin: 0;
+    padding: 15px;
+    background: #0b1120;
+    color: #fff;
+    font-family: Arial, sans-serif;
 }
 
-.header h2{
- margin:0;
- color:#32d6a0;
+header {
+    background: #151f33;
+    padding: 18px;
+    border-radius: 14px;
+    margin-bottom: 15px;
+    border: 1px solid #263650;
 }
 
-.header p{
- color:#aab8ce;
- margin-bottom:0;
- font-size:13px;
+header h2 {
+    margin: 0;
+    color: #38bdf8;
 }
 
-.status{
- margin-top:10px;
- font-size:13px;
- color:#32d6a0;
+header p {
+    color: #94a3b8;
+    font-size: 12px;
 }
 
-.controls{
- display:flex;
- flex-wrap:wrap;
- gap:8px;
- margin-bottom:15px;
+input, select, button {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #172338;
+    color: white;
+    margin: 4px 0;
 }
 
-button,select,input{
- padding:12px;
- border:none;
- border-radius:7px;
- font-size:14px;
+input {
+    width: 100%;
 }
 
-button{
- background:#168b68;
- color:white;
- font-weight:bold;
- cursor:pointer;
+button {
+    cursor: pointer;
+    background: #2563eb;
+    border: none;
+    font-weight: bold;
 }
 
-button.secondary{
- background:#263850;
+button:disabled {
+    opacity: .5;
+    cursor: wait;
 }
 
-input,select{
- background:#1c2b42;
- color:white;
- border:1px solid #40516b;
+.controls {
+    background: #151f33;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
 }
 
-.cards{
- display:grid;
- grid-template-columns:repeat(2,1fr);
- gap:10px;
- margin-bottom:15px;
+.stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
-.card{
- background:#17243a;
- padding:15px;
- border-radius:10px;
+.stat {
+    background: #151f33;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid #263650;
 }
 
-.card small{
- color:#9eacc1;
+.stat small {
+    color: #94a3b8;
 }
 
-.card h2{
- margin:8px 0 0;
- font-size:25px;
+.stat h2 {
+    margin: 8px 0 0;
 }
 
-.green{color:#32d6a0}
-.red{color:#ff6565}
-.yellow{color:#ffcc66}
+.green { color: #22c55e; }
+.red { color: #ef4444; }
+.yellow { color: #facc15; }
+.blue { color: #38bdf8; }
 
-.section-title{
- margin:20px 0 10px;
- font-size:18px;
+.status {
+    padding: 12px;
+    border-radius: 8px;
+    background: #172338;
+    margin-bottom: 15px;
+    font-size: 13px;
+    color: #cbd5e1;
+    overflow-wrap: anywhere;
 }
 
-.stock{
- background:#17243a;
- border:1px solid #2b3c55;
- border-radius:10px;
- padding:15px;
- margin-bottom:12px;
+.stock {
+    background: #151f33;
+    padding: 16px;
+    margin-bottom: 12px;
+    border-radius: 13px;
+    border: 1px solid #263650;
 }
 
-.stock-head{
- display:flex;
- justify-content:space-between;
- align-items:center;
- gap:8px;
+.stock-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
 }
 
-.stock-name{
- font-size:17px;
- font-weight:bold;
+.stock h3 {
+    margin: 0;
+    color: #fff;
 }
 
-.badge{
- padding:6px 9px;
- border-radius:5px;
- font-size:11px;
- font-weight:bold;
+.badge {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: bold;
 }
 
-.strong{background:#075c42;color:#70ffd0}
-.buy{background:#15518b;color:#a8d8ff}
-.wait{background:#6a4a12;color:#ffe09a}
-
-.price{
- font-size:23px;
- font-weight:bold;
- margin:12px 0;
+.strong {
+    background: #14532d;
+    color: #4ade80;
 }
 
-.grid{
- display:grid;
- grid-template-columns:repeat(2,1fr);
- gap:9px;
+.buy {
+    background: #064e3b;
+    color: #34d399;
 }
 
-.item{
- background:#0e192b;
- padding:9px;
- border-radius:6px;
+.wait {
+    background: #713f12;
+    color: #fde047;
 }
 
-.item small{
- display:block;
- color:#94a5bd;
- font-size:11px;
+.avoid {
+    background: #7f1d1d;
+    color: #fca5a5;
 }
 
-.item b{
- display:block;
- margin-top:5px;
- font-size:14px;
+.price {
+    font-size: 23px;
+    font-weight: bold;
+    margin: 15px 0;
 }
 
-.conditions{
- margin-top:12px;
- font-size:12px;
- line-height:1.9;
- color:#b9c9dc;
+.details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
 }
 
-.footer{
- color:#8293aa;
- font-size:11px;
- margin-top:12px;
+.detail {
+    background: #0b1120;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
 }
 
-#message{
- background:#17243a;
- padding:12px;
- border-radius:8px;
- margin-bottom:12px;
- font-size:13px;
+.detail small {
+    color: #94a3b8;
+    display: block;
+    margin-bottom: 5px;
 }
 
-@media(min-width:700px){
- body{max-width:1000px;margin:auto}
- .cards{grid-template-columns:repeat(4,1fr)}
- .grid{grid-template-columns:repeat(4,1fr)}
+.detail b {
+    font-size: 14px;
 }
-</style></head><body><div class="header">
- <h2>📈 SMART TRADE INDIA</h2>
- <p>NSE SHORT TERM SWING SCANNER V3</p>
- <p>1–5 Days | Technical Momentum | Daily Candles</p>
- <div class="status" id="connection">● Connecting...</div>
-</div><div class="controls">
- <button onclick="runScanner()">🔄 SCAN NOW</button> <select id="limit">
-  <option value="50">50 Stocks</option>
-  <option value="100" selected>100 Stocks</option>
-  <option value="200">200 Stocks</option>
-  <option value="300">300 Stocks</option>
- </select> <select id="minScore">
-  <option value="65">Score 65+</option>
-  <option value="70" selected>Score 70+</option>
-  <option value="80">Score 80+</option>
-  <option value="85">Score 85+</option>
- </select><button class="secondary" onclick="nextBatch()">NEXT STOCKS ➜</button>
 
-</div><input
-id="search"
-type="text"
-placeholder="🔍 Search NSE Stock..."
-style="width:100%;margin-bottom:15px"
-oninput="renderStocks()"
+.score {
+    margin-top: 12px;
+    background: #0b1120;
+    height: 8px;
+    border-radius: 10px;
+    overflow: hidden;
+}
 
-«»
+.score div {
+    height: 100%;
+    background: #22c55e;
+}
 
-<div id="message">Waiting for scanner...</div><div class="cards">
- <div class="card">
-  <small>Stocks Checked</small>
-  <h2 id="checked">0</h2>
- </div> <div class="card">
-  <small>STRONG BUY</small>
-  <h2 class="green" id="strongCount">0</h2>
- </div> <div class="card">
-  <small>BUY</small>
-  <h2 class="green" id="buyCount">0</h2>
- </div> <div class="card">
-  <small>WAIT</small>
-  <h2 class="yellow" id="waitCount">0</h2>
- </div>
-</div><h3 class="section-title">🚀 STRONG BUY SIGNALS</h3>
-<div id="strongList"></div><h3 class="section-title">📈 BUY SIGNALS</h3>
-<div id="buyList"></div><h3 class="section-title">📊 ALL SCANNED STOCKS</h3>
-<div id="allList"></div><div class="footer" id="updated">
-Last updated: Not scanned
+.filters {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+}
+
+.filters select {
+    flex: 1;
+    min-width: 130px;
+}
+
+.footer {
+    text-align: center;
+    color: #64748b;
+    font-size: 11px;
+    padding: 20px;
+}
+
+@media(min-width:700px) {
+    .stats {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    #results {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+</style></head><body><header>
+    <h2>🚀 SMART TRADE INDIA</h2>
+    <p>SHORT TERM SWING SCANNER V2 | NSE EQUITY</p>
+    <p>DAILY + 5 MINUTE MOMENTUM ANALYSIS</p>
+</header><div class="controls"><label>Backend Render URL</label>
+
+<input
+    id="apiUrl"
+    type="url"
+    placeholder="https://your-backend.onrender.com"
+>
+
+<button onclick="saveURL()" style="width:100%">
+    SAVE BACKEND URL
+</button>
+
+<div style="display:flex;gap:8px;margin-top:10px">
+
+    <button id="scanBtn"
+        onclick="startScan()"
+        style="flex:1">
+        🔍 START SCAN
+    </button>
+
+    <button onclick="stopAuto()"
+        style="flex:1;background:#dc2626">
+        STOP AUTO
+    </button>
+
+</div>
+
+<div class="filters">
+
+    <select id="signalFilter" onchange="renderStocks()">
+        <option value="ALL">ALL SIGNALS</option>
+        <option value="STRONG BUY">STRONG BUY</option>
+        <option value="BUY">BUY</option>
+        <option value="WAIT">WAIT</option>
+        <option value="AVOID">AVOID</option>
+    </select>
+
+    <select id="sortFilter" onchange="renderStocks()">
+        <option value="score">Highest Score</option>
+        <option value="price">Highest Price</option>
+        <option value="rsi">Highest RSI</option>
+    </select>
+
+</div>
+
+<div style="display:flex;gap:8px">
+
+    <button onclick="previousPage()" style="flex:1">
+        ◀ PREVIOUS
+    </button>
+
+    <button onclick="nextPage()" style="flex:1">
+        NEXT 100 ▶
+    </button>
+
+</div>
+
+<button onclick="enableAuto()"
+    style="width:100%;background:#0891b2;margin-top:8px">
+    ⏱ AUTO REFRESH (5 MIN)
+</button>
+
+</div><div class="stats"><div class="stat">
+    <small>SCANNED</small>
+    <h2 id="total">0</h2>
+</div>
+
+<div class="stat">
+    <small>STRONG BUY</small>
+    <h2 class="green" id="strong">0</h2>
+</div>
+
+<div class="stat">
+    <small>BUY</small>
+    <h2 class="green" id="buy">0</h2>
+</div>
+
+<div class="stat">
+    <small>ERRORS</small>
+    <h2 class="red" id="errors">0</h2>
+</div>
+
+</div><div class="status" id="status">
+    Waiting for scanner connection...
+</div><h3>📊 SWING TRADING SIGNALS</h3><div id="results"></div><div class="footer">
+    SMART TRADE INDIA<br>
+    Daily + 5 Minute Scanner<br>
+    Technical signals are not guaranteed returns.
 </div><script>
 
-// ============================================
-// API CONFIGURATION
-// ============================================
+// ======================================
+// CONFIGURATION
+// ======================================
 
-const API_BASE =
-"https://smart-trade-backend-ig6l.onrender.com";
+let offset = 0;
 
-let allStocks = [];
-let currentOffset = 0;
-let lastScanData = null;
-let loading = false;
+const LIMIT = 100;
 
-// ============================================
-// CONNECTION CHECK
-// ============================================
+let stocks = [];
 
-async function checkConnection(){
+let autoTimer = null;
 
- try{
+let scanning = false;
 
-  const response = await fetch(
-   API_BASE + "/health"
-  );
+const savedURL = localStorage.getItem("swingAPI");
 
-  if(!response.ok) throw new Error("Server error");
+if (savedURL) {
+    document.getElementById("apiUrl").value = savedURL;
+}
 
-  const data = await response.json();
+// ======================================
+// SAVE BACKEND URL
+// ======================================
 
-  document.getElementById("connection").innerHTML =
-   "● SERVER CONNECTED";
+function saveURL() {
 
- }catch(error){
+    const url = document
+        .getElementById("apiUrl")
+        .value.trim()
+        .replace(/\/+$/, "");
 
-  document.getElementById("connection").innerHTML =
-   "● SERVER CONNECTION FAILED";
+    if (!url.startsWith("https://")) {
+        alert("Enter valid HTTPS Render URL");
+        return;
+    }
 
- }
+    localStorage.setItem("swingAPI", url);
+
+    alert("Backend URL Saved Successfully");
+}
+
+// ======================================
+// START SCAN
+// ======================================
+
+async function startScan() {
+
+    if (scanning) return;
+
+    const baseURL = localStorage.getItem("swingAPI");
+
+    if (!baseURL) {
+        alert("First enter and save your Render URL");
+        return;
+    }
+
+    scanning = true;
+
+    const btn = document.getElementById("scanBtn");
+
+    btn.disabled = true;
+
+    btn.innerText = "SCANNING...";
+
+    document.getElementById("status").innerText =
+        "Connecting to Upstox backend...";
+
+    document.getElementById("results").innerHTML = "";
+
+    try {
+
+        const response = await fetch(
+            `${baseURL}/api/swing/scan?offset=${offset}&limit=${LIMIT}`
+        );
+
+        if (!response.ok) {
+            throw new Error("Backend HTTP Error: " + response.status);
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || "Scanner failed");
+        }
+
+        stocks = data.signals || [];
+
+        document.getElementById("total").innerText =
+            data.scanned ?? 0;
+
+        document.getElementById("strong").innerText =
+            data.strongBuy ?? 0;
+
+        document.getElementById("buy").innerText =
+            data.buy ?? 0;
+
+        document.getElementById("errors").innerText =
+            (data.errors || []).length;
+
+        document.getElementById("status").innerText =
+            `Scan Complete | NSE Stocks: ${data.totalNSEStocks} | Scanned: ${data.scanned} | Offset: ${data.offset}`;
+
+        renderStocks();
+
+    } catch(error) {
+
+        document.getElementById("status").innerText =
+            "ERROR: " + error.message;
+
+    } finally {
+
+        scanning = false;
+
+        btn.disabled = false;
+
+        btn.innerText = "🔍 START SCAN";
+    }
+}
+
+// ======================================
+// RENDER STOCKS
+// ======================================
+
+function renderStocks() {
+
+    const container = document.getElementById("results");
+
+    container.innerHTML = "";
+
+    const filter =
+        document.getElementById("signalFilter").value;
+
+    const sort =
+        document.getElementById("sortFilter").value;
+
+    let filtered = stocks.filter(s => {
+
+        return filter === "ALL" || s.signal === filter;
+
+    });
+
+    filtered.sort((a,b) => {
+
+        if (sort === "score") return b.score - a.score;
+
+        if (sort === "price") return b.price - a.price;
+
+        if (sort === "rsi") return b.daily.rsi - a.daily.rsi;
+
+        return 0;
+    });
+
+    if (!filtered.length) {
+
+        container.innerHTML =
+            "<div class='status'>No matching stocks found.</div>";
+
+        return;
+    }
+
+    filtered.forEach(stock => {
+
+        const badge =
+            stock.signal === "STRONG BUY" ? "strong" :
+            stock.signal === "BUY" ? "buy" :
+            stock.signal === "WAIT" ? "wait" : "avoid";
+
+        const card = document.createElement("div");
+
+        card.className = "stock";
+
+        card.innerHTML = `
+
+            <div class="stock-top">
+
+                <h3>${escapeHTML(stock.symbol)}</h3>
+
+                <span class="badge ${badge}">
+                    ${escapeHTML(stock.signal)}
+                </span>
+
+            </div>
+
+            <div style="color:#94a3b8;font-size:11px;margin-top:5px">
+                ${escapeHTML(stock.name || "")}
+            </div>
+
+            <div class="price">
+                ₹${Number(stock.price).toFixed(2)}
+            </div>
+
+            <div class="details">
+
+                <div class="detail">
+                    <small>ENTRY</small>
+                    <b class="blue">₹${stock.entry}</b>
+                </div>
+
+                <div class="detail">
+                    <small>STOP LOSS</small>
+                    <b class="red">₹${stock.stopLoss}</b>
+                </div>
+
+                <div class="detail">
+                    <small>TARGET 1</small>
+                    <b class="green">₹${stock.target1}</b>
+                </div>
+
+                <div class="detail">
+                    <small>TARGET 2</small>
+                    <b class="green">₹${stock.target2}</b>
+                </div>
+
+                <div class="detail">
+                    <small>DAILY RSI</small>
+                    <b>${stock.daily.rsi}</b>
+                </div>
+
+                <div class="detail">
+                    <small>5 MIN RSI</small>
+                    <b>${stock.fiveMinute.rsi}</b>
+                </div>
+
+                <div class="detail">
+                    <small>DAILY EMA 20</small>
+                    <b>${stock.daily.ema20}</b>
+                </div>
+
+                <div class="detail">
+                    <small>DAILY EMA 50</small>
+                    <b>${stock.daily.ema50}</b>
+                </div>
+
+                <div class="detail">
+                    <small>DAILY VOLUME RATIO</small>
+                    <b>${stock.daily.volumeRatio}x</b>
+                </div>
+
+                <div class="detail">
+                    <small>5 MIN VOLUME RATIO</small>
+                    <b>${stock.fiveMinute.volumeRatio}x</b>
+                </div>
+
+            </div>
+
+            <div style="margin-top:15px">
+                <small style="color:#94a3b8">
+                    SIGNAL STRENGTH: ${stock.score}/100
+                </small>
+
+                <div class="score">
+                    <div style="width:${Math.min(100,Math.max(0,stock.score))}%"></div>
+                </div>
+            </div>
+
+            <div style="margin-top:12px;font-size:12px;color:#94a3b8">
+                DAILY TREND: ${escapeHTML(stock.trend)}
+                <br>
+                5 MIN TREND: ${escapeHTML(stock.fiveMinute.trend)}
+                <br>
+                HOLDING: ${escapeHTML(stock.holdingPeriod)}
+            </div>
+
+        `;
+
+        container.appendChild(card);
+
+    });
+}
+
+// ======================================
+// HTML ESCAPE
+// ======================================
+
+function escapeHTML(value) {
+
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
 
 }
 
-// ============================================
-// SCAN
-// ============================================
+// ======================================
+// PAGINATION
+// ======================================
 
-async function runScanner(){
+function nextPage() {
 
- if(loading) return;
+    if (scanning) return;
 
- loading = true;
+    offset += LIMIT;
 
- const limit =
- Number(document.getElementById("limit").value);
+    startScan();
+}
 
- const minScore =
- Number(document.getElementById("minScore").value);
+function previousPage() {
 
- const message =
- document.getElementById("message");
+    if (scanning) return;
 
- message.innerHTML =
- "⏳ Scanning NSE stocks... Please wait.";
+    offset = Math.max(0, offset - LIMIT);
 
- document.getElementById("strongList").innerHTML = "";
- document.getElementById("buyList").innerHTML = "";
- document.getElementById("allList").innerHTML = "";
+    startScan();
+}
 
- try{
+// ======================================
+// AUTO REFRESH
+// ======================================
 
-  const apiURL =
-   `${API_BASE}/api/stocks/swing-scan` +
-   `?limit=${limit}` +
-   `&minScore=${minScore}` +
-   `&offset=${currentOffset}`;
+function enableAuto() {
 
-  const response = await fetch(apiURL);
+    stopAuto();
 
-  const data = await response.json();
+    autoTimer = setInterval(() => {
 
-  if(!response.ok || !data.success){
+        if (!scanning) startScan();
 
-   throw new Error(data.error || "Scanner failed");
+    }, 5 * 60 * 1000);
 
-  }
+    alert("Auto Refresh Enabled: Every 5 Minutes");
+}
 
-  lastScanData = data;
+function stopAuto() {
 
-  allStocks = data.all_results || [];
+    if (autoTimer) {
 
-  document.getElementById("checked").innerText =
-   data.checked ?? 0;
+        clearInterval(autoTimer);
 
-  document.getElementById("strongCount").innerText =
-   data.strong_buy_count ?? 0;
-
-  document.getElementById("buyCount").innerText =
-   data.buy_count ?? 0;
-
-  document.getElementById("waitCount").innerText =
-   data.wait_count ?? 0;
-
-  document.getElementById("strongList").innerHTML =
-   makeStockCards(data.strong_buy || []);
-
-  document.getElementById("buyList").innerHTML =
-   makeStockCards(data.buy || []);
-
-  renderStocks();
-
-  message.innerHTML =
-   `✅ Scan Completed | ${data.checked} stocks checked | ` +
-   `Total NSE stocks: ${data.total_nse_stocks}`;
-
-  document.getElementById("updated").innerText =
-   "Last updated: " + new Date().toLocaleString();
-
- }catch(error){
-
-  message.innerHTML =
-   "❌ ERROR: " + escapeHTML(error.message);
-
- }finally{
-
-  loading = false;
-
- }
+        autoTimer = null;
+    }
 
 }
 
-// ============================================
-// NEXT BATCH
-// ============================================
-
-function nextBatch(){
-
- const limit =
- Number(document.getElementById("limit").value);
-
- const total =
- lastScanData?.total_nse_stocks || 0;
-
- if(total && currentOffset + limit >= total){
-
-  currentOffset = 0;
-
-  alert("Last batch completed. Starting from first batch.");
-
- }else{
-
-  currentOffset += limit;
-
- }
-
- runScanner();
-
-}
-
-// ============================================
-// RENDER ALL STOCKS
-// ============================================
-
-function renderStocks(){
-
- const search =
- document.getElementById("search").value.toUpperCase();
-
- const filtered = allStocks.filter(stock =>
-
-  String(stock.symbol || "")
-   .toUpperCase()
-   .includes(search)
-
- );
-
- document.getElementById("allList").innerHTML =
-  makeStockCards(filtered);
-
-}
-
-// ============================================
-// STOCK CARDS
-// ============================================
-
-function makeStockCards(stocks){
-
- if(!stocks.length){
-
-  return `<div class="stock">No stocks found.</div>`;
-
- }
-
- return stocks.map(stock => {
-
-  let badge = "wait";
-
-  if(stock.signal === "STRONG_BUY") badge = "strong";
-  else if(stock.signal === "BUY") badge = "buy";
-
-  return `
-
-  <div class="stock">
-
-   <div class="stock-head">
-
-    <div class="stock-name">
-     ${escapeHTML(stock.symbol || "-")}
-    </div>
-
-    <span class="badge ${badge}">
-     ${escapeHTML(stock.signal || "WAIT")}
-    </span>
-
-   </div>
-
-   <div class="footer">
-    ${escapeHTML(stock.name || "")}
-   </div>
-
-   <div class="price">
-    ₹${format(stock.price)}
-    <span class="${Number(stock.change_percent)>=0?'green':'red'}"
-     style="font-size:13px">
-     ${Number(stock.change_percent)>=0?'+':''}
-     ${format(stock.change_percent)}%
-    </span>
-   </div>
-
-   <div class="grid">
-
-    <div class="item">
-     <small>ENTRY PRICE</small>
-     <b>₹${format(stock.entry_price)}</b>
-    </div>
-
-    <div class="item">
-     <small>STOP LOSS</small>
-     <b class="red">₹${format(stock.stop_loss)}</b>
-    </div>
-
-    <div class="item">
-     <small>TARGET 1</small>
-     <b class="green">₹${format(stock.target1)}</b>
-    </div>
-
-    <div class="item">
-     <small>TARGET 2</small>
-     <b class="green">₹${format(stock.target2)}</b>
-    </div>
-
-    <div class="item">
-     <small>MOMENTUM SCORE</small>
-     <b>${format(stock.momentum_score)}/100</b>
-    </div>
-
-    <div class="item">
-     <small>RSI 14</small>
-     <b>${format(stock.rsi14)}</b>
-    </div>
-
-    <div class="item">
-     <small>ADX 14</small>
-     <b>${format(stock.adx14)}</b>
-    </div>
-
-    <div class="item">
-     <small>VOLUME RATIO</small>
-     <b>${format(stock.volume_ratio)}x</b>
-    </div>
-
-    <div class="item">
-     <small>EMA 20</small>
-     <b>₹${format(stock.ema20)}</b>
-    </div>
-
-    <div class="item">
-     <small>EMA 50</small>
-     <b>₹${format(stock.ema50)}</b>
-    </div>
-
-    <div class="item">
-     <small>3 DAY MOMENTUM</small>
-     <b class="green">${format(stock.momentum_3day)}%</b>
-    </div>
-
-    <div class="item">
-     <small>RISK / REWARD</small>
-     <b>${format(stock.risk_reward)} R</b>
-    </div>
-
-    <div class="item">
-     <small>SUPPORT</small>
-     <b>₹${format(stock.support)}</b>
-    </div>
-
-    <div class="item">
-     <small>RESISTANCE</small>
-     <b>₹${format(stock.resistance)}</b>
-    </div>
-
-    <div class="item">
-     <small>MACD</small>
-     <b>${format(stock.macd)}</b>
-    </div>
-
-    <div class="item">
-     <small>VOLUME</small>
-     <b>${Number(stock.volume || 0).toLocaleString("en-IN")}</b>
-    </div>
-
-   </div>
-
-   <div class="conditions">
-
-    <b>Technical Conditions</b><br>
-
-    ${condition(stock.conditions?.aboveEMA20,"Above EMA20")}
-    ${condition(stock.conditions?.emaBullish,"EMA20 > EMA50")}
-    ${condition(stock.conditions?.rsiStrong,"RSI Strong")}
-    ${condition(stock.conditions?.adxStrong,"ADX Strong")}
-    ${condition(stock.conditions?.macdBullish,"MACD Bullish")}
-    ${condition(stock.conditions?.volumeStrong,"Volume Strong")}
-    ${condition(stock.conditions?.priceMomentum,"Price Momentum")}
-    ${condition(stock.conditions?.bullishCandle,"Bullish Candle")}
-    ${condition(stock.conditions?.strongBreakout,"Breakout")}
-
-   </div>
-
-   <div class="footer">
-    Holding: ${escapeHTML(stock.holding_period || "1-5 DAYS")}
-    <br>
-    Fundamentals: ${escapeHTML(stock.fundamental_status || "NOT_VERIFIED")}
-    <br>
-    Candle: ${escapeHTML(stock.candle_time || "-")}
-   </div>
-
-  </div>
-
-  `;
-
- }).join("");
-
-}
-
-// ============================================
-// CONDITION DISPLAY
-// ============================================
-
-function condition(value,label){
-
- return `
-  <span style="color:${value?'#32d6a0':'#ff7777'}">
-   ${value?'✔':'✖'} ${label}
-  </span>
-  &nbsp;
- `;
-
-}
-
-// ============================================
-// SAFE FORMATTING
-// ============================================
-
-function format(value){
-
- const n = Number(value);
-
- return Number.isFinite(n)
-  ? n.toFixed(2)
-  : "-";
-
-}
-
-function escapeHTML(value){
-
- return String(value ?? "").replace(
-  /[&<>"']/g,
-  char => ({
-   "&":"&amp;",
-   "<":"&lt;",
-   ">":"&gt;",
-   '"':"&quot;",
-   "'":"&#39;"
-  })[char]
- );
-
-}
-
-// ============================================
-// START
-// ============================================
-
-checkConnection();
-
-runScanner();
+// ======================================
+// INITIALIZATION
+// ======================================
 
 </script></body>
-</html>
+ </html>
