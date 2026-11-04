@@ -109,7 +109,31 @@ function subtractDays(date, days) {
 // ======================================================
 // LOAD ONLY NSE F&O STOCKS
 // ======================================================
+// ==========================================
+// FETCH WITH TIMEOUT
+// ==========================================
 
+async function fetchWithTimeout(url, options = {}) {
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+        controller.abort();
+    }, 20000);
+
+    try {
+
+        return await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+
+    } finally {
+
+        clearTimeout(timeout);
+
+    }
+}
 async function loadFnoStocks() {
 
     if (
