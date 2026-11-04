@@ -185,13 +185,22 @@ async function downloadMaster() {
         jsonBuffer.toString("utf8")
     );
 
-    const today = new Intl.DateTimeFormat(
-        "en-CA",
-        {
-            timeZone: "Asia/Kolkata"
-        }
-    ).format(new Date());
+    // NSE FUTURES - FIXED
 
+futuresMaster = master.filter(item => {
+
+    const expiryTime = Number(item.expiry);
+
+    return (
+        item.segment === "NSE_FO" &&
+        item.instrument_key &&
+        item.underlying_symbol &&
+        String(item.instrument_type).toUpperCase() === "FUT" &&
+        Number.isFinite(expiryTime) &&
+        expiryTime >= Date.now()
+    );
+
+});
     // NSE EQUITY
 
     equityMaster = master.filter(item => {
