@@ -1,570 +1,376 @@
-// ==================================================
-// SMART TRADE INDIA
-// 52 WEEK HIGH MOMENTUM SCANNER V2
-// NSE ALL STOCKS + NSE F&O STOCKS
-// NODE.JS 20+ | UPSTOX V3 | RENDER
-// ==================================================
+// ==========================================
+// SMART TRADE INDIA V2
+// 1-5 DAYS SWING TRADING SCANNER
+// UPSTOX API V3
+// ==========================================
 
-const http = require("http");
-const https = require("https");
-const zlib = require("zlib");
+async function getSwingDailyCandles(instrumentKey) {
 
-const PORT = process.env.PORT || 10000;
+    const now = new Date();
 
-const TOKEN = process.env.UPSTOX_ACCESS_TOKEN || "";
-
-const UPSTOX = "https://api.upstox.com";
-
-const INSTRUMENT_URL =
-"https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
-
-// ==================================================
-// SETTINGS
-// ==================================================
-
-const SETTINGS = {
-    TOUCH_PERCENT: 3,
-    BREAKOUT_PERCENT: 0.10,
-    MIN_RSI: 60,
-    MIN_VOLUME_RATIO: 1.5,
-    EMA_PERIOD: 20,
-    RSI_PERIOD: 14,
-    ATR_PERIOD: 14,
-    WORKERS: 3,
-    CACHE_TIME: 6 * 60 * 60 * 1000,
-    REQUEST_DELAY: 300
-};
-
-let instrumentCache = [];
-
-let scanCache = {
-    ALL: [],
-    FNO: [],
-    updatedAt: null
-};
-
-let lastScan = 0;
-
-// ==================================================
-// HTTP RESPONSE
-// ==================================================
-
-function sendJson(res, status, data) {
-
-    res.writeHead(status, {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Methods": "GET, OPTIONS"
-    });
-
-    res.end(JSON.stringify(data));
-}
-
-// ==================================================
-// UPSTOX REQUEST
-// ==================================================
-
-async function upstoxRequest(url) {
-
-    if (!TOKEN) {
-        throw new Error("UPSTOX_ACCESS_TOKEN missing");
-    }
-
-    const response = await fetch(url, {
-        headers: {
-            "Accept": "application/json",
-            "Authorization": "Bearer " + TOKEN
-        },
-        signal: AbortSignal.timeout(20000)
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-        throw new Error(
-            "Upstox API error " + response.status +
-            ": " + JSON.stringify(result)
-        );
-    }
-
-    return result;
-}
-
-// ==================================================
-// INSTRUMENT MASTER DOWNLOAD
-// ==================================================
-
-async function loadInstruments() {
-
-    if (instrumentCache.length) {
-        return instrumentCache;
-    }
-
-    const response = await fetch(INSTRUMENT_URL);
-
-    if (!response.ok) {
-        throw new Error("Instrument master download failed");
-    }
-
-    let buffer = Buffer.from(
-        await response.arrayBuffer()
+    const indiaTime = new Date(
+        now.toLocaleString("en-US", {
+            timeZone: "Asia/Kolkata"
+        })
     );
 
-    if (buffer[0] === 0x1f && buffer[1] === 0x8b) {
-        buffer = zlib.gunzipSync(buffer);
-    }
+    const toDate =
+        indiaTime.getFullYear() + "-" +
+        String(indiaTime.getMonth() + 1).padStart(2, "0") + "-" +
+        String(indiaTime.getDate()).padStart(2, "0");
 
-    const instruments = JSON.parse(
-        buffer.toString("utf8")
+    const from = new Date(indiaTime);
+
+    from.setDate(from.getDate() - 180);
+
+    const fromDate =
+        from.getFullYear() + "-" +
+        String(from.getMonth() + 1).padStart(2, "0") + "-" +
+        String(from.getDate()).padStart(2, "0");
+
+    const key = encodeURIComponent(instrumentKey);
+
+    const path =
+        `/v3/historical-candle/${key}/days/1/${toDate}/${fromDate}`;
+
+    const response = await upstoxFetch(path);
+
+    const candles = response?.data?.candles || [];
+
+    return candles.map(c => ({
+
+        timestamp: c[0],
+
+        open: Number(c[1]),
+
+        high: Number(c[2]),
+
+        low: Number(c[3]),
+
+        close: Number(c[4]),
+
+        volume: Number(c[5] || 0)
+
+    })).filter(c =>
+
+        Number.isFinite(c.close) &&
+        Number.isFinite(c.high) &&
+        Number.isFinite(c.low) &&
+        Number.isFinite(c.volume)
+
+    ).sort((a, b) =>
+
+        Date.parse(a.timestamp) - Date.parse(b.timestamp)
+
     );
+}function swingEMA(values, period) {
 
-    const allStocks = instruments.filter(item =>
-        item.segment === "NSE_EQ" &&
-        item.instrument_type === "EQ" &&
-        item.instrument_key &&
-        item.trading_symbol &&
-        item.security_type !== "SM"
-    );
+    if (values.length < period) return null;
 
-    const fnoKeys = new Set(
-        instruments
-            .filter(item =>
-                item.segment === "NSE_FO" &&
-                item.instrument_type === "FUT" &&
-                item.underlying_type === "EQUITY" &&
-                item.underlying_key
-            )
-            .map(item => item.underlying_key)
-    );
-
-    instrumentCache = allStocks.map(stock => ({
-        ...stock,
-        isFNO: fnoKeys.has(stock.instrument_key)
-    }));
-
-    return instrumentCache;
-}
-
-// ==================================================
-// DATE HELPERS
-// ==================================================
-
-function getISTDate() {
-
-    return new Intl.DateTimeFormat(
-        "en-CA",
-        {
-            timeZone: "Asia/Kolkata",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit"
-        }
-    ).format(new Date());
-}
-
-function getDateBefore(days) {
-
-    const date = new Date();
-
-    date.setUTCDate(date.getUTCDate() - days);
-
-    return date.toISOString().slice(0, 10);
-}
-
-// ==================================================
-// RSI CALCULATION
-// ==================================================
-
-function calculateRSI(values, period = 14) {
-
-    if (values.length <= period) return 0;
-
-    let gains = 0;
-    let losses = 0;
-
-    for (let i = 1; i <= period; i++) {
-
-        const change = values[i] - values[i - 1];
-
-        if (change > 0) gains += change;
-        else losses += Math.abs(change);
-    }
-
-    let avgGain = gains / period;
-    let avgLoss = losses / period;
-
-    for (let i = period + 1; i < values.length; i++) {
-
-        const change = values[i] - values[i - 1];
-
-        const gain = Math.max(change, 0);
-        const loss = Math.max(-change, 0);
-
-        avgGain =
-            (avgGain * (period - 1) + gain) / period;
-
-        avgLoss =
-            (avgLoss * (period - 1) + loss) / period;
-    }
-
-    if (avgLoss === 0) return 100;
-
-    const rs = avgGain / avgLoss;
-
-    return 100 - (100 / (1 + rs));
-}
-
-// ==================================================
-// EMA CALCULATION
-// ==================================================
-
-function calculateEMA(values, period = 20) {
-
-    if (values.length < period) return 0;
+    const multiplier = 2 / (period + 1);
 
     let ema = values
         .slice(0, period)
         .reduce((a, b) => a + b, 0) / period;
 
-    const multiplier = 2 / (period + 1);
-
     for (let i = period; i < values.length; i++) {
 
         ema =
             (values[i] - ema) * multiplier + ema;
+
     }
 
     return ema;
-}
+}function swingRSI(values, period = 14) {
 
-// ==================================================
-// ATR CALCULATION
-// ==================================================
+    if (values.length <= period) return null;
 
-function calculateATR(candles, period = 14) {
+    let gain = 0;
+    let loss = 0;
 
-    if (candles.length < period + 1) return 0;
+    for (let i = 1; i <= period; i++) {
 
-    const ranges = [];
+        const diff = values[i] - values[i - 1];
+
+        if (diff > 0) gain += diff;
+        else loss += Math.abs(diff);
+    }
+
+    let avgGain = gain / period;
+    let avgLoss = loss / period;
+
+    for (let i = period + 1; i < values.length; i++) {
+
+        const diff = values[i] - values[i - 1];
+
+        avgGain =
+            (avgGaifunction swingATR(candles, period = 14) {
+
+    if (candles.length < period + 1) return null;
+
+    const trs = [];
 
     for (let i = 1; i < candles.length; i++) {
 
-        const high = Number(candles[i][2]);
-        const low = Number(candles[i][3]);
+        const c = candles[i];
+        const p = candles[i - 1];
 
-        const previousClose =
-            Number(candles[i - 1][4]);
+        trs.push(Math.max(
 
-        ranges.push(
-            Math.max(
-                high - low,
-                Math.abs(high - previousClose),
-                Math.abs(low - previousClose)
-            )
-        );
+            c.high - c.low,
+
+            Math.abs(c.high - p.close),
+
+            Math.abs(c.low - p.close)
+
+        ));
     }
 
-    const recent = ranges.slice(-period);
+    const recent = trs.slice(-period);
 
-    return recent.reduce((a, b) => a + b, 0)
-        / recent.length;
-}
+    return recent.reduce((a, b) => a + b, 0) / period;
+        }n * 13 + Math.max(diff, 0)) / 14;
 
-// ==================================================
-// HISTORICAL DAILY CANDLES
-// ==================================================
-
-async function getDailyCandles(instrumentKey) {
-
-    const toDate = getISTDate();
-
-    const fromDate = getDateBefore(370);
-
-    const url =
-        UPSTOX +
-        "/v3/historical-candle/" +
-        encodeURIComponent(instrumentKey) +
-        "/days/1/" +
-        toDate +
-        "/" +
-        fromDate;
-
-    const result = await upstoxRequest(url);
-
-    const candles = result.data?.candles || [];
-
-    return candles
-        .filter(c =>
-            Array.isArray(c) &&
-            c.length >= 6 &&
-            String(c[0]).slice(0, 10) < toDate
-        )
-        .sort((a, b) =>
-            new Date(a[0]) - new Date(b[0])
-        );
-}
-
-// ==================================================
-// CURRENT MARKET QUOTES
-// ==================================================
-
-async function getMarketQuotes(instruments) {
-
-    const result = {};
-
-    const batchSize = 500;
-
-    for (let i = 0; i < instruments.length; i += batchSize) {
-
-        const batch = instruments.slice(i, i + batchSize);
-
-        const keys = batch
-            .map(x => x.instrument_key)
-            .join(",");
-
-        const url =
-            UPSTOX +
-            "/v3/market-quote/quotes?instrument_key=" +
-            encodeURIComponent(keys);
-
-        const data = await upstoxRequest(url);
-
-        Object.assign(result, data.data || {});
+        avgLoss =
+            (avgLoss * 13 + Math.max(-diff, 0)) / 14;
     }
 
-    return result;
-}
+    if (avgLoss === 0) return 100;
 
-// ==================================================
-// 52 WEEK HIGH ANALYSIS
-// ==================================================
+    return 100 - (100 / (1 + avgGain / avgLoss));
+        }// ==========================================
+// 1-5 DAY SWING MOMENTUM ANALYSIS
+// ==========================================
 
-function analyse52Week(stock, candles, quote) {
+function analyseSwing1to5(stock, rawCandles) {
 
-    if (!candles || candles.length < 252) {
+    const candles = rawCandles;
+
+    if (!candles || candles.length < 60) {
         return null;
     }
 
-    const closes = candles.map(c => Number(c[4]));
-
-    const volumes = candles.map(c => Number(c[5]));
+    const closes = candles.map(c => c.close);
 
     const latest = candles[candles.length - 1];
 
-    const previous = candles[candles.length - 2];
+    const previous = candles.slice(0, -1);
 
-    const previous252 = candles.slice(-252);
+    const ema20 = swingEMA(closes, 20);
 
-    const high52 = Math.max(
-        ...previous252.map(c => Number(c[2]))
+    const ema50 = swingEMA(closes, 50);
+
+    const rsi = swingRSI(closes, 14);
+
+    const atr = swingATR(candles, 14);
+
+    const oldEMA20 = swingEMA(
+        closes.slice(0, -5),
+        20
     );
 
-    const currentPrice = Number(
-        quote?.last_price || latest[4]
-    );
-
-    if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+    if (!ema20 || !ema50 || !rsi || !atr || !oldEMA20) {
         return null;
     }
 
-    const rsi = calculateRSI(
-        closes,
-        SETTINGS.RSI_PERIOD
+    // Previous 10 Day High
+
+    const previous10 = previous.slice(-10);
+
+    const resistance = Math.max(
+        ...previous10.map(c => c.high)
     );
 
-    const ema20 = calculateEMA(
-        closes,
-        SETTINGS.EMA_PERIOD
-    );
+    // Previous 20 Day Volume
 
-    const atr = calculateATR(
-        candles,
-        SETTINGS.ATR_PERIOD
-    );
+    const previous20 = previous.slice(-20);
 
     const avgVolume =
-        volumes.slice(-21, -1)
-            .reduce((a, b) => a + b, 0) / 20;
+        previous20.reduce(
+            (sum, c) => sum + c.volume,
+            0
+        ) / 20;
 
-    const volumeRatio =
-        avgVolume > 0
-            ? Number(latest[5]) / avgVolume
-            : 0;
+    const volumeRatio = avgVolume > 0
+        ? latest.volume / avgVolume
+        : 0;
 
-    const distance =
-        ((high52 - currentPrice) / high52) * 100;
+    // Average Traded Value
 
-    const touch52 =
-        currentPrice >= high52 * 0.97 &&
-        currentPrice <= high52 * 1.001;
+    const avgTurnover =
+        previous20.reduce(
+            (sum, c) => sum + c.close * c.volume,
+            0
+        ) / 20;
 
-    const breakout52 =
-        currentPrice > high52 * 1.001;
+    // ATR Percentage
 
-    const bullishCandle =
-        Number(latest[4]) > Number(latest[1]);
+    const atrPercent =
+        (atr / latest.close) * 100;
 
-    const bullishTrend =
-        currentPrice > ema20;
+    // Candle Strength
 
-    const rsiPass =
-        rsi >= SETTINGS.MIN_RSI;
+    const candleRange = latest.high - latest.low;
 
-    const volumePass =
-        volumeRatio >= SETTINGS.MIN_VOLUME_RATIO;
+    const closePosition = candleRange > 0
+        ? (latest.close - latest.low) / candleRange
+        : 0;
+
+    // =================================
+    // TREND CONDITIONS
+    // =================================
+
+    const trendUp =
+        latest.close > ema20 &&
+        ema20 > ema50;
+
+    const emaRising =
+        ema20 > oldEMA20;
+
+    const rsiStrong =
+        rsi >= 52 && rsi <= 68;
+
+    const volumeStrong =
+        volumeRatio >= 1.5;
+
+    const breakout =
+        latest.close > resistance;
+
+    const nearBreakout =
+        latest.close >= resistance * 0.97;
+
+    const candleStrong =
+        latest.close > latest.open &&
+        closePosition >= 0.65;
+
+    const liquidity =
+        avgTurnover >= 50000000;
+
+    const volatility =
+        atrPercent >= 1 &&
+        atrPercent <= 5;
+
+    // =================================
+    // SCORE CALCULATION
+    // =================================
+
+    let score = 0;
+
+    if (trendUp) score += 25;
+
+    if (emaRising) score += 10;
+
+    if (rsiStrong) score += 15;
+
+    if (volumeRatio >= 1.5) score += 15;
+    else if (volumeRatio >= 1.2) score += 8;
+
+    if (breakout) score += 20;
+    else if (nearBreakout) score += 12;
+
+    if (candleStrong) score += 10;
+
+    if (volatility) score += 5;
+
+    // =================================
+    // SIGNAL
+    // =================================
 
     let signal = "WAIT";
 
     if (
-        breakout52 &&
-        bullishTrend &&
-        rsiPass &&
-        volumePass
+        score >= 80 &&
+        trendUp &&
+        emaRising &&
+        breakout &&
+        liquidity
     ) {
-        signal = "STRONG BUY";
-    }
 
-    else if (
-        touch52 &&
-        bullishTrend &&
-        rsiPass &&
-        bullishCandle
+        signal = "STRONG BUY";
+
+    } else if (
+        score >= 65 &&
+        trendUp &&
+        emaRising &&
+        liquidity
     ) {
+
         signal = "BUY WATCH";
     }
 
-    // ==============================================
-    // ENTRY / TARGET / STOP LOSS
-    // ==============================================
+    // =================================
+    // ENTRY / SL / TARGET
+    // =================================
 
-    const entry = currentPrice;
+    const entry =
+        latest.high * 1.001;
 
-    const safeATR = atr > 0
-        ? atr
-        : entry * 0.015;
+    const stopLoss =
+        entry - (1.5 * atr);
 
-    const stopLoss = Math.max(
-        entry - safeATR * 1.5,
-        entry * 0.985
-    );
+    const risk =
+        entry - stopLoss;
 
-    const risk = entry - stopLoss;
+    const target1 =
+        entry + (1.5 * risk);
 
-    const target1 = entry + risk * 1.5;
-
-    const target2 = entry + risk * 2.5;
+    const target2 =
+        entry + (2.5 * risk);
 
     return {
 
         symbol: stock.trading_symbol,
 
-        name: stock.name,
-
         instrumentKey: stock.instrument_key,
-
-        market: stock.isFNO ? "NSE F&O" : "NSE ALL",
 
         signal,
 
-        price: Number(entry.toFixed(2)),
+        timeframe: "DAILY",
 
-        high52: Number(high52.toFixed(2)),
+        holdingPeriod: "1-5 DAYS",
 
-        distance52: Number(distance.toFixed(2)),
+        score,
 
-        RSI: Number(rsi.toFixed(2)),
-
-        EMA20: Number(ema20.toFixed(2)),
-
-        volumeRatio: Number(volumeRatio.toFixed(2)),
+        price: Number(latest.close.toFixed(2)),
 
         entry: Number(entry.toFixed(2)),
+
+        stopLoss: Number(stopLoss.toFixed(2)),
 
         target1: Number(target1.toFixed(2)),
 
         target2: Number(target2.toFixed(2)),
 
-        stopLoss: Number(stopLoss.toFixed(2)),
+        ema20: Number(ema20.toFixed(2)),
 
-        touch52Week: touch52,
+        ema50: Number(ema50.toFixed(2)),
 
-        breakout52Week: breakout52,
+        rsi: Number(rsi.toFixed(2)),
 
-        bullishTrend,
+        atr: Number(atr.toFixed(2)),
 
-        volumePass,
+        atrPercent: Number(atrPercent.toFixed(2)),
 
-        candleDate: String(latest[0]).slice(0, 10)
+        volumeRatio: Number(volumeRatio.toFixed(2)),
+
+        resistance: Number(resistance.toFixed(2)),
+
+        avgTurnover: Math.round(avgTurnover),
+
+        breakout,
+
+        riskReward: "1:1.5 / 1:2.5",
+
+        validForSessions: 2,
+
+        updatedAt: new Date().toISOString()
 
     };
-}
+    }// ==========================================
+// MAIN 1-5 DAY SWING SCANNER
+// ==========================================
 
-// ==================================================
-// WORKER POOL
-// ==================================================
-
-async function runWorkers(items, worker, concurrency = 3) {
-
-    let index = 0;
-
-    const results = [];
-
-    async function run() {
-
-        while (true) {
-
-            const current = index++;
-
-            if (current >= items.length) return;
-
-            try {
-
-                const result = await worker(items[current]);
-
-                if (result) results.push(result);
-
-            } catch (error) {
-
-                console.error(
-                    "Scan error:",
-                    items[current].trading_symbol,
-                    error.message
-                );
-            }
-
-            await new Promise(resolve =>
-                setTimeout(resolve, SETTINGS.REQUEST_DELAY)
-            );
-        }
-    }
-
-    const workers = [];
-
-    for (let i = 0; i < concurrency; i++) {
-        workers.push(run());
-    }
-
-    await Promise.all(workers);
-
-    return results;
-}
-
-// ==================================================
-// MAIN SCANNER
-// ==================================================
-
-async function scanStocks(type = "ALL", limit = 100) {
-
-    const now = Date.now();
-
-    if (
-        scanCache.updatedAt &&
-        now - lastScan < SETTINGS.CACHE_TIME
-    ) {
-
-        return scanCache[type];
-    }
+async function scanSwingStocks(type = "ALL", limit = 100) {
 
     const all = await loadInstruments();
 
@@ -572,10 +378,9 @@ async function scanStocks(type = "ALL", limit = 100) {
         ? all.filter(s => s.isFNO)
         : all;
 
-    // Avoid excessive API requests.
-    // Set SCAN_LIMIT=0 in Render to scan the full universe.
-
-    const scanLimit = Number(process.env.SCAN_LIMIT || 300);
+    const scanLimit = Number(
+        process.env.SWING_SCAN_LIMIT || 100
+    );
 
     if (scanLimit > 0) {
         stocks = stocks.slice(0, scanLimit);
@@ -586,230 +391,129 @@ async function scanStocks(type = "ALL", limit = 100) {
     }
 
     console.log(
-        "Starting scanner:",
+        "SWING SCANNER:",
         type,
-        "Stocks:",
         stocks.length
     );
 
-    const quotes = await getMarketQuotes(stocks);
-
-    const quoteList = Object.values(quotes);
-
-    const quoteMap = {};
-
-    quoteList.forEach(q => {
-
-        if (q.instrument_token) {
-            quoteMap[q.instrument_token] = q;
-        }
-    });
-
     const results = await runWorkers(
+
         stocks,
+
         async stock => {
 
-            const quoteKey =
-                "NSE_EQ:" + stock.trading_symbol;
+            try {
 
-            const quote =
-                quotes[quoteKey] ||
-                quoteMap[stock.instrument_key];
+                const candles =
+                    await getSwingDailyCandles(
+                        stock.instrument_key
+                    );
 
-            const candles = await getDailyCandles(
-                stock.instrument_key
-            );
+                return analyseSwing1to5(
+                    stock,
+                    candles
+                );
 
-            return analyse52Week(
-                stock,
-                candles,
-                quote
-            );
+            } catch (error) {
+
+                console.error(
+                    stock.trading_symbol,
+                    error.message
+                );
+
+                return null;
+            }
 
         },
-        SETTINGS.WORKERS
+
+        Math.min(SETTINGS.WORKERS || 3, 5)
+
     );
 
-    const sorted = results.sort((a, b) => {
+    const valid = results.filter(Boolean);
 
-        const priority = {
-            "STRONG BUY": 3,
-            "BUY WATCH": 2,
-            "WAIT": 1
-        };
+    const priority = {
+        "STRONG BUY": 3,
+        "BUY WATCH": 2,
+        "WAIT": 1
+    };
 
-        return priority[b.signal] - priority[a.signal];
+    valid.sort((a, b) => {
+
+        if (priority[b.signal] !== priority[a.signal]) {
+            return priority[b.signal] - priority[a.signal];
+        }
+
+        return b.score - a.score;
+
     });
 
-    scanCache[type] = sorted;
+    return valid;
+}// ==========================================
+// SWING TRADING SCANNER API
+// ==========================================
 
-    scanCache.updatedAt = new Date().toISOString();
-
-    lastScan = Date.now();
-
-    return sorted;
-}
-
-// ==================================================
-// API ROUTES
-// ==================================================
-
-const server = http.createServer(async (req, res) => {
-
-    if (req.method === "OPTIONS") {
-
-        res.writeHead(204, {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "GET, OPTIONS"
-        });
-
-        return res.end();
-    }
-
-    const url = new URL(
-        req.url,
-        "http://localhost"
-    );
+if (url.pathname === "/api/scanner/swing") {
 
     try {
 
-        // HEALTH
+        const type = (
+            url.searchParams.get("type") || "ALL"
+        ).toUpperCase();
 
-        if (url.pathname === "/health") {
+        const limit = Math.min(
+            Number(url.searchParams.get("limit") || 100),
+            200
+        );
 
-            return sendJson(res, 200, {
-                status: "OK",
-                app: "SMART TRADE INDIA",
-                version: "2.0",
-                time: new Date().toISOString()
+        if (!["ALL", "FNO"].includes(type)) {
+
+            return sendJson(res, 400, {
+                success: false,
+                error: "Use ALL or FNO"
             });
         }
 
-        // UPSTOX STATUS
+        const results = await scanSwingStocks(
+            type,
+            limit
+        );
 
-        if (url.pathname === "/api/upstox/status") {
+        return sendJson(res, 200, {
 
-            return sendJson(res, 200, {
-                connected: Boolean(TOKEN),
-                provider: "UPSTOX",
-                version: "V3"
-            });
-        }
+            success: true,
 
-        // INSTRUMENT UNIVERSE
+            scanner: "SMART TRADE INDIA SWING SCANNER",
 
-        if (url.pathname === "/api/scanner/universe") {
+            timeframe: "DAILY",
 
-            const stocks = await loadInstruments();
+            holdingPeriod: "1-5 TRADING DAYS",
 
-            return sendJson(res, 200, {
-                totalNSEStocks: stocks.length,
-                totalFNOStocks: stocks.filter(s => s.isFNO).length
-            });
-        }
+            market: type,
 
-        // 52 WEEK HIGH SCANNER
+            totalScanned: results.length,
 
-        if (url.pathname === "/api/scanner/52week") {
+            strongBuy: results.filter(
+                x => x.signal === "STRONG BUY"
+            ).length,
 
-            const type = (
-                url.searchParams.get("type") || "ALL"
-            ).toUpperCase();
+            buyWatch: results.filter(
+                x => x.signal === "BUY WATCH"
+            ).length,
 
-            const limit = Number(
-                url.searchParams.get("limit") || 100
-            );
+            wait: results.filter(
+                x => x.signal === "WAIT"
+            ).length,
 
-            if (!["ALL", "FNO"].includes(type)) {
+            data: results,
 
-                return sendJson(res, 400, {
-                    error: "Use type=ALL or type=FNO"
-                });
-            }
+            updatedAt: new Date().toISOString()
 
-            const results = await scanStocks(
-                type,
-                limit
-            );
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                scanner: "52 WEEK HIGH MOMENTUM",
-
-                market: type,
-
-                totalScanned: results.length,
-
-                strongBuy: results.filter(
-                    x => x.signal === "STRONG BUY"
-                ).length,
-
-                buyWatch: results.filter(
-                    x => x.signal === "BUY WATCH"
-                ).length,
-
-                wait: results.filter(
-                    x => x.signal === "WAIT"
-                ).length,
-
-                updatedAt: scanCache.updatedAt,
-
-                data: results
-
-            });
-        }
-
-        // BUY SIGNALS ONLY
-
-        if (url.pathname === "/api/scanner/buy") {
-
-            const type = (
-                url.searchParams.get("type") || "ALL"
-            ).toUpperCase();
-
-            const results = await scanStocks(type, 100);
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                data: results.filter(
-                    x =>
-                        x.signal === "STRONG BUY" ||
-                        x.signal === "BUY WATCH"
-                )
-
-            });
-        }
-
-        // CACHE CLEAR
-
-        if (url.pathname === "/api/scanner/refresh") {
-
-            lastScan = 0;
-
-            scanCache.ALL = [];
-
-            scanCache.FNO = [];
-
-            scanCache.updatedAt = null;
-
-            return sendJson(res, 200, {
-                success: true,
-                message: "Scanner cache cleared"
-            });
-        }
-
-        return sendJson(res, 404, {
-            error: "API route not found"
         });
 
     } catch (error) {
 
-        console.error(error);
+        console.error("SWING SCANNER ERROR:", error);
 
         return sendJson(res, 500, {
 
@@ -819,17 +523,4 @@ const server = http.createServer(async (req, res) => {
 
         });
     }
-});
-
-// ==================================================
-// SERVER START
-// ==================================================
-
-server.listen(PORT, () => {
-
-    console.log(
-        "SMART TRADE INDIA SERVER RUNNING ON PORT",
-        PORT
-    );
-
-});
+              }
