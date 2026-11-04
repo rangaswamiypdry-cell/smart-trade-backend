@@ -790,11 +790,6 @@ function analyseStock(item, candles) {
 
 const SCAN_LIMIT = 100;
 const SCAN_CONCURRENCY = 5;
-const CACHE_TIME = 60000;
-
-let scanBusy = false;
-let stockCache = [];
-let lastScanTime = null;
 let lastScanError = null;
 
 // ======================================================
