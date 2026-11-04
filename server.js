@@ -225,7 +225,8 @@ futuresMaster = master.filter(item => {
             String(item.instrument_type)
                 .toUpperCase()
                 .includes("FUT") &&
-            item.expiry >= today
+            Number.isFinite(Number(item.expiry)) &&
+Number(item.expiry) >= Date.now()
         );
 
     });
