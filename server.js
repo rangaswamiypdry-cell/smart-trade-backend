@@ -1295,34 +1295,36 @@ const server = http.createServer(async (req, res) => {
         }
 
         // ==========================================
-        // NSE F&O STOCK LIST
-        // ==========================================
+// NSE F&O STOCK LIST
+// ==========================================
 
-        if (path === "/api/nse-stocks") {
+if (path === "/api/nse-stocks") {
 
-            const list = await getInstruments();
+    const list = await getInstruments();
 
-            return sendJson(res, 200, {
+    return sendJson(res, 200, {
 
-                success: true,
+        success: true,
 
-                count: list.length,
+        count: list.length,
 
-                stocks: list.map(item => ({
+        stocks: list.map(item => ({
 
-                    symbol: item.underlying_symbol,
+            symbol: item.symbol,
 
-                    tradingSymbol: item.trading_symbol,
+            tradingSymbol: item.futuresTradingSymbol,
 
-                    instrumentKey: item.instrument_key,
+            equityKey: item.equityKey,
 
-                    expiry: item.expiry
+            futuresKey: item.futuresKey,
 
-                }))
+            expiry: item.expiry
 
-            });
+        }))
 
-        }
+    });
+
+}
 
         // ==========================================
         // SCAN STATUS
