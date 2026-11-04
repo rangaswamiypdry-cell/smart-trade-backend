@@ -4,10 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Smart Trade India - Swing Scanner</title>
+<title>Smart Trade India - Live Swing Scanner</title>
 
 <style>
-
 * {
     box-sizing: border-box;
 }
@@ -21,32 +20,34 @@ body {
 
 header {
     background: #111e32;
-    padding: 20px;
+    padding: 25px 10px;
     text-align: center;
-    border-bottom: 2px solid #1c8cff;
+    border-bottom: 3px solid #168cff;
 }
 
 header h2 {
-    margin: 0;
     color: #00d5ff;
+    margin: 0;
+    font-size: 25px;
 }
 
 header p {
     color: #aab8ca;
-    font-size: 13px;
+    margin: 12px 0 0;
 }
 
 .container {
-    padding: 15px;
-    max-width: 1300px;
+    max-width: 1400px;
     margin: auto;
+    padding: 15px;
 }
 
 .status {
     background: #14243a;
-    padding: 13px;
-    border-radius: 8px;
-    margin-bottom: 15px;
+    padding: 17px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    font-size: 17px;
 }
 
 .online {
@@ -59,25 +60,25 @@ header p {
 
 .cards {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
     margin-bottom: 20px;
 }
 
 .card {
     background: #14243a;
-    padding: 15px;
-    border-radius: 10px;
+    padding: 22px 8px;
+    border-radius: 15px;
     text-align: center;
 }
 
 .card h3 {
-    font-size: 13px;
     color: #9aacc5;
+    font-size: 14px;
 }
 
 .card strong {
-    font-size: 25px;
+    font-size: 32px;
 }
 
 .green {
@@ -92,58 +93,80 @@ header p {
     color: #00c8ff;
 }
 
-button {
-    border: none;
-    padding: 13px 18px;
-    border-radius: 7px;
-    background: #087cff;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    margin: 4px;
-}
-
-button:disabled {
-    opacity: 0.5;
-}
-
 .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-bottom: 15px;
 }
 
+button {
+    border: none;
+    padding: 15px 18px;
+    border-radius: 9px;
+    background: #087cff;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    flex: 1;
+}
+
+button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 input {
-    padding: 12px;
     width: 100%;
-    max-width: 300px;
+    padding: 17px;
     background: #14243a;
     border: 1px solid #334761;
     color: white;
-    border-radius: 7px;
+    border-radius: 10px;
+    font-size: 16px;
+    margin-bottom: 15px;
+}
+
+.message {
+    margin: 15px 0;
+    font-size: 15px;
+}
+
+.loading {
+    color: #00d5ff;
+}
+
+.error {
+    color: #ff5252;
 }
 
 .tablebox {
     overflow-x: auto;
     background: #14243a;
-    border-radius: 10px;
+    border-radius: 12px;
+    margin-top: 15px;
 }
 
 table {
     width: 100%;
-    min-width: 1100px;
+    min-width: 1250px;
     border-collapse: collapse;
 }
 
 th {
     background: #203653;
-    padding: 13px;
+    padding: 17px 12px;
     color: #00d5ff;
+    white-space: nowrap;
 }
 
 td {
-    padding: 12px;
+    padding: 15px 12px;
     text-align: center;
     border-bottom: 1px solid #293c54;
-    font-size: 13px;
+    font-size: 14px;
+    white-space: nowrap;
 }
 
 tbody tr:hover {
@@ -151,8 +174,8 @@ tbody tr:hover {
 }
 
 .badge {
-    padding: 6px 9px;
-    border-radius: 5px;
+    padding: 7px 10px;
+    border-radius: 6px;
     font-weight: bold;
 }
 
@@ -171,35 +194,42 @@ tbody tr:hover {
     color: #ffdb70;
 }
 
-.loading {
-    text-align: center;
-    padding: 20px;
-    color: #00d5ff;
+.price {
+    color: #ffffff;
+    font-weight: bold;
 }
 
-.error {
-    color: #ff5252;
-    padding: 15px;
+.live {
+    color: #00e59b;
+    font-size: 12px;
 }
 
 footer {
     text-align: center;
-    padding: 20px;
+    padding: 25px;
     color: #8293a9;
 }
 
 @media(max-width:600px) {
 
-    .cards {
-        grid-template-columns: repeat(2, 1fr);
+    header h2 {
+        font-size: 21px;
     }
 
-    header h2 {
-        font-size: 19px;
+    .card {
+        padding: 20px 5px;
+    }
+
+    .card strong {
+        font-size: 29px;
+    }
+
+    button {
+        font-size: 12px;
+        padding: 15px 8px;
     }
 
 }
-
 </style>
 </head>
 
@@ -209,9 +239,9 @@ footer {
 
 <h2>SMART TRADE INDIA</h2>
 
-<p>NSE F&O SHORT TERM SWING SCANNER V3</p>
+<p>NSE F&O SHORT TERM SWING SCANNER V4</p>
 
-<p>1–5 DAYS MOMENTUM STOCK FINDER</p>
+<p>1–5 DAYS LIVE MOMENTUM STOCK FINDER</p>
 
 </header>
 
@@ -224,7 +254,16 @@ Backend Status:
 CHECKING...
 </strong>
 
+<br><br>
+
+Market Data:
+<strong id="marketStatus" class="blue">
+WAITING
+</strong>
+
 </div>
+
+<!-- DASHBOARD -->
 
 <div class="cards">
 
@@ -250,6 +289,8 @@ CHECKING...
 
 </div>
 
+<!-- BUTTONS -->
+
 <div class="controls">
 
 <button onclick="checkServer()">
@@ -260,17 +301,25 @@ CHECK SERVER
 START SCANNER
 </button>
 
-<button onclick="nextPage()" id="nextBtn">
-NEXT 100 STOCKS
-</button>
-
-<button onclick="previousPage()" id="prevBtn">
-PREVIOUS
+<button onclick="refreshLive()">
+LIVE REFRESH
 </button>
 
 </div>
 
 <div class="controls">
+
+<button onclick="nextPage()" id="nextBtn" disabled>
+NEXT 100 STOCKS
+</button>
+
+<button onclick="previousPage()" id="prevBtn" disabled>
+PREVIOUS
+</button>
+
+</div>
+
+<!-- SEARCH -->
 
 <input
 type="text"
@@ -279,9 +328,9 @@ placeholder="Search Stock Name..."
 oninput="renderTable()"
 >
 
-</div>
+<div id="message" class="message"></div>
 
-<div id="message"></div>
+<!-- RESULTS -->
 
 <div class="tablebox">
 
@@ -293,7 +342,7 @@ oninput="renderTable()"
 <th>STOCK</th>
 <th>SIGNAL</th>
 <th>SCORE</th>
-<th>PRICE</th>
+<th>LIVE PRICE</th>
 <th>ENTRY</th>
 <th>STOP LOSS</th>
 <th>TARGET 1</th>
@@ -312,7 +361,7 @@ oninput="renderTable()"
 
 <tr>
 <td colspan="14">
-Click START SCANNER
+CLICK START SCANNER
 </td>
 </tr>
 
@@ -330,14 +379,18 @@ SMART TRADE INDIA © 2026
 
 <br><br>
 
-Data: Upstox API V3
+LIVE DATA: UPSTOX API V3
+
+<br>
+
+1–5 DAYS SWING SCANNER
 
 </footer>
 
 <script>
 
 // ======================================
-// BACKEND CONFIGURATION
+// BACKEND URL
 // ======================================
 
 const API =
@@ -357,8 +410,51 @@ let previousOffset = null;
 
 let signals = [];
 
+let scanning = false;
+
 // ======================================
-// SERVER STATUS
+// SAFE DISPLAY
+// ======================================
+
+function safe(value, digits = 2) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        value === ""
+    ) {
+        return "-";
+    }
+
+    const number = Number(value);
+
+    return Number.isFinite(number)
+        ? number.toFixed(digits)
+        : "-";
+
+}
+
+// ======================================
+// HTML ESCAPE
+// ======================================
+
+function escapeHTML(value) {
+
+    return String(value ?? "").replace(
+        /[&<>"']/g,
+        char => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        })[char]
+    );
+
+}
+
+// ======================================
+// SERVER CHECK
 // ======================================
 
 async function checkServer() {
@@ -370,22 +466,27 @@ async function checkServer() {
 
     try {
 
-        const response =
-            await fetch(API + "/health");
+        const response = await fetch(
+            API + "/health",
+            { cache: "no-store" }
+        );
 
         const data = await response.json();
 
-        if (response.ok && data.success) {
-
-            status.innerText = "ONLINE";
-
-            status.className = "online";
-
-        } else {
-
+        if (!response.ok || !data.success) {
             throw new Error("Server unavailable");
-
         }
+
+        status.innerText = "ONLINE";
+
+        status.className = "online";
+
+        document.getElementById(
+            "marketStatus"
+        ).innerText =
+            data.upstoxConnected
+                ? "UPSTOX CONNECTED"
+                : "TOKEN MISSING";
 
     } catch(error) {
 
@@ -393,7 +494,9 @@ async function checkServer() {
 
         status.className = "offline";
 
-        console.error(error);
+        document.getElementById(
+            "marketStatus"
+        ).innerText = "CONNECTION ERROR";
 
     }
 
@@ -404,6 +507,10 @@ async function checkServer() {
 // ======================================
 
 async function startScan() {
+
+    if (scanning) return;
+
+    scanning = true;
 
     const message =
         document.getElementById("message");
@@ -416,7 +523,7 @@ async function startScan() {
     button.disabled = true;
 
     message.innerHTML =
-        '<div class="loading">SCANNING NSE F&O STOCKS...</div>';
+        '<span class="loading">SCANNING NSE F&O STOCKS...</span>';
 
     try {
 
@@ -427,7 +534,10 @@ async function startScan() {
             "&limit=" +
             limit;
 
-        const response = await fetch(url);
+        const response = await fetch(
+            url,
+            { cache: "no-store" }
+        );
 
         const data = await response.json();
 
@@ -439,33 +549,64 @@ async function startScan() {
 
         }
 
-        signals = data.signals || [];
+        signals = Array.isArray(data.signals)
+            ? data.signals
+            : [];
 
         nextOffset = data.nextOffset;
 
         previousOffset = data.previousOffset;
 
-        document.getElementById("total").innerText =
+        // DASHBOARD
+
+        document.getElementById(
+            "total"
+        ).innerText =
             data.totalFnoStocks || 0;
 
-        document.getElementById("scanned").innerText =
+        document.getElementById(
+            "scanned"
+        ).innerText =
             data.scanned || 0;
 
-        document.getElementById("strongBuy").innerText =
+        document.getElementById(
+            "strongBuy"
+        ).innerText =
             data.strongBuy || 0;
 
-        document.getElementById("buy").innerText =
+        document.getElementById(
+            "buy"
+        ).innerText =
             data.buy || 0;
+
+        // MARKET STATUS
+
+        document.getElementById(
+            "marketStatus"
+        ).innerText =
+            "LIVE PRICE RECEIVED";
+
+        // TABLE
 
         renderTable();
 
         message.innerHTML =
-            '<p class="green">SCAN COMPLETED SUCCESSFULLY</p>';
+            '<span class="green">SCAN COMPLETED SUCCESSFULLY</span>' +
+            '<br><br>Stocks Scanned: ' +
+            (data.scanned || 0) +
+            ' | Signals: ' +
+            signals.length;
 
-        document.getElementById("nextBtn").disabled =
+        // PAGINATION
+
+        document.getElementById(
+            "nextBtn"
+        ).disabled =
             nextOffset === null;
 
-        document.getElementById("prevBtn").disabled =
+        document.getElementById(
+            "prevBtn"
+        ).disabled =
             previousOffset === null;
 
         checkServer();
@@ -473,11 +614,17 @@ async function startScan() {
     } catch(error) {
 
         message.innerHTML =
-            '<div class="error">' +
-            error.message +
-            '</div>';
+            '<span class="error">' +
+            escapeHTML(error.message) +
+            '</span>';
+
+        document.getElementById(
+            "marketStatus"
+        ).innerText = "DATA ERROR";
 
     } finally {
+
+        scanning = false;
 
         button.disabled = false;
 
@@ -486,7 +633,24 @@ async function startScan() {
 }
 
 // ======================================
-// RENDER RESULTS
+// LIVE PRICE REFRESH
+// ======================================
+
+async function refreshLive() {
+
+    if (scanning) return;
+
+    document.getElementById(
+        "message"
+    ).innerHTML =
+        '<span class="loading">REFRESHING LIVE MARKET DATA...</span>';
+
+    await startScan();
+
+}
+
+// ======================================
+// RENDER TABLE
 // ======================================
 
 function renderTable() {
@@ -496,13 +660,22 @@ function renderTable() {
 
     const search =
         document.getElementById("search")
-        .value.toUpperCase();
+        .value.trim().toUpperCase();
 
     const filtered = signals.filter(stock => {
 
         return (
-            stock.symbol.toUpperCase().includes(search) ||
-            (stock.name || "").toUpperCase().includes(search)
+
+            String(stock.symbol || "")
+                .toUpperCase()
+                .includes(search)
+
+            ||
+
+            String(stock.name || "")
+                .toUpperCase()
+                .includes(search)
+
         );
 
     });
@@ -511,7 +684,9 @@ function renderTable() {
 
         tbody.innerHTML = `
         <tr>
-        <td colspan="14">NO MATCHING STOCKS FOUND</td>
+        <td colspan="14">
+        NO MATCHING STOCKS FOUND
+        </td>
         </tr>`;
 
         return;
@@ -532,53 +707,70 @@ function renderTable() {
 
         }
 
+        const price =
+            safe(stock.price);
+
         return `
 
         <tr>
 
         <td>
-        <b>${stock.symbol}</b>
+        <b>${escapeHTML(stock.symbol)}</b>
         </td>
 
         <td>
         <span class="badge ${badge}">
-        ${stock.signal}
+        ${escapeHTML(stock.signal)}
         </span>
         </td>
 
-        <td>${stock.score}</td>
+        <td>${safe(stock.score, 0)}</td>
 
-        <td>₹${stock.price}</td>
+        <td class="price">
+        ₹${price}
+        <br>
+        <span class="live">● LIVE</span>
+        </td>
 
         <td class="green">
-        ₹${stock.entry}
+        ₹${safe(stock.entry)}
         </td>
 
         <td class="red">
-        ₹${stock.stopLoss}
+        ₹${safe(stock.stopLoss)}
         </td>
 
         <td class="green">
-        ₹${stock.target1}
+        ₹${safe(stock.target1)}
         </td>
 
         <td class="green">
-        ₹${stock.target2}
+        ₹${safe(stock.target2)}
         </td>
 
-        <td>${stock.rsi}</td>
+        <td>${safe(stock.rsi)}</td>
 
-        <td>${stock.ema20}</td>
+        <td>${safe(stock.ema20)}</td>
 
-        <td>${stock.ema50}</td>
-
-        <td>${stock.volumeRatio}x</td>
-
-        <td class="green">
-        ${stock.fiveDayChange}%
-        </td>
+        <td>${safe(stock.ema50)}</td>
 
         <td>
+        ${safe(stock.volumeRatio)}x
+        </td>
+
+        <td class="${
+            Number(stock.fiveDayChange) >= 0
+            ? "green"
+            : "red"
+        }">
+        ${safe(stock.fiveDayChange)}%
+        </td>
+
+        <td class="${
+            stock.breakout
+            ? "green"
+            : "red"
+        }">
         ${stock.breakout ? "YES" : "NO"}
         </td>
 
@@ -596,7 +788,10 @@ function renderTable() {
 
 async function nextPage() {
 
-    if (nextOffset === null) return;
+    if (
+        nextOffset === null ||
+        scanning
+    ) return;
 
     offset = nextOffset;
 
@@ -610,7 +805,10 @@ async function nextPage() {
 
 async function previousPage() {
 
-    if (previousOffset === null) return;
+    if (
+        previousOffset === null ||
+        scanning
+    ) return;
 
     offset = previousOffset;
 
