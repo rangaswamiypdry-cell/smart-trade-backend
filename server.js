@@ -1,9 +1,7 @@
 // ======================================================
-// SMART TRADE INDIA
-// NSE F&O SHORT TERM SWING SCANNER V3
-// ONLY NSE F&O EQUITY STOCKS
-// 1 TO 5 DAYS MOMENTUM SCANNER
-// NODE.JS 20+ | UPSTOX V3 | RENDER
+// SMART TRADE INDIA - NSE F&O SWING SCANNER V4
+// LIVE MARKET PRICE - UPTSOX API V3
+// NODE.JS 20+ | RENDER
 // ======================================================
 
 const http = require("http");
@@ -13,7 +11,7 @@ const PORT = Number(process.env.PORT || 10000);
 
 const TOKEN = process.env.UPSTOX_ACCESS_TOKEN || "";
 
-const UPSTOX_BASE = "https://api.upstox.com";
+const BASE = "https://api.upstox.com";
 
 const INSTRUMENT_URL =
 "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
@@ -48,11 +46,12 @@ const CONFIG = {
 
     BATCH_SIZE: 4,
 
-    INSTRUMENT_CACHE_TIME:
+    INSTRUMENT_CACHE_MS:
         6 * 60 * 60 * 1000,
 
-    CANDLE_CACHE_TIME:
+    CANDLE_CACHE_MS:
         5 * 60 * 1000
+
 };
 
 // ======================================================
@@ -69,57 +68,45 @@ const candleCache = new Map();
 // JSON RESPONSE
 // ======================================================
 
-function json(res, status, data) {
+function sendJson(res, status, data) {
 
     res.writeHead(status, {
-        "Content-Type": "application/json; charset=utf-8",
+
+        "Content-Type":
+            "application/json; charset=utf-8",
+
         "Access-Control-Allow-Origin": "*",
+
         "Access-Control-Allow-Methods":
-            "GET, POST, OPTIONS",
+            "GET, OPTIONS",
+
         "Access-Control-Allow-Headers":
             "Content-Type, Authorization",
+
         "Cache-Control": "no-store"
+
     });
 
     res.end(JSON.stringify(data));
+
 }
 
 // ======================================================
-// IST DATE
+// FETCH TIMEOUT
 // ======================================================
 
-function getISTDate() {
-
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-    }).format(new Date());
-}
-
-function subtractDays(date, days) {
-
-    const d = new Date(date + "T00:00:00Z");
-
-    d.setUTCDate(d.getUTCDate() - days);
-
-    return d.toISOString().slice(0, 10);
-}
-// ======================================================
-// LOAD ONLY NSE F&O STOCKS
-// ======================================================
-// ==========================================
-// FETCH WITH TIMEOUT
-// ==========================================
-
-async function fetchWithTimeout(url, options = {}) {
+async function fetchTimeout(
+    url,
+    options = {},
+    ms = 25000
+) {
 
     const controller = new AbortController();
 
-    const timeout = setTimeout(() => {
-        controller.abort();
-    }, 20000);
+    const timer = setTimeout(
+        () => controller.abort(),
+        ms
+    );
 
     try {
 
@@ -130,66 +117,126 @@ async function fetchWithTimeout(url, options = {}) {
 
     } finally {
 
-        clearTimeout(timeout);
+        clearTimeout(timer);
 
     }
+
 }
+
+// ======================================================
+// IST DATE
+// ======================================================
+
+function istDate() {
+
+    return new Intl.DateTimeFormat("en-CA", {
+
+        timeZone: "Asia/Kolkata",
+
+        year: "numeric",
+
+        month: "2-digit",
+
+        day: "2-digit"
+
+    }).format(new Date());
+
+}
+
+function subtractDays(date, days) {
+
+    const d = new Date(date + "T00:00:00Z");
+
+    d.setUTCDate(d.getUTCDate() - days);
+
+    return d.toISOString().slice(0, 10);
+
+}
+
+// ======================================================
+// UPTSOX AUTHENTICATION
+// ======================================================
+
+function authHeaders() {
+
+    if (!TOKEN) {
+
+        throw new Error(
+            "UPSTOX_ACCESS_TOKEN missing in Render"
+        );
+
+    }
+
+    return {
+
+        Authorization: `Bearer ${TOKEN}`,
+
+        Accept: "application/json"
+
+    };
+
+}
+
+// ======================================================
+// LOAD NSE F&O EQUITY STOCKS
+// ======================================================
+
 async function loadFnoStocks() {
 
     if (
+
         fnoStocks.length > 0 &&
+
         Date.now() - instrumentCacheTime <
-        CONFIG.INSTRUMENT_CACHE_TIME
+        CONFIG.INSTRUMENT_CACHE_MS
+
     ) {
+
         return fnoStocks;
+
     }
 
-    console.log("Downloading NSE F&O instruments...");
+    console.log(
+        "Downloading NSE F&O instruments..."
+    );
 
-    const response = await fetchWithTimeout(
+    const response = await fetchTimeout(
         INSTRUMENT_URL
     );
 
     if (!response.ok) {
+
         throw new Error(
-            "F&O Instrument API Error: " +
+            "Instrument API Error: " +
             response.status
         );
+
     }
 
     const buffer = Buffer.from(
         await response.arrayBuffer()
     );
 
-    let raw;
+    const raw = (
 
-    try {
+        buffer[0] === 0x1f &&
+        buffer[1] === 0x8b
 
-        if (
-            buffer[0] === 0x1f &&
-            buffer[1] === 0x8b
-        ) {
-            raw = zlib.gunzipSync(buffer).toString("utf8");
-        } else {
-            raw = buffer.toString("utf8");
-        }
+    )
 
-    } catch (error) {
+        ? zlib.gunzipSync(buffer).toString("utf8")
 
-        throw new Error(
-            "Instrument decompression failed"
-        );
-    }
+        : buffer.toString("utf8");
 
     const parsed = JSON.parse(raw);
 
-    const instruments = Array.isArray(parsed)
+    const items = Array.isArray(parsed)
         ? parsed
         : parsed.data || [];
 
-    const stocks = new Map();
+    const unique = new Map();
 
-    for (const item of instruments) {
+    for (const item of items) {
 
         if (item.segment !== "NSE_FO") continue;
 
@@ -205,23 +252,29 @@ async function loadFnoStocks() {
             continue;
         }
 
-        if (!stocks.has(key)) {
+        if (!unique.has(key)) {
 
-            stocks.set(key, {
+            unique.set(key, {
 
-                symbol: item.underlying_symbol,
+                symbol:
+                    item.underlying_symbol ||
+                    item.trading_symbol || "",
 
-                name: item.name,
+                name:
+                    item.name ||
+                    item.underlying_symbol || "",
 
                 instrumentKey: key,
 
                 segment: "NSE_FO"
 
             });
+
         }
+
     }
 
-    fnoStocks = [...stocks.values()].sort(
+    fnoStocks = [...unique.values()].sort(
         (a, b) => a.symbol.localeCompare(b.symbol)
     );
 
@@ -233,50 +286,51 @@ async function loadFnoStocks() {
     );
 
     return fnoStocks;
+
 }
 
 // ======================================================
-// UPSTOX DAILY HISTORICAL CANDLES
+// DAILY HISTORICAL CANDLES
 // ======================================================
 
 async function getDailyCandles(instrumentKey) {
 
-    if (!TOKEN) {
-        throw new Error(
-            "UPSTOX_ACCESS_TOKEN missing"
-        );
-    }
-
     const cached = candleCache.get(instrumentKey);
 
     if (
+
         cached &&
+
         Date.now() - cached.time <
-        CONFIG.CANDLE_CACHE_TIME
+        CONFIG.CANDLE_CACHE_MS
+
     ) {
+
         return cached.candles;
+
     }
 
-    const today = getISTDate();
+    const today = istDate();
 
     const fromDate = subtractDays(today, 180);
 
     const url =
-        UPSTOX_BASE +
-        "/v3/historical-candle/" +
-        encodeURIComponent(instrumentKey) +
-        "/days/1/" +
-        today +
-        "/" +
-        fromDate;
 
-    const response = await fetchWithTimeout(url, {
+        `${BASE}/v3/historical-candle/` +
 
-        headers: {
-            "Authorization": "Bearer " + TOKEN,
-            "Accept": "application/json"
-        }
+        `${encodeURIComponent(instrumentKey)}` +
+
+        `/days/1/${today}/${fromDate}`;
+
+    const response = await fetchTimeout(url, {
+
+        headers: authHeaders()
+
     });
+
+    const body = await response.json().catch(
+        () => ({})
+    );
 
     if (!response.ok) {
 
@@ -284,24 +338,14 @@ async function getDailyCandles(instrumentKey) {
             "Historical API Error: " +
             response.status
         );
+
     }
 
-    const result = await response.json();
+    const candles = (body.data?.candles || [])
 
-    const rawCandles =
-        result.data?.candles || [];
-
-    // Only completed daily candles
-
-    const candles = rawCandles
-
-        .filter(c => {
-
-            const candleDate =
-                String(c[0]).slice(0, 10);
-
-            return candleDate < today;
-        })
+        .filter(c =>
+            String(c[0]).slice(0, 10) < today
+        )
 
         .map(c => ({
 
@@ -315,16 +359,14 @@ async function getDailyCandles(instrumentKey) {
 
             close: Number(c[4]),
 
-            volume: Number(c[5]),
+            volume: Number(c[5] || 0),
 
             oi: Number(c[6] || 0)
 
         }))
 
         .filter(c =>
-            c.close > 0 &&
-            c.high > 0 &&
-            c.volume >= 0
+            c.close > 0 && c.high > 0
         )
 
         .sort((a, b) =>
@@ -340,54 +382,155 @@ async function getDailyCandles(instrumentKey) {
     });
 
     return candles;
+
 }
 
+// ======================================================
+// LIVE MARKET PRICE - UPTSOX V3
+// IMPORTANT: USE last_price ONLY
+// ======================================================
+
+async function getLiveQuotes(stocks) {
+
+    const quotesByKey = new Map();
+
+    const keys = stocks.map(
+        s => s.instrumentKey
+    );
+
+    for (
+        let i = 0;
+        i < keys.length;
+        i += 500
+    ) {
+
+        const group = keys.slice(i, i + 500);
+
+        const url =
+
+            `${BASE}/v3/market-quote/quotes?instrument_key=` +
+
+            encodeURIComponent(group.join(","));
+
+        const response = await fetchTimeout(url, {
+
+            headers: authHeaders()
+
+        });
+
+        const body = await response.json().catch(
+            () => ({})
+        );
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Live Quote API Error: " +
+                response.status
+            );
+
+        }
+
+        const data = body.data || {};
+
+        for (const quote of Object.values(data)) {
+
+            const key = quote.instrument_token;
+
+            const ltp = Number(quote.last_price);
+
+            if (
+                key &&
+                Number.isFinite(ltp) &&
+                ltp > 0
+            ) {
+
+                quotesByKey.set(key, {
+
+                    lastPrice: ltp,
+
+                    volume: Number(
+                        quote.volume || 0
+                    ),
+
+                    averagePrice: Number(
+                        quote.average_price || 0
+                    ),
+
+                    previousClose: Number(
+                        quote.prev_close_price ||
+                        quote.ohlc?.close || 0
+                    ),
+
+                    netChange: Number(
+                        quote.net_change || 0
+                    ),
+
+                    lastTradeTime:
+                        quote.last_trade_time || null,
+
+                    quoteTimestamp:
+                        quote.timestamp || null
+
+                });
+
+            }
+
+        }
+
+    }
+
+    return quotesByKey;
+
+}
 // ======================================================
 // EMA CALCULATION
 // ======================================================
 
-function calculateEMA(values, period) {
+function ema(values, period) {
 
     if (values.length < period) return null;
 
     const multiplier = 2 / (period + 1);
 
-    let ema = values
+    let value = values
         .slice(0, period)
         .reduce((a, b) => a + b, 0) / period;
 
     for (let i = period; i < values.length; i++) {
 
-        ema =
-            (values[i] - ema) * multiplier + ema;
+        value =
+            values[i] * multiplier +
+            value * (1 - multiplier);
+
     }
 
-    return ema;
+    return value;
+
 }
 
 // ======================================================
 // RSI CALCULATION
 // ======================================================
 
-function calculateRSI(values, period = 14) {
+function rsi(values, period = 14) {
 
     if (values.length <= period) return null;
 
     let gains = 0;
-
     let losses = 0;
 
     for (let i = 1; i <= period; i++) {
 
-        const change = values[i] - values[i - 1];
+        const change =
+            values[i] - values[i - 1];
 
         if (change > 0) gains += change;
-
         else losses += Math.abs(change);
+
     }
 
     let avgGain = gains / period;
-
     let avgLoss = losses / period;
 
     for (
@@ -406,31 +549,32 @@ function calculateRSI(values, period = 14) {
         avgLoss =
             (avgLoss * (period - 1) +
             Math.max(-change, 0)) / period;
+
     }
 
     if (avgLoss === 0) return 100;
 
     const rs = avgGain / avgLoss;
 
-    return 100 - (100 / (1 + rs));
+    return 100 - 100 / (1 + rs);
+
 }
 
 // ======================================================
 // ATR CALCULATION
 // ======================================================
 
-function calculateATR(candles, period = 14) {
+function atr(candles, period = 14) {
 
     if (candles.length < period + 1) {
         return null;
     }
 
-    const trs = [];
+    const ranges = [];
 
     for (let i = 1; i < candles.length; i++) {
 
         const current = candles[i];
-
         const previous = candles[i - 1];
 
         const tr = Math.max(
@@ -444,141 +588,152 @@ function calculateATR(candles, period = 14) {
             Math.abs(
                 current.low - previous.close
             )
+
         );
 
-        trs.push(tr);
+        ranges.push(tr);
+
     }
 
-    if (trs.length < period) return null;
-
-    let atr =
-        trs.slice(0, period)
+    let value =
+        ranges.slice(0, period)
         .reduce((a, b) => a + b, 0) / period;
 
-    for (let i = period; i < trs.length; i++) {
+    for (let i = period; i < ranges.length; i++) {
 
-        atr =
-            ((atr * (period - 1)) + trs[i]) / period;
+        value =
+            (
+                value * (period - 1) +
+                ranges[i]
+            ) / period;
+
     }
 
-    return atr;
+    return value;
+
 }
 
 // ======================================================
 // STOCK ANALYSIS
+// INDICATORS = COMPLETED DAILY CANDLES
+// PRICE = LIVE UPTSOX LTP
 // ======================================================
 
-function analyseStock(stock, candles) {
+function analyseStock(stock, candles, quote) {
 
-    if (candles.length < 60) return null;
+    if (
+        candles.length < 60 ||
+        !quote ||
+        !(quote.lastPrice > 0)
+    ) {
+        return null;
+    }
 
     const closes = candles.map(c => c.close);
 
     const last = candles[candles.length - 1];
 
-    const previous = candles[candles.length - 2];
+    const livePrice = quote.lastPrice;
 
-    const ema20 = calculateEMA(
-        closes,
-        CONFIG.EMA_FAST
-    );
+    // EMA
 
-    const ema50 = calculateEMA(
-        closes,
-        CONFIG.EMA_SLOW
-    );
+    const ema20 = ema(closes, 20);
 
-    const rsi = calculateRSI(
-        closes,
-        CONFIG.RSI_PERIOD
-    );
+    const ema50 = ema(closes, 50);
 
-    const atr = calculateATR(candles, 14);
+    // RSI
+
+    const currentRsi = rsi(closes, 14);
+
+    // ATR
+
+    const currentAtr = atr(candles, 14);
 
     if (
         ema20 === null ||
         ema50 === null ||
-        rsi === null ||
-        atr === null ||
-        atr <= 0
+        currentRsi === null ||
+        currentAtr === null ||
+        currentAtr <= 0
     ) {
         return null;
     }
 
-    // ==============================================
-    // VOLUME
-    // ==============================================
+    // ==========================================
+    // VOLUME ANALYSIS
+    // ==========================================
 
-    const volumeCandles = candles.slice(-21, -1);
+    const volumeBars = candles.slice(-21, -1);
 
-    const averageVolume =
-        volumeCandles.reduce(
+    const avgVolume =
+        volumeBars.reduce(
             (sum, c) => sum + c.volume,
             0
-        ) / volumeCandles.length;
+        ) / Math.max(1, volumeBars.length);
 
-    const volumeRatio =
-        averageVolume > 0
-            ? last.volume / averageVolume
+    const dailyVolumeRatio =
+        avgVolume > 0
+            ? last.volume / avgVolume
             : 0;
 
-    // ==============================================
-    // FIVE DAY PRICE CHANGE
-    // ==============================================
+    // ==========================================
+    // FIVE DAY MOMENTUM
+    // ==========================================
 
-    const fiveDayPrevious =
+    const fiveDayBase =
         candles[candles.length - 6];
 
     const fiveDayChange =
         (
-            (last.close - fiveDayPrevious.close) /
-            fiveDayPrevious.close
+            (livePrice - fiveDayBase.close) /
+            fiveDayBase.close
         ) * 100;
 
-    // ==============================================
-    // RESISTANCE
-    // ==============================================
+    // ==========================================
+    // BREAKOUT
+    // ==========================================
 
-    const resistanceCandles =
+    const resistanceBars =
         candles.slice(-11, -1);
 
     const resistance = Math.max(
-        ...resistanceCandles.map(c => c.high)
+        ...resistanceBars.map(c => c.high)
     );
 
     const breakout =
-        last.close > resistance;
+        livePrice > resistance;
 
-    // ==============================================
+    // ==========================================
     // TREND CONDITIONS
-    // ==============================================
+    // ==========================================
 
     const trendPass =
         ema20 > ema50;
 
     const pricePass =
-        last.close > ema20;
+        livePrice > ema20;
 
     const momentumPass =
-        last.close > previous.close &&
+        livePrice > last.close &&
         fiveDayChange > 0;
 
     const rsiPass =
-        rsi >= CONFIG.RSI_MIN &&
-        rsi <= CONFIG.RSI_MAX;
+        currentRsi >= 55 &&
+        currentRsi <= 75;
 
     const volumePass =
-        volumeRatio >= CONFIG.VOLUME_MULTIPLIER;
+        dailyVolumeRatio >= 1.5;
+
+    const oldEma20 =
+        ema(closes.slice(0, -5), 20);
 
     const emaSlopePass =
-        ema20 > calculateEMA(
-            closes.slice(0, -5),
-            CONFIG.EMA_FAST
-        );
+        oldEma20 !== null &&
+        ema20 > oldEma20;
 
-    // ==============================================
-    // SCORE
-    // ==============================================
+    // ==========================================
+    // SCORE CALCULATION
+    // ==========================================
 
     let score = 0;
 
@@ -596,7 +751,9 @@ function analyseStock(stock, candles) {
 
     if (emaSlopePass) score += 5;
 
-    // Only upward trend stocks
+    // ==========================================
+    // UPTREND FILTER
+    // ==========================================
 
     if (!trendPass) return null;
 
@@ -606,35 +763,46 @@ function analyseStock(stock, candles) {
 
     if (score < CONFIG.MIN_SCORE) return null;
 
-    // ==============================================
-    // SIGNAL
-    // ==============================================
+    // ==========================================
+    // BUY SIGNAL
+    // ==========================================
 
     let signal = "WATCH";
 
-    if (score >= CONFIG.STRONG_BUY_SCORE) {
+    if (
+        score >= CONFIG.STRONG_BUY_SCORE &&
+        rsiPass &&
+        volumePass &&
+        breakout
+    ) {
 
         signal = "STRONG BUY";
 
     } else if (score >= CONFIG.BUY_SCORE) {
 
         signal = "BUY";
+
     }
 
-    // ==============================================
-    // ENTRY / STOP LOSS / TARGET
-    // ==============================================
+    // ==========================================
+    // LIVE ENTRY PRICE
+    // ==========================================
 
-    const entry = last.close;
+    const entry = livePrice;
+
+    // ==========================================
+    // STOP LOSS AND TARGET
+    // ==========================================
 
     const riskPercent = Math.min(
 
         Math.max(
-            (atr * 1.5) / entry,
+            (currentAtr * 1.5) / entry,
             0.015
         ),
 
         0.05
+
     );
 
     const risk = entry * riskPercent;
@@ -645,9 +813,9 @@ function analyseStock(stock, candles) {
 
     const target2 = entry + risk * 3;
 
-    // ==============================================
-    // RESULT
-    // ==============================================
+    // ==========================================
+    // FINAL RESULT
+    // ==========================================
 
     return {
 
@@ -661,7 +829,7 @@ function analyseStock(stock, candles) {
 
         score,
 
-        price: Number(entry.toFixed(2)),
+        price: Number(livePrice.toFixed(2)),
 
         entry: Number(entry.toFixed(2)),
 
@@ -673,20 +841,20 @@ function analyseStock(stock, candles) {
 
         riskReward: "1:2 / 1:3",
 
+        rsi: Number(currentRsi.toFixed(2)),
+
         ema20: Number(ema20.toFixed(2)),
 
         ema50: Number(ema50.toFixed(2)),
 
-        rsi: Number(rsi.toFixed(2)),
+        atr: Number(currentAtr.toFixed(2)),
 
-        atr: Number(atr.toFixed(2)),
+        volume: quote.volume,
 
-        volume: last.volume,
-
-        averageVolume: Math.round(averageVolume),
+        averageVolume: Math.round(avgVolume),
 
         volumeRatio: Number(
-            volumeRatio.toFixed(2)
+            dailyVolumeRatio.toFixed(2)
         ),
 
         fiveDayChange: Number(
@@ -695,27 +863,37 @@ function analyseStock(stock, candles) {
 
         breakout,
 
-        trend: "UPTREND",
+        resistance: Number(
+            resistance.toFixed(2)
+        ),
 
-        emaSlopePass,
+        trend: "UPTREND",
 
         holdingPeriod: "1-5 DAYS",
 
-        timeframe: "1 DAY",
+        timeframe: "DAILY",
 
-        candleDate: last.time
+        candleDate: last.time,
+
+        priceSource: "UPSTOX_V3_LAST_PRICE",
+
+        livePriceAvailable: true,
+
+        lastTradeTime: quote.lastTradeTime,
+
+        previousClose: quote.previousClose,
+
+        netChange: quote.netChange
 
     };
+
 }
 
 // ======================================================
 // SCAN NSE F&O STOCKS
 // ======================================================
 
-async function scanOnlyNseFnoStocks(
-    offset = 0,
-    limit = 100
-) {
+async function scanFno(offset, limit) {
 
     const universe = await loadFnoStocks();
 
@@ -723,6 +901,10 @@ async function scanOnlyNseFnoStocks(
         offset,
         offset + limit
     );
+
+    // Fetch live market quotes
+
+    const quotes = await getLiveQuotes(selected);
 
     const results = [];
 
@@ -745,6 +927,25 @@ async function scanOnlyNseFnoStocks(
 
                 try {
 
+                    const quote = quotes.get(
+                        stock.instrumentKey
+                    );
+
+                    if (!quote) {
+
+                        errors.push({
+
+                            symbol: stock.symbol,
+
+                            error:
+                            "Live LTP missing"
+
+                        });
+
+                        return null;
+
+                    }
+
                     const candles =
                         await getDailyCandles(
                             stock.instrumentKey
@@ -752,7 +953,8 @@ async function scanOnlyNseFnoStocks(
 
                     return analyseStock(
                         stock,
-                        candles
+                        candles,
+                        quote
                     );
 
                 } catch (error) {
@@ -766,29 +968,39 @@ async function scanOnlyNseFnoStocks(
                     });
 
                     return null;
+
                 }
+
             })
+
         );
 
         results.push(
             ...batchResults.filter(Boolean)
         );
+
     }
+
+    // SORT BY SCORE
 
     results.sort((a, b) => {
 
         if (b.score !== a.score) {
+
             return b.score - a.score;
+
         }
 
         return b.fiveDayChange - a.fiveDayChange;
+
     });
 
     return {
 
         success: true,
 
-        scanner: "SMART TRADE INDIA FNO SWING V3",
+        scanner:
+        "SMART TRADE INDIA NSE F&O SWING V4",
 
         market: "NSE",
 
@@ -830,9 +1042,13 @@ async function scanOnlyNseFnoStocks(
 
         signals: results,
 
+        priceSource:
+        "UPSTOX V3 FULL MARKET QUOTE last_price",
+
         timestamp: new Date().toISOString()
 
     };
+
 }
 
 // ======================================================
@@ -844,9 +1060,10 @@ const server = http.createServer(
 
         if (req.method === "OPTIONS") {
 
-            return json(res, 200, {
+            return sendJson(res, 200, {
                 success: true
             });
+
         }
 
         const url = new URL(
@@ -856,44 +1073,60 @@ const server = http.createServer(
 
         try {
 
+            if (req.method !== "GET") {
+
+                return sendJson(res, 405, {
+
+                    success: false,
+
+                    error: "GET only"
+
+                });
+
+            }
+
             // ======================================
-            // HEALTH
+            // HEALTH CHECK
             // ======================================
 
             if (url.pathname === "/health") {
 
-                return json(res, 200, {
+                return sendJson(res, 200, {
 
                     success: true,
 
                     app: "SMART TRADE INDIA",
 
-                    version: "SWING V3",
+                    version: "SWING V4 LIVE PRICE",
 
                     status: "RUNNING",
 
                     upstoxConnected: Boolean(TOKEN)
 
                 });
+
             }
 
             // ======================================
-            // UPSTOX STATUS
+            // UPTSOX STATUS
             // ======================================
 
-            if (url.pathname === "/api/upstox/status") {
+            if (
+                url.pathname === "/api/upstox/status"
+            ) {
 
-                return json(res, 200, {
+                return sendJson(res, 200, {
 
                     success: Boolean(TOKEN),
 
                     connected: Boolean(TOKEN),
 
                     message: TOKEN
-                        ? "Upstox token configured"
+                        ? "Access token configured"
                         : "UPSTOX_ACCESS_TOKEN missing"
 
                 });
+
             }
 
             // ======================================
@@ -906,7 +1139,7 @@ const server = http.createServer(
 
                 const stocks = await loadFnoStocks();
 
-                return json(res, 200, {
+                return sendJson(res, 200, {
 
                     success: true,
 
@@ -914,13 +1147,14 @@ const server = http.createServer(
 
                     market: "NSE F&O",
 
-                    stocks: stocks
+                    stocks
 
                 });
+
             }
 
             // ======================================
-            // MAIN F&O SWING SCANNER
+            // MAIN SWING SCANNER
             // ======================================
 
             if (
@@ -933,7 +1167,7 @@ const server = http.createServer(
 
                 if (!TOKEN) {
 
-                    return json(res, 503, {
+                    return sendJson(res, 503, {
 
                         success: false,
 
@@ -941,6 +1175,7 @@ const server = http.createServer(
                         "UPSTOX_ACCESS_TOKEN missing in Render"
 
                     });
+
                 }
 
                 const offset = Math.max(
@@ -953,83 +1188,68 @@ const server = http.createServer(
 
                 );
 
+                const requestedLimit = Number(
+
+                    url.searchParams.get("limit") ||
+                    CONFIG.DEFAULT_LIMIT
+
+                );
+
                 const limit = Math.min(
 
                     CONFIG.MAX_LIMIT,
 
                     Math.max(
-
                         1,
-
-                        Number(
-                            url.searchParams.get("limit") ||
-                            CONFIG.DEFAULT_LIMIT
-                        )
-
+                        Number.isFinite(requestedLimit)
+                            ? requestedLimit
+                            : CONFIG.DEFAULT_LIMIT
                     )
 
                 );
 
-                const result =
-                    await scanOnlyNseFnoStocks(
-                        offset,
-                        limit
-                    );
+                const result = await scanFno(
+                    offset,
+                    limit
+                );
 
-                return json(res, 200, result);
+                return sendJson(res, 200, result);
+
             }
 
             // ======================================
-            // CLEAR CACHE
+            // UNKNOWN ROUTE
             // ======================================
 
-            if (
-                url.pathname === "/api/swing/clear-cache"
-            ) {
-
-                candleCache.clear();
-
-                fnoStocks = [];
-
-                instrumentCacheTime = 0;
-
-                return json(res, 200, {
-
-                    success: true,
-
-                    message: "Cache cleared"
-
-                });
-            }
-
-            // ======================================
-            // ROUTE NOT FOUND
-            // ======================================
-
-            return json(res, 404, {
+            return sendJson(res, 404, {
 
                 success: false,
 
-                message: "Route not found"
+                error: "Route not found"
 
             });
 
         } catch (error) {
 
             console.error(
-                "SERVER ERROR:",
+                "API ERROR:",
                 error
             );
 
-            return json(res, 500, {
+            return sendJson(res, 500, {
 
                 success: false,
 
-                error: error.message
+                error:
+                error.message ||
+                "Internal Server Error"
 
             });
+
         }
+
     }
+
 );
 
 // ======================================================
@@ -1039,25 +1259,9 @@ const server = http.createServer(
 server.listen(PORT, () => {
 
     console.log(
-        "======================================"
-    );
-
-    console.log(
-        "SMART TRADE INDIA SWING V3 STARTED"
-    );
-
-    console.log(
-        "PORT:",
+        "SMART TRADE INDIA SWING V4 RUNNING ON PORT",
         PORT
     );
 
-    console.log(
-        "UPSTOX TOKEN:",
-        TOKEN ? "CONFIGURED" : "MISSING"
-    );
-
-    console.log(
-        "======================================"
-    );
-
 });
+            
