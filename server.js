@@ -16,8 +16,7 @@ const ACCESS_TOKEN = process.env.UPSTOX_ACCESS_TOKEN;
 const UPSTOX_BASE = "https://api.upstox.com";
 
 const MASTER_URL =
-"https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
-
+"https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz";
 // SETTINGS
 
 const SCAN_LIMIT = 2751;
