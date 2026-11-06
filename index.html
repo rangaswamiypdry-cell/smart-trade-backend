@@ -371,59 +371,57 @@ let loading = false;
 let lastData = null;
 
 // ======================================
-// API STATUS
+// API STATUS - IMPROVED
 // ======================================
 
 async function checkStatus() {
 
+    const status = document.getElementById("apiStatus");
+
     try {
 
         const response = await fetch(
-            API + "/api/orb/status"
+            API + "/api/orb/status",
+            {
+                method: "GET",
+                mode: "cors",
+                cache: "no-store",
+                credentials: "omit"
+            }
         );
 
         if (!response.ok) {
-            throw new Error("API error " + response.status);
+            throw new Error("API ERROR: " + response.status);
         }
 
         const data = await response.json();
 
-        const status = document.getElementById("apiStatus");
-
         status.innerText =
-            data.apiConnected &&
-            data.instrumentsLoaded > 0
-            ? "ONLINE"
-            : "DATA NOT READY";
+            data.apiConnected ? "ONLINE" : "TOKEN CHECK";
 
         status.className =
-            data.apiConnected &&
-            data.instrumentsLoaded > 0
-            ? "online"
-            : "offline";
+            data.apiConnected ? "online" : "offline";
 
         document.getElementById("masterStatus").innerText =
-            "NSE: " + data.instrumentsLoaded +
-            " | F&O: " + data.fnoStocks;
+            "NSE: " + (data.instrumentsLoaded || 0) +
+            " | F&O: " + (data.fnoStocks || 0);
 
         document.getElementById("fnoStocks").innerText =
-            data.fnoStocks;
+            data.fnoStocks || 0;
 
         document.getElementById("totalStocks").innerText =
-            data.instrumentsLoaded;
+            data.instrumentsLoaded || 0;
 
-    } catch(error) {
+    } catch (error) {
 
-        document.getElementById("apiStatus").innerText =
-            "OFFLINE";
-
-        document.getElementById("apiStatus").className =
-            "offline";
+        status.innerText = "OFFLINE";
+        status.className = "offline";
 
         showError(error.message);
 
-    }
+        console.error("STATUS ERROR:", error);
 
+    }
 }
 
 // ======================================
