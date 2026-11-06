@@ -242,23 +242,36 @@ async function loadInstruments(force = false) {
 
         });
 
-        const fno = new Set();
+        // ======================================================
+// NSE FNO STOCK FILTER - UPDATED
+// ======================================================
 
-        for (const item of raw) {
+const fno = new Set();
 
-            if (
-                item.segment === "NSE_FO" &&
-                ["FUTSTK", "OPTSTK"].includes(
-                    item.instrument_type
-                ) &&
-                item.underlying_symbol
-            ) {
+for (const item of raw) {
 
-                fno.add(item.underlying_symbol);
+    if (
+        item.segment === "NSE_FO" &&
 
-            }
+        ["FUT", "CE", "PE"].includes(
+            item.instrument_type
+        ) &&
 
-        }
+        item.underlying_symbol
+    ) {
+
+        fno.add(
+            item.underlying_symbol
+        );
+
+    }
+
+}
+
+console.log(
+    "NSE FNO STOCKS FOUND:",
+    fno.size
+);
 
         instruments = allEquity;
 
