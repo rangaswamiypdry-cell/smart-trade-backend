@@ -872,7 +872,13 @@ async function scanOrbStocks(type = "ALL") {
 
         scannedStocks: stocks.length,
 
-        signals: results.length,
+        signals: results.filter(
+    x => x.signal !== "WAIT"
+).length,
+
+wait: results.filter(
+    x => x.signal === "WAIT"
+).length,
 
         bullish: results.filter(
             x => x.signal === "STRONG BUY"
