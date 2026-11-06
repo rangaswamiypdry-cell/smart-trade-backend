@@ -908,7 +908,13 @@ wait: results.filter(
 
         totalStocks: stocks.length,
 
-        signals: results.length,
+        signals: results.filter(
+    x => x.signal !== "WAIT"
+).length,
+
+wait: results.filter(
+    x => x.signal === "WAIT"
+).length,
 
         completedAt: new Date().toISOString()
 
