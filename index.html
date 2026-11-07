@@ -384,9 +384,7 @@ async function checkStatus() {
             API + "/api/orb/status",
             {
                 method: "GET",
-                mode: "cors",
-                cache: "no-store",
-                credentials: "omit"
+                cache: "no-store"
             }
         );
 
@@ -396,21 +394,21 @@ async function checkStatus() {
 
         const data = await response.json();
 
-        status.innerText =
-            data.apiConnected ? "ONLINE" : "TOKEN CHECK";
-
-        status.className =
-            data.apiConnected ? "online" : "offline";
+        status.innerText = "ONLINE";
+        status.className = "online";
 
         document.getElementById("masterStatus").innerText =
-            "NSE: " + (data.instrumentsLoaded || 0) +
-            " | F&O: " + (data.fnoStocks || 0);
-
-        document.getElementById("fnoStocks").innerText =
-            data.fnoStocks || 0;
+            data.instrumentsLoaded
+                ? "NSE MASTER: LOADED"
+                : "NSE MASTER: LOADING";
 
         document.getElementById("totalStocks").innerText =
-            data.instrumentsLoaded || 0;
+            data.totalInstruments || 0;
+
+        document.getElementById("fnoStocks").innerText =
+            data.totalInstruments || 0;
+
+        console.log("API STATUS:", data);
 
     } catch (error) {
 
@@ -420,10 +418,8 @@ async function checkStatus() {
         showError(error.message);
 
         console.error("STATUS ERROR:", error);
-
     }
-}
-
+            }
 // ======================================
 // SELECT TYPE
 // ======================================
