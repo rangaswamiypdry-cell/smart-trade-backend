@@ -1,132 +1,140 @@
-// ======================================================
-// SMART TRADE INDIA V2 - ORB + VOLUME BREAKOUT SCANNER
-// Node.js 20+ | Upstox API V3 | NSE Equity / F&O
-// Signals use completed 5-minute candles only.
-// ======================================================
+// SMART TRADE INDIA - ORB + VOLUME BREAKOUT SCANNER
+// Node.js 20+ | Upstox V3 | 5-minute completed candles
 
 "use strict";
 
 const http = require("http");
 const zlib = require("zlib");
+const { URL } = require("url");
 
 const PORT = Number(process.env.PORT || 10000);
-const UPSTOX_TOKEN = process.env.UPSTOX_ACCESS_TOKEN || "";
+const TOKEN = process.env.UPSTOX_ACCESS_TOKEN;
+
+const API = "https://api.upstox.com";
 
 const MASTER_URL =
 "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 
-const UPSTOX_BASE = "https://api.upstox.com";
+// SCANNER SETTINGS
 
 const SCAN_LIMIT = Math.max(
     1,
-    Number(process.env.ORB_SCAN_LIMIT || 300)
+    Number(process.env.ORB_SCAN_LIMIT || 100)
 );
 
-const SCAN_CONCURRENCY = Math.max(
+const CONCURRENCY = Math.max(
     1,
-    Number(process.env.ORB_SCAN_CONCURRENCY || 3)
+    Number(process.env.ORB_CONCURRENCY || 1)
 );
 
-const CACHE_MS = 5 * 60 * 1000;
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_GAP_MS = Math.max(
+    250,
+    Number(process.env.UPSTOX_REQUEST_GAP_MS || 400)
+);
 
-const SETTINGS = {
-    volumeMultiplier: 2.5,
-    buyRsi: 65,
-    sellRsi: 35,
-    minAdx: 25,
-    minCandles: 35,
-    atrStopMultiplier: 1.0,
-    reward1: 2,
-    reward2: 3
-};
+const CANDLE_CACHE_MS = 60000;
+const SCAN_CACHE_MS = 5 * 60 * 1000;
+
+const VOLUME_MULTIPLIER = 2.5;
+
+const RSI_BUY = 65;
+const RSI_SELL = 35;
+
+const ADX_MIN = 25;
+
+const MIN_EXPECTED_MOVE = 38;
+
+const ATR_MOVE_MULTIPLIER = 1.5;
+
+const RR1 = 2;
+const RR2 = 3;
+
+const MAX_EQUITY_POSITIONS = 2;
+const MAX_OPTION_POSITIONS = 2;
 
 // GLOBAL VARIABLES
 
 let instruments = [];
 let fnoSymbols = new Set();
 
-let masterLoadedAt = null;
+let lastMasterUpdate = null;
 let masterLoading = false;
-let masterError = null;
 
 let lastScanTime = null;
 let lastScanError = null;
+let lastRateLimitAt = null;
 
+const candleCache = new Map();
 const scanCache = new Map();
 
-// ======================================
-// JSON RESPONSE
-// ======================================
+const positions = {
+    equity: [],
+    options: []
+};
 
-function sendJson(res, status, data) {
+let requestQueue = Promise.resolve();
+let lastRequestAt = 0;
 
-    res.writeHead(status, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Cache-Control": "no-store"
-    });
+const sleep = ms =>
+    new Promise(resolve => setTimeout(resolve, ms));
 
-    res.end(JSON.stringify(data));
-}
+const round = n =>
+    Number(Number(n).toFixed(2));
 
-// ======================================
-// IST TIME
-// ======================================
+// TIME HELPERS
 
-function istParts(date = new Date()) {
+function istDate(date = new Date()) {
 
-    const parts = new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Kolkata",
         year: "numeric",
         month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23"
-    }).formatToParts(date);
+        day: "2-digit"
+    }).format(date);
 
-    const out = {};
-
-    for (const p of parts) {
-        if (p.type !== "literal") {
-            out[p.type] = p.value;
-        }
-    }
-
-    return out;
-}
-
-function istDate(date) {
-
-    const p = istParts(date);
-
-    return `${p.year}-${p.month}-${p.day}`;
 }
 
 function istTime(date) {
 
-    const p = istParts(date);
+    return new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    }).format(date);
 
-    return `${p.hour}:${p.minute}`;
 }
 
-function safeNumber(value, digits = 2) {
+// JSON RESPONSE
 
-    const n = Number(value);
+function sendJson(res, status, data) {
 
-    return Number.isFinite(n)
-        ? Number(n.toFixed(digits))
-        : null;
+    res.writeHead(status, {
+
+        "Content-Type":
+        "application/json; charset=utf-8",
+
+        "Access-Control-Allow-Origin": "*",
+
+        "Access-Control-Allow-Methods":
+        "GET, POST, OPTIONS",
+
+        "Access-Control-Allow-Headers":
+        "Content-Type, Authorization"
+
+    });
+
+    res.end(JSON.stringify(data));
+
 }
 
-// ======================================
-// DOWNLOAD MASTER
-// ======================================
+// FETCH WITH TIMEOUT
 
-async function fetchBuffer(url, timeout = 60000) {
+async function fetchTimeout(
+    url,
+    options = {},
+    timeout = 20000
+) {
 
     const controller = new AbortController();
 
@@ -137,102 +145,127 @@ async function fetchBuffer(url, timeout = 60000) {
 
     try {
 
-        const response = await fetch(url, {
+        return await fetch(url, {
+            ...options,
             signal: controller.signal
         });
 
-        if (!response.ok) {
-            throw new Error(
-                `HTTP ${response.status} while downloading instrument master`
-            );
-        }
-
-        return Buffer.from(
-            await response.arrayBuffer()
-        );
-
     } finally {
 
         clearTimeout(timer);
 
     }
+
 }
 
-// ======================================
-// UPSTOX API
-// ======================================
+// UPSTOX API WITH RATE LIMIT PROTECTION
 
-async function upstoxGet(path) {
+function upstoxRequest(path) {
 
-    if (!UPSTOX_TOKEN) {
+    const task = async () => {
+
+        if (!TOKEN) {
+            throw new Error(
+                "UPSTOX_ACCESS_TOKEN environment variable is missing"
+            );
+        }
+
+        const wait = Math.max(
+            0,
+            REQUEST_GAP_MS -
+            (Date.now() - lastRequestAt)
+        );
+
+        if (wait) await sleep(wait);
+
+        let attempt = 0;
+
+        while (attempt < 4) {
+
+            lastRequestAt = Date.now();
+
+            const response = await fetchTimeout(
+                API + path,
+                {
+                    headers: {
+                        Accept: "application/json",
+                        Authorization: "Bearer " + TOKEN
+                    }
+                },
+                20000
+            );
+
+            let data;
+
+            try {
+                data = await response.json();
+            } catch {
+                data = {
+                    message: "Invalid JSON response"
+                };
+            }
+
+            if (response.ok) {
+                return data;
+            }
+
+            if (
+                response.status === 429 ||
+                response.status >= 500
+            ) {
+
+                if (response.status === 429) {
+                    lastRateLimitAt =
+                        new Date().toISOString();
+                }
+
+                const retryAfter = Number(
+                    response.headers.get("retry-after")
+                );
+
+                const delay = retryAfter > 0
+                    ? retryAfter * 1000
+                    : Math.min(
+                        15000,
+                        1000 * (2 ** attempt)
+                    );
+
+                attempt++;
+
+                await sleep(delay);
+
+                continue;
+
+            }
+
+            throw new Error(
+                `Upstox API ${response.status}: ${JSON.stringify(data)}`
+            );
+
+        }
 
         throw new Error(
-            "UPSTOX_ACCESS_TOKEN is missing in Render environment variables"
+            "Upstox rate limit/server error: retry limit reached"
         );
 
-    }
+    };
 
-    const controller = new AbortController();
+    const result = requestQueue.then(task, task);
 
-    const timer = setTimeout(
-        () => controller.abort(),
-        REQUEST_TIMEOUT_MS
-    );
+    requestQueue = result.catch(() => {});
 
-    try {
+    return result;
 
-        const response = await fetch(
-            UPSTOX_BASE + path,
-            {
-                method: "GET",
-
-                headers: {
-                    Accept: "application/json",
-                    Authorization: `Bearer ${UPSTOX_TOKEN}`
-                },
-
-                signal: controller.signal
-            }
-        );
-
-        const body = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-
-            const message =
-                body?.errors?.[0]?.message ||
-                body?.message ||
-                JSON.stringify(body);
-
-            throw new Error(
-                `Upstox ${response.status}: ${message}`
-            );
-
-        }
-
-        return body;
-
-    } finally {
-
-        clearTimeout(timer);
-
-    }
 }
 
-// ======================================
 // LOAD NSE INSTRUMENT MASTER
-// ======================================
 
 async function loadInstruments(force = false) {
 
     if (masterLoading) {
 
         while (masterLoading) {
-
-            await new Promise(resolve =>
-                setTimeout(resolve, 200)
-            );
-
+            await sleep(150);
         }
 
         if (instruments.length) {
@@ -244,9 +277,8 @@ async function loadInstruments(force = false) {
     if (
         !force &&
         instruments.length &&
-        masterLoadedAt &&
-        Date.now() - new Date(masterLoadedAt).getTime()
-            < 24 * 60 * 60 * 1000
+        lastMasterUpdate &&
+        Date.now() - lastMasterUpdate < 86400000
     ) {
 
         return instruments.length;
@@ -254,97 +286,86 @@ async function loadInstruments(force = false) {
     }
 
     masterLoading = true;
-    masterError = null;
 
     try {
 
-        const buffer = await fetchBuffer(MASTER_URL);
-
-        let jsonBuffer;
-
-        try {
-
-            jsonBuffer = zlib.gunzipSync(buffer);
-
-        } catch {
-
-            jsonBuffer = buffer;
-
-        }
-
-        const raw = JSON.parse(
-            jsonBuffer.toString("utf8")
+        const response = await fetchTimeout(
+            MASTER_URL,
+            {},
+            60000
         );
 
-        if (!Array.isArray(raw)) {
+        if (!response.ok) {
 
             throw new Error(
-                "Instrument master response is not an array"
+                `Instrument master download failed: ${response.status}`
             );
 
         }
 
-        const equity = raw.filter(item =>
-
-            item.segment === "NSE_EQ" &&
-            item.instrument_type === "EQ" &&
-            item.instrument_key &&
-            item.trading_symbol
-
+        const buffer = Buffer.from(
+            await response.arrayBuffer()
         );
 
-        const fno = new Set();
+        let decoded;
 
-        for (const item of raw) {
+        try {
+
+            decoded = zlib.gunzipSync(buffer);
+
+        } catch {
+
+            decoded = buffer;
+
+        }
+
+        const rows = JSON.parse(
+            decoded.toString("utf8")
+        );
+
+        if (!Array.isArray(rows)) {
+            throw new Error(
+                "Invalid instrument master format"
+            );
+        }
+
+        const nextEquity = rows.filter(x =>
+            x.segment === "NSE_EQ" &&
+            x.instrument_type === "EQ" &&
+            x.instrument_key &&
+            x.trading_symbol &&
+            x.security_type !== "SM"
+        );
+
+        const nextFno = new Set();
+
+        for (const x of rows) {
 
             if (
-                item.segment === "NSE_FO" &&
-                ["FUT", "CE", "PE"].includes(item.instrument_type) &&
-                item.underlying_symbol
+                x.segment === "NSE_FO" &&
+                ["FUT", "CE", "PE"].includes(
+                    x.instrument_type
+                ) &&
+                x.underlying_symbol
             ) {
 
-                fno.add(
-                    String(item.underlying_symbol).toUpperCase()
-                );
+                nextFno.add(x.underlying_symbol);
 
             }
 
         }
 
-        instruments = equity.map(item => ({
+        instruments = nextEquity;
 
-            symbol: String(
-                item.trading_symbol
-            ).toUpperCase(),
+        fnoSymbols = nextFno;
 
-            company:
-                item.name || item.trading_symbol,
-
-            instrumentKey:
-                item.instrument_key
-
-        }));
-
-        fnoSymbols = fno;
-
-        masterLoadedAt = new Date().toISOString();
+        lastMasterUpdate = Date.now();
 
         console.log(
-            `Instrument master loaded: ${instruments.length} NSE EQ; ${fnoSymbols.size} F&O underlyings`
+            `Instrument master loaded: ${instruments.length} equity; ${fnoSymbols.size} F&O underlyings`
         );
 
         return instruments.length;
-
-    } catch (error) {
-
-        masterError = error.message;
-
-        console.error(
-            "MASTER LOAD ERROR:",
-            error.message
-        );
-
-        throw error;
 
     } finally {
 
@@ -354,67 +375,80 @@ async function loadInstruments(force = false) {
 
 }
 
-// ======================================
 // GET NSE STOCKS
-// ======================================
 
-function getStocksForScan(type) {
+function getStocksForScan(type = "FNO") {
 
-    const mode = String(type || "FNO").toUpperCase();
+    const mode = String(type).toUpperCase();
 
-    if (!["ALL", "FNO"].includes(mode)) {
-
-        throw new Error(
-            "type must be ALL or FNO"
-        );
-
+    if (!["FNO", "ALL"].includes(mode)) {
+        throw new Error("type must be FNO or ALL");
     }
 
     const list = mode === "FNO"
-
-        ? instruments.filter(item =>
-            fnoSymbols.has(item.symbol)
+        ? instruments.filter(x =>
+            fnoSymbols.has(x.trading_symbol)
         )
-
         : instruments;
 
-    return list.slice(0, SCAN_LIMIT);
+    return list.slice(0, SCAN_LIMIT).map(x => ({
+
+        symbol: x.trading_symbol,
+
+        instrumentKey: x.instrument_key
+
+    }));
 
 }
 
-// ======================================
 // GET 5 MINUTE CANDLES
-// ======================================
 
-async function getFiveMinuteCandles(instrumentKey) {
+async function getStockCandles(stock) {
 
-    const encodedKey = encodeURIComponent(
-        instrumentKey
+    const key = stock.instrumentKey;
+
+    const cached = candleCache.get(key);
+
+    if (
+        cached &&
+        Date.now() - cached.time < CANDLE_CACHE_MS
+    ) {
+
+        return cached.candles;
+
+    }
+
+    const encoded = encodeURIComponent(key);
+
+    const path =
+        `/v3/historical-candle/intraday/${encoded}/minutes/5`;
+
+    const result = await upstoxRequest(path);
+
+    const candles = prepareCandles(
+        result?.data?.candles || []
     );
 
-    const result = await upstoxGet(
+    candleCache.set(key, {
+        time: Date.now(),
+        candles
+    });
 
-        `/v3/historical-candle/intraday/${encodedKey}/minutes/5`
-
-    );
-
-    return result?.data?.candles || [];
+    return candles;
 
 }
 
-// ======================================
-// COMPLETED 5 MIN CANDLES
-// ======================================
+// PREPARE COMPLETED CANDLES
 
-function completedTodayCandles(raw) {
+function prepareCandles(raw) {
 
-    const today = istDate(new Date());
+    const today = istDate();
 
     const now = Date.now();
 
     return raw.map(c => ({
 
-        time: String(c[0]),
+        time: c[0],
 
         open: Number(c[1]),
 
@@ -430,16 +464,12 @@ function completedTodayCandles(raw) {
 
     })).filter(c => {
 
-        const timestamp = new Date(c.time).getTime();
+        const t = new Date(c.time).getTime();
 
         return (
-
-            Number.isFinite(timestamp) &&
-
-            istDate(new Date(timestamp)) === today &&
-
-            timestamp + 5 * 60 * 1000 <= now &&
-
+            Number.isFinite(t) &&
+            istDate(new Date(t)) === today &&
+            t + 5 * 60000 <= now &&
             [
                 c.open,
                 c.high,
@@ -447,22 +477,49 @@ function completedTodayCandles(raw) {
                 c.close,
                 c.volume
             ].every(Number.isFinite)
-
         );
 
     }).sort((a, b) =>
-
         new Date(a.time) - new Date(b.time)
-
     );
 
 }
 
-// ======================================
-// EMA
-// ======================================
+// ORB CALCULATION
 
-function ema(values, period) {
+function calculateORB(candles) {
+
+    const opening = candles.filter(c =>
+        [
+            "09:15",
+            "09:20",
+            "09:25"
+        ].includes(
+            istTime(new Date(c.time))
+        )
+    );
+
+    if (opening.length !== 3) {
+        return null;
+    }
+
+    return {
+
+        high: Math.max(
+            ...opening.map(c => c.high)
+        ),
+
+        low: Math.min(
+            ...opening.map(c => c.low)
+        )
+
+    };
+
+}
+
+// EMA
+
+function calculateEMA(values, period) {
 
     if (values.length < period) {
         return null;
@@ -470,27 +527,25 @@ function ema(values, period) {
 
     const k = 2 / (period + 1);
 
-    let value = values
+    let ema = values
         .slice(0, period)
         .reduce((a, b) => a + b, 0) / period;
 
     for (let i = period; i < values.length; i++) {
 
-        value =
+        ema =
             values[i] * k +
-            value * (1 - k);
+            ema * (1 - k);
 
     }
 
-    return value;
+    return ema;
 
 }
 
-// ======================================
 // RSI
-// ======================================
 
-function rsi(values, period = 14) {
+function calculateRSI(values, period = 14) {
 
     if (values.length <= period) {
         return null;
@@ -501,14 +556,10 @@ function rsi(values, period = 14) {
 
     for (let i = 1; i <= period; i++) {
 
-        const change =
-            values[i] - values[i - 1];
+        const d = values[i] - values[i - 1];
 
-        if (change > 0) {
-            gain += change;
-        } else {
-            loss -= change;
-        }
+        if (d > 0) gain += d;
+        else loss -= d;
 
     }
 
@@ -521,34 +572,28 @@ function rsi(values, period = 14) {
         i++
     ) {
 
-        const change =
-            values[i] - values[i - 1];
+        const d = values[i] - values[i - 1];
 
         avgGain =
             (avgGain * (period - 1) +
-            Math.max(change, 0)) / period;
+            Math.max(d, 0)) / period;
 
         avgLoss =
             (avgLoss * (period - 1) +
-            Math.max(-change, 0)) / period;
+            Math.max(-d, 0)) / period;
 
     }
 
-    if (avgLoss === 0) {
-        return 100;
-    }
+    if (avgLoss === 0) return 100;
 
-    return 100 - 100 / (
-        1 + avgGain / avgLoss
-    );
+    return 100 -
+        100 / (1 + avgGain / avgLoss);
 
 }
 
-// ======================================
 // VWAP
-// ======================================
 
-function vwap(candles) {
+function calculateVWAP(candles) {
 
     let pv = 0;
     let volume = 0;
@@ -570,47 +615,41 @@ function vwap(candles) {
 
 }
 
-// ======================================
 // ATR
-// ======================================
 
-function atr(candles, period = 14) {
+function calculateATR(candles, period = 14) {
 
     if (candles.length < period + 1) {
         return null;
     }
 
-    const ranges = [];
+    const tr = [];
 
     for (let i = 1; i < candles.length; i++) {
 
         const c = candles[i];
-        const prev = candles[i - 1];
+        const p = candles[i - 1];
 
-        ranges.push(Math.max(
-
+        tr.push(Math.max(
             c.high - c.low,
-
-            Math.abs(c.high - prev.close),
-
-            Math.abs(c.low - prev.close)
-
+            Math.abs(c.high - p.close),
+            Math.abs(c.low - p.close)
         ));
 
     }
 
-    const recent = ranges.slice(-period);
+    const recent = tr.slice(-period);
 
     return recent.reduce(
         (a, b) => a + b,
         0
     ) / recent.length;
 
-}// ======================================
-// ADX
-// ======================================
+}
 
-function adx(candles, period = 14) {
+// ADX
+
+function calculateADX(candles, period = 14) {
 
     if (candles.length < period * 2 + 1) {
         return null;
@@ -628,12 +667,6 @@ function adx(candles, period = 14) {
         const up = c.high - p.high;
         const down = p.low - c.low;
 
-        tr.push(Math.max(
-            c.high - c.low,
-            Math.abs(c.high - p.close),
-            Math.abs(c.low - p.close)
-        ));
-
         plus.push(
             up > down && up > 0 ? up : 0
         );
@@ -641,6 +674,12 @@ function adx(candles, period = 14) {
         minus.push(
             down > up && down > 0 ? down : 0
         );
+
+        tr.push(Math.max(
+            c.high - c.low,
+            Math.abs(c.high - p.close),
+            Math.abs(c.low - p.close)
+        ));
 
     }
 
@@ -654,28 +693,29 @@ function adx(candles, period = 14) {
 
         const start = i - period + 1;
 
-        const trSum = tr
+        const sumTR = tr
             .slice(start, i + 1)
             .reduce((a, b) => a + b, 0);
 
-        if (!trSum) continue;
+        if (!sumTR) continue;
 
         const pdi =
             100 *
             plus.slice(start, i + 1)
                 .reduce((a, b) => a + b, 0) /
-            trSum;
+            sumTR;
 
         const mdi =
             100 *
             minus.slice(start, i + 1)
                 .reduce((a, b) => a + b, 0) /
-            trSum;
+            sumTR;
 
         dx.push(
             pdi + mdi === 0
                 ? 0
-                : 100 * Math.abs(pdi - mdi) / (pdi + mdi)
+                : 100 * Math.abs(pdi - mdi) /
+                  (pdi + mdi)
         );
 
     }
@@ -684,88 +724,91 @@ function adx(candles, period = 14) {
         return null;
     }
 
-    return dx
-        .slice(-period)
-        .reduce((a, b) => a + b, 0) / period;
+    return dx.slice(-period).reduce(
+        (a, b) => a + b,
+        0
+    ) / period;
 
 }
 
-// ======================================
-// ORB CALCULATION
-// ======================================
+// CANDLE STRENGTH
 
-function getOrb(candles) {
+function candleStrength(c, direction) {
 
-    const opening = candles.filter(c =>
+    const range = c.high - c.low;
 
-        ["09:15", "09:20", "09:25"].includes(
-            istTime(new Date(c.time))
-        )
-
-    );
-
-    if (opening.length !== 3) {
-        return null;
-    }
-
-    return {
-
-        high: Math.max(
-            ...opening.map(c => c.high)
-        ),
-
-        low: Math.min(
-            ...opening.map(c => c.low)
-        )
-
-    };
-
-}
-
-// ======================================
-// STRONG CANDLE
-// ======================================
-
-function candleIsStrong(candle, direction) {
-
-    const range =
-        candle.high - candle.low;
-
-    if (range <= 0) {
-        return false;
-    }
+    if (range <= 0) return false;
 
     const bodyRatio =
-        Math.abs(candle.close - candle.open) / range;
+        Math.abs(c.close - c.open) / range;
 
     if (direction === "BUY") {
 
         return (
-            candle.close > candle.open &&
+            c.close > c.open &&
             bodyRatio >= 0.60 &&
-            (candle.high - candle.close) / range <= 0.20
+            (c.high - c.close) / range <= 0.20
         );
 
     }
 
     return (
-        candle.close < candle.open &&
+        c.close < c.open &&
         bodyRatio >= 0.60 &&
-        (candle.close - candle.low) / range <= 0.20
+        (c.close - c.low) / range <= 0.20
     );
 
 }
 
-// ======================================
+// TRADE CALCULATION
+
+function calculateTrade(direction, price, atr) {
+
+    const risk = Math.max(
+        atr,
+        price * 0.005
+    );
+
+    if (direction === "BUY") {
+
+        return {
+
+            entry: round(price),
+
+            stopLoss: round(price - risk),
+
+            target1: round(price + risk * RR1),
+
+            target2: round(price + risk * RR2),
+
+            riskPoints: round(risk)
+
+        };
+
+    }
+
+    return {
+
+        entry: round(price),
+
+        stopLoss: round(price + risk),
+
+        target1: round(price - risk * RR1),
+
+        target2: round(price - risk * RR2),
+
+        riskPoints: round(risk)
+
+    };
+
+}
+// ======================================================
 // STOCK ANALYSIS
-// ======================================
+// ======================================================
 
-function analyseStock(stock, rawCandles) {
+function analyseStock(stock, candles) {
 
-    const candles =
-        completedTodayCandles(rawCandles);
-
-    if (candles.length < SETTINGS.minCandles) {
+    if (!candles || candles.length < 35) {
         return null;
     }
 
@@ -775,217 +818,178 @@ function analyseStock(stock, rawCandles) {
 
     const closes = candles.map(c => c.close);
 
-    const ema20 = ema(closes, 20);
+    const ema20 = calculateEMA(closes, 20);
 
-    const rsi14 = rsi(closes, 14);
+    const rsi = calculateRSI(closes, 14);
 
-    const sessionVwap = vwap(candles);
+    const vwap = calculateVWAP(candles);
 
-    const atr14 = atr(candles, 14);
+    const atr = calculateATR(candles, 14);
 
-    const adx14 = adx(candles, 14);
-
-    const orb = getOrb(candles);
+    const adx = calculateADX(candles, 14);
 
     if (
-        [ema20, rsi14, sessionVwap, atr14, adx14]
-            .some(v => !Number.isFinite(v)) ||
-        !orb
+        ![
+            ema20,
+            rsi,
+            vwap,
+            atr,
+            adx
+        ].every(Number.isFinite)
     ) {
         return null;
     }
 
-    const previousVolumes =
-        candles.slice(-21, -1).map(c => c.volume);
+    // ORB
+
+    const orb = calculateORB(candles);
+
+    if (!orb) {
+        return null;
+    }
+
+    // PREVIOUS 20 CANDLE VOLUME
+
+    const previousVolumes = candles
+        .slice(-21, -1)
+        .map(c => c.volume);
 
     if (previousVolumes.length !== 20) {
         return null;
     }
 
     const averageVolume =
-        previousVolumes.reduce((a, b) => a + b, 0) / 20;
+        previousVolumes.reduce(
+            (a, b) => a + b,
+            0
+        ) / 20;
 
     const volumeRatio =
         averageVolume > 0
             ? last.volume / averageVolume
             : 0;
 
-    const volumePass =
-        volumeRatio >= SETTINGS.volumeMultiplier;
+    const estimatedMovePoints =
+        atr * ATR_MOVE_MULTIPLIER;
 
-    const adxPass =
-        adx14 >= SETTINGS.minAdx;
+    const commonPass =
+        volumeRatio >= VOLUME_MULTIPLIER &&
+        adx >= ADX_MIN &&
+        estimatedMovePoints >= MIN_EXPECTED_MOVE;
 
-    const moveRisk =
-        Math.max(atr14, last.close * 0.005);
-
-    // BULLISH CONDITIONS
+    // BULLISH
 
     const bullish =
-
+        commonPass &&
         last.close > last.open &&
-
         last.close > ema20 &&
-
-        last.close > sessionVwap &&
-
+        last.close > vwap &&
         previous.close <= orb.high &&
-
         last.close > orb.high &&
+        rsi >= RSI_BUY &&
+        candleStrength(last, "BUY");
 
-        rsi14 >= SETTINGS.buyRsi &&
-
-        volumePass &&
-
-        adxPass &&
-
-        candleIsStrong(last, "BUY");
-
-    // BEARISH CONDITIONS
+    // BEARISH
 
     const bearish =
-
+        commonPass &&
         last.close < last.open &&
-
         last.close < ema20 &&
-
-        last.close < sessionVwap &&
-
+        last.close < vwap &&
         previous.close >= orb.low &&
-
         last.close < orb.low &&
-
-        rsi14 <= SETTINGS.sellRsi &&
-
-        volumePass &&
-
-        adxPass &&
-
-        candleIsStrong(last, "SELL");
+        rsi <= RSI_SELL &&
+        candleStrength(last, "SELL");
 
     if (!bullish && !bearish) {
         return null;
     }
 
-    const direction =
-        bullish ? "BUY" : "SELL";
-
-    const entry = last.close;
-
-    const stopLoss =
-        direction === "BUY"
-            ? entry - moveRisk
-            : entry + moveRisk;
-
-    const target1 =
-        direction === "BUY"
-            ? entry + moveRisk * SETTINGS.reward1
-            : entry - moveRisk * SETTINGS.reward1;
-
-    const target2 =
-        direction === "BUY"
-            ? entry + moveRisk * SETTINGS.reward2
-            : entry - moveRisk * SETTINGS.reward2;
+    const direction = bullish ? "BUY" : "SELL";
 
     return {
 
         symbol: stock.symbol,
 
-        company: stock.company,
-
         instrumentKey: stock.instrumentKey,
 
-        signal:
-            direction === "BUY"
-                ? "STRONG BUY"
-                : "STRONG SELL",
+        signal: direction,
 
-        direction,
+        strength: `VERY STRONG ${direction}`,
 
-        price: safeNumber(last.close),
-
-        entry: safeNumber(entry),
-
-        stopLoss: safeNumber(stopLoss),
-
-        target1: safeNumber(target1),
-
-        target2: safeNumber(target2),
-
-        riskReward:
-            `1:${SETTINGS.reward1} / 1:${SETTINGS.reward2}`,
-
-        orbHigh: safeNumber(orb.high),
-
-        orbLow: safeNumber(orb.low),
-
-        volumeRatio: safeNumber(volumeRatio),
-
-        volumeBreakout: volumePass,
-
-        rsi: safeNumber(rsi14),
-
-        adx: safeNumber(adx14),
-
-        vwap: safeNumber(sessionVwap),
-
-        ema20: safeNumber(ema20),
-
-        atr: safeNumber(atr14),
+        price: round(last.close),
 
         candleTime: last.time,
 
         timeframe: "5 MIN",
 
+        indicators: {
+
+            rsi: round(rsi),
+
+            adx: round(adx),
+
+            ema20: round(ema20),
+
+            vwap: round(vwap),
+
+            atr: round(atr),
+
+            volumeRatio: round(volumeRatio),
+
+            estimatedMovePoints:
+                round(estimatedMovePoints)
+
+        },
+
+        orb: {
+
+            high: round(orb.high),
+
+            low: round(orb.low)
+
+        },
+
+        trade: calculateTrade(
+            direction,
+            last.close,
+            atr
+        ),
+
         note:
-            "Signal from completed 5-minute candles; estimated levels are not guaranteed."
+            "Completed 5-minute candle signal. ATR-based targets are estimates, not guaranteed."
 
     };
 
 }
 
-// ======================================
 // CONCURRENT SCANNER
-// ======================================
 
-async function runPool(items, concurrency, worker) {
+async function runConcurrent(items, limit, worker) {
 
     const results = [];
 
-    let next = 0;
-
-    let errors = 0;
+    let index = 0;
 
     async function runner() {
 
-        while (true) {
+        while (index < items.length) {
 
-            const index = next++;
-
-            if (index >= items.length) {
-                return;
-            }
+            const item = items[index++];
 
             try {
 
-                const result = await worker(items[index]);
+                const value = await worker(item);
 
-                if (result) {
-                    results.push(result);
+                if (value) {
+                    results.push(value);
                 }
 
             } catch (error) {
 
-                errors++;
-
-                if (errors <= 5) {
-
-                    console.error(
-                        "Individual stock scan error:",
-                        error.message
-                    );
-
-                }
+                console.error(
+                    `Scan error: ${item.symbol}: ${error.message}`
+                );
 
             }
 
@@ -994,390 +998,563 @@ async function runPool(items, concurrency, worker) {
     }
 
     await Promise.all(
-
         Array.from(
             {
-                length: Math.min(concurrency, items.length)
+                length: Math.min(limit, items.length)
             },
-            () => runner()
+            runner
         )
-
     );
 
-    return {
-        results,
-        errors
-    };
+    return results;
 
 }
 
-// ======================================
-// MAIN ORB SCANNER
-// ======================================
+// ORB SCANNER
 
-async function scanStocks(type = "FNO", force = false) {
+async function scanOrbStocks(type = "FNO") {
 
     const mode = String(type).toUpperCase();
 
-    if (!["ALL", "FNO"].includes(mode)) {
+    const bucket = Math.floor(
+        Date.now() / SCAN_CACHE_MS
+    );
 
-        throw new Error(
-            "Invalid scan type. Use ALL or FNO."
-        );
+    const cacheKey = `${mode}_${bucket}`;
 
+    if (scanCache.has(cacheKey)) {
+        return scanCache.get(cacheKey);
     }
 
-    const cacheKey = mode;
-
-    const cached = scanCache.get(cacheKey);
-
-    if (
-        !force &&
-        cached &&
-        Date.now() - cached.createdAt < CACHE_MS
-    ) {
-
-        return {
-            ...cached.payload,
-            cached: true
-        };
-
+    if (!instruments.length) {
+        await loadInstruments();
     }
 
-    await loadInstruments();
+    const stocks = getStocksForScan(mode);
 
-    const universe = getStocksForScan(mode);
-
-    const { results, errors } = await runPool(
-
-        universe,
-
-        SCAN_CONCURRENCY,
-
+    const signals = await runConcurrent(
+        stocks,
+        CONCURRENCY,
         async stock => {
 
-            const candles =
-                await getFiveMinuteCandles(stock.instrumentKey);
+            const candles = await getStockCandles(stock);
 
             return analyseStock(stock, candles);
 
         }
-
     );
 
-    results.sort((a, b) =>
-
-        (b.volumeRatio * b.adx) -
-        (a.volumeRatio * a.adx)
-
+    signals.sort((a, b) =>
+        b.indicators.volumeRatio * b.indicators.adx -
+        a.indicators.volumeRatio * a.indicators.adx
     );
 
-    const payload = {
+    const result = {
 
         success: true,
 
         type: mode,
 
-        totalStocks: universe.length,
+        totalScanned: stocks.length,
 
-        fnoStocks: fnoSymbols.size,
-
-        totalScanned: universe.length,
-
-        bullish: results.filter(
-            x => x.direction === "BUY"
-        ).length,
-
-        bearish: results.filter(
-            x => x.direction === "SELL"
-        ).length,
-
-        totalSignals: results.length,
-
-        scanErrors: errors,
+        totalSignals: signals.length,
 
         scanTime: new Date().toISOString(),
 
-        data: results
+        signals
 
     };
 
-    lastScanTime = payload.scanTime;
+    scanCache.clear();
 
-    lastScanError = errors
-        ? `${errors} individual instrument request(s) failed`
-        : null;
+    scanCache.set(cacheKey, result);
 
-    scanCache.set(cacheKey, {
-        createdAt: Date.now(),
-        payload
-    });
+    lastScanTime = result.scanTime;
 
-    return {
-        ...payload,
-        cached: false
-    };
+    lastScanError = null;
+
+    return result;
 
 }
 
-// ======================================
-// HTTP SERVER
-// ======================================
+// FILTER SIGNALS
 
-const server = http.createServer(async (req, res) => {
+function filterSignals(signals, direction) {
 
-    if (req.method === "OPTIONS") {
-
-        return sendJson(res, 200, {
-            success: true
-        });
-
-    }
-
-    const url = new URL(
-        req.url,
-        `http://${req.headers.host || "localhost"}`
+    return signals.filter(
+        x => x.signal === direction
     );
 
-    const path = url.pathname;
+}
 
-    try {
+// READ REQUEST BODY
 
-        // HEALTH CHECK
+function readBody(req) {
 
-        if (
-            req.method === "GET" &&
-            path === "/health"
-        ) {
+    return new Promise((resolve, reject) => {
 
-            return sendJson(res, 200, {
+        let body = "";
 
-                success: true,
+        req.on("data", chunk => {
 
-                message:
-                    "Smart Trade India ORB V2 backend running",
+            body += chunk;
 
-                time: new Date().toISOString()
+            if (body.length > 1000000) {
 
-            });
+                reject(
+                    new Error("Request body too large")
+                );
 
-        }
-
-        // API STATUS
-
-        if (
-            req.method === "GET" &&
-            path === "/api/orb/status"
-        ) {
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                apiOnline: true,
-
-                tokenConfigured: Boolean(UPSTOX_TOKEN),
-
-                instrumentsLoaded: instruments.length > 0,
-
-                totalInstruments: instruments.length,
-
-                totalFnoStocks: fnoSymbols.size,
-
-                masterLoading,
-
-                masterLoadedAt,
-
-                masterError,
-
-                lastScanTime,
-
-                lastScanError,
-
-                scanLimit: SCAN_LIMIT,
-
-                scanConcurrency: SCAN_CONCURRENCY
-
-            });
-
-        }
-
-        // REFRESH NSE MASTER
-
-        if (
-            req.method === "GET" &&
-            path === "/api/orb/refresh-master"
-        ) {
-
-            const total = await loadInstruments(true);
-
-            scanCache.clear();
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                totalInstruments: total,
-
-                totalFnoStocks: fnoSymbols.size,
-
-                masterLoadedAt
-
-            });
-
-        }
-
-        // FULL SCANNER
-
-        if (
-            req.method === "GET" &&
-            path === "/api/orb/scan"
-        ) {
-
-            const type =
-                url.searchParams.get("type") || "FNO";
-
-            const force =
-                url.searchParams.get("refresh") === "1";
-
-            const result =
-                await scanStocks(type, force);
-
-            return sendJson(res, 200, result);
-
-        }
-
-        // BULLISH SIGNALS
-
-        if (
-            req.method === "GET" &&
-            path === "/api/orb/bullish"
-        ) {
-
-            const result =
-                await scanStocks("FNO");
-
-            const data = result.data.filter(
-                x => x.direction === "BUY"
-            );
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                total: data.length,
-
-                data
-
-            });
-
-        }
-
-        // BEARISH SIGNALS
-
-        if (
-            req.method === "GET" &&
-            path === "/api/orb/bearish"
-        ) {
-
-            const result =
-                await scanStocks("FNO");
-
-            const data = result.data.filter(
-                x => x.direction === "SELL"
-            );
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                total: data.length,
-
-                data
-
-            });
-
-        }
-
-        // STRONG SIGNALS
-
-        if (
-            req.method === "GET" &&
-            path === "/api/orb/strong"
-        ) {
-
-            const result =
-                await scanStocks("FNO");
-
-            return sendJson(res, 200, {
-
-                success: true,
-
-                total: result.data.length,
-
-                data: result.data
-
-            });
-
-        }
-
-        // ROUTE NOT FOUND
-
-        return sendJson(res, 404, {
-
-            success: false,
-
-            error: "API route not found",
-
-            path
+            }
 
         });
 
-    } catch (error) {
+        req.on("end", () => {
 
-        lastScanError = error.message;
+            try {
 
-        console.error(
-            "SERVER ERROR:",
-            error
+                resolve(
+                    body ? JSON.parse(body) : {}
+                );
+
+            } catch {
+
+                reject(
+                    new Error("Invalid JSON body")
+                );
+
+            }
+
+        });
+
+        req.on("error", reject);
+
+    });
+
+}
+
+// ADD POSITION
+
+function addPosition(type, data) {
+
+    if (!positions[type]) {
+        throw new Error("Invalid position type");
+    }
+
+    const open = positions[type].filter(
+        p => p.status === "OPEN"
+    );
+
+    const max = type === "equity"
+        ? MAX_EQUITY_POSITIONS
+        : MAX_OPTION_POSITIONS;
+
+    if (open.length >= max) {
+
+        throw new Error(
+            `Maximum ${type} positions reached`
         );
-
-        const status =
-            error.message.includes("UPSTOX_ACCESS_TOKEN")
-                ? 503
-                : 500;
-
-        return sendJson(res, status, {
-
-            success: false,
-
-            error: error.message
-
-        });
 
     }
 
-});
+    const entryPrice = Number(data.entryPrice);
 
-// ======================================
+    const quantity = Number(data.quantity || 1);
+
+    if (
+        !data.symbol ||
+        !Number.isFinite(entryPrice) ||
+        entryPrice <= 0 ||
+        !Number.isFinite(quantity) ||
+        quantity <= 0
+    ) {
+
+        throw new Error(
+            "Valid symbol, entryPrice and quantity are required"
+        );
+
+    }
+
+    const position = {
+
+        id:
+            Date.now().toString(36) +
+            Math.random().toString(36).slice(2, 8),
+
+        type,
+
+        symbol: String(data.symbol),
+
+        direction:
+            data.direction === "SELL"
+                ? "SELL"
+                : "BUY",
+
+        entryPrice,
+
+        quantity,
+
+        status: "OPEN",
+
+        createdAt: new Date().toISOString()
+
+    };
+
+    positions[type].push(position);
+
+    return position;
+
+}
+
+// CLOSE POSITION
+
+function closePosition(type, id) {
+
+    const p = positions[type]?.find(
+        x =>
+            x.id === id &&
+            x.status === "OPEN"
+    );
+
+    if (!p) {
+        return null;
+    }
+
+    p.status = "CLOSED";
+
+    p.closedAt = new Date().toISOString();
+
+    return p;
+
+}
+
+// ======================================================
+// HTTP SERVER
+// ======================================================
+
+const server = http.createServer(
+    async (req, res) => {
+
+        if (req.method === "OPTIONS") {
+
+            res.writeHead(204, {
+
+                "Access-Control-Allow-Origin": "*",
+
+                "Access-Control-Allow-Methods":
+                    "GET, POST, OPTIONS",
+
+                "Access-Control-Allow-Headers":
+                    "Content-Type, Authorization"
+
+            });
+
+            return res.end();
+
+        }
+
+        const url = new URL(
+            req.url,
+            "http://localhost"
+        );
+
+        const path = url.pathname;
+
+        try {
+
+            // HEALTH
+
+            if (
+                req.method === "GET" &&
+                path === "/health"
+            ) {
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    message:
+                        "Smart Trade India ORB scanner running",
+
+                    time: new Date().toISOString()
+
+                });
+
+            }
+
+            // ORB STATUS
+
+            if (
+                req.method === "GET" &&
+                path === "/api/orb/status"
+            ) {
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    tokenConfigured: Boolean(TOKEN),
+
+                    instrumentsLoaded:
+                        instruments.length > 0,
+
+                    totalInstruments:
+                        instruments.length,
+
+                    totalFnoSymbols:
+                        fnoSymbols.size,
+
+                    lastMasterLoad:
+                        lastMasterUpdate
+                            ? new Date(lastMasterUpdate).toISOString()
+                            : null,
+
+                    lastScanTime,
+
+                    lastScanError,
+
+                    lastRateLimitAt,
+
+                    scanLimit: SCAN_LIMIT,
+
+                    concurrency: CONCURRENCY
+
+                });
+
+            }
+
+            // REFRESH MASTER
+
+            if (
+                req.method === "GET" &&
+                path === "/api/orb/refresh-master"
+            ) {
+
+                const total =
+                    await loadInstruments(true);
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    totalInstruments: total,
+
+                    totalFnoSymbols:
+                        fnoSymbols.size
+
+                });
+
+            }
+
+            // STOCK LIST
+
+            if (
+                req.method === "GET" &&
+                path === "/api/orb/stocks"
+            ) {
+
+                if (!instruments.length) {
+                    await loadInstruments();
+                }
+
+                const stocks = getStocksForScan(
+                    url.searchParams.get("type") || "FNO"
+                );
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    total: stocks.length,
+
+                    stocks
+
+                });
+
+            }
+
+            // FULL SCAN
+
+            if (
+                req.method === "GET" &&
+                path === "/api/orb/scan"
+            ) {
+
+                return sendJson(
+                    res,
+                    200,
+                    await scanOrbStocks(
+                        url.searchParams.get("type") || "FNO"
+                    )
+                );
+
+            }
+
+            // BULLISH / BEARISH / STRONG
+
+            if (
+                req.method === "GET" &&
+                [
+                    "/api/orb/bullish",
+                    "/api/orb/bearish",
+                    "/api/orb/strong"
+                ].includes(path)
+            ) {
+
+                const result =
+                    await scanOrbStocks("FNO");
+
+                const signals =
+                    path.endsWith("bullish")
+                        ? filterSignals(
+                            result.signals,
+                            "BUY"
+                        )
+                        : path.endsWith("bearish")
+                            ? filterSignals(
+                                result.signals,
+                                "SELL"
+                            )
+                            : result.signals;
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    total: signals.length,
+
+                    signals
+
+                });
+
+            }
+
+            // GET POSITIONS
+
+            if (
+                req.method === "GET" &&
+                path === "/api/positions"
+            ) {
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    positions
+
+                });
+
+            }
+
+            // ADD POSITION
+
+            if (
+                req.method === "POST" &&
+                [
+                    "/api/positions/equity",
+                    "/api/positions/options"
+                ].includes(path)
+            ) {
+
+                const type =
+                    path.endsWith("equity")
+                        ? "equity"
+                        : "options";
+
+                const position = addPosition(
+                    type,
+                    await readBody(req)
+                );
+
+                return sendJson(res, 201, {
+
+                    success: true,
+
+                    position
+
+                });
+
+            }
+
+            // CLOSE POSITION
+
+            const match = path.match(
+                /^\/api\/positions\/(equity|options)\/([^/]+)\/close$/
+            );
+
+            if (
+                req.method === "POST" &&
+                match
+            ) {
+
+                const position = closePosition(
+                    match[1],
+                    match[2]
+                );
+
+                if (!position) {
+
+                    return sendJson(res, 404, {
+
+                        success: false,
+
+                        message:
+                            "Open position not found"
+
+                    });
+
+                }
+
+                return sendJson(res, 200, {
+
+                    success: true,
+
+                    position
+
+                });
+
+            }
+
+            // ROUTE NOT FOUND
+
+            return sendJson(res, 404, {
+
+                success: false,
+
+                message: "API route not found",
+
+                path
+
+            });
+
+        } catch (error) {
+
+            lastScanError = error.message;
+
+            console.error(
+                "SERVER ERROR:",
+                error
+            );
+
+            return sendJson(res, 500, {
+
+                success: false,
+
+                error: error.message
+
+            });
+
+        }
+
+    }
+);
+
 // START SERVER
-// ======================================
 
 server.listen(PORT, () => {
 
     console.log(
-        `SMART TRADE INDIA ORB V2 running on port ${PORT}`
-    );
-
-    // Load NSE master in background
-
-    loadInstruments().catch(error =>
-
-        console.error(
-            "Startup master load failed:",
-            error.message
-        )
-
+        `SMART TRADE INDIA ORB SCANNER RUNNING ON PORT ${PORT}`
     );
 
 });
