@@ -1,17 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta name="viewport"
-content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Smart Trade India Scanner</title>
 
 <style>
-
 * {
     margin: 0;
     padding: 0;
@@ -22,7 +17,7 @@ body {
     background: #080f1e;
     color: white;
     font-family: Arial, sans-serif;
-    padding: 15px;
+    padding: 12px;
 }
 
 .header {
@@ -30,6 +25,7 @@ body {
     padding: 20px;
     border-radius: 12px;
     margin-bottom: 15px;
+    border: 1px solid #263a58;
 }
 
 .header h2 {
@@ -40,6 +36,7 @@ body {
 .header p {
     color: #aab7cc;
     margin-top: 8px;
+    font-size: 13px;
 }
 
 .status {
@@ -54,22 +51,28 @@ body {
     font-weight: bold;
 }
 
+#lastScan {
+    color: #aab7cc;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
 .cards {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 10px;
     margin-bottom: 15px;
 }
 
 .card {
     background: #17253c;
-    padding: 18px;
+    padding: 17px;
     border-radius: 12px;
 }
 
 .card p {
     color: #aab7cc;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .card h2 {
@@ -77,24 +80,20 @@ body {
     font-size: 25px;
 }
 
-.green {
-    color: #00e5a0;
-}
-
-.red {
-    color: #ff5268;
-}
-
-.blue {
-    color: #46a6ff;
-}
+.green { color: #00e5a0; }
+.red { color: #ff5268; }
+.blue { color: #46a6ff; }
 
 button {
     border: none;
-    padding: 13px;
+    padding: 14px;
     border-radius: 8px;
     font-weight: bold;
     cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.5;
 }
 
 .scanBtn {
@@ -102,7 +101,7 @@ button {
     background: #00d99a;
     color: #071528;
     font-size: 16px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .refreshBtn {
@@ -114,7 +113,7 @@ button {
 
 .tabs {
     display: flex;
-    gap: 7px;
+    gap: 6px;
     margin-bottom: 15px;
 }
 
@@ -123,6 +122,7 @@ button {
     background: #17253c;
     color: white;
     font-size: 12px;
+    padding: 12px 5px;
 }
 
 .tabs button.active {
@@ -162,7 +162,8 @@ button {
 .signal p {
     font-size: 13px;
     color: #b8c5d9;
-    margin-top: 6px;
+    margin-top: 7px;
+    line-height: 1.5;
 }
 
 .signal strong {
@@ -171,14 +172,16 @@ button {
 
 .loading {
     text-align: center;
-    padding: 20px;
+    padding: 25px 10px;
     color: #00e5a0;
+    line-height: 1.8;
 }
 
 .error {
     color: #ff5268;
-    padding: 10px;
+    padding: 12px;
     font-size: 13px;
+    line-height: 1.7;
 }
 
 .footer {
@@ -189,183 +192,195 @@ button {
 }
 
 @media(min-width:700px) {
+    body {
+        max-width: 1100px;
+        margin: auto;
+    }
 
     .cards {
         grid-template-columns: repeat(4, 1fr);
     }
-
 }
-
 </style>
-
 </head>
 
 <body>
 
 <div class="header">
-
-<h2>SMART TRADE INDIA</h2>
-
-<p>ORB + VOLUME + SMART MONEY SCANNER</p>
-
-<p>5 MINUTE CLOSED CANDLE</p>
-
+    <h2>SMART TRADE INDIA</h2>
+    <p>ORB + VOLUME + SMART MONEY SCANNER</p>
+    <p>5 MINUTE CLOSED CANDLE</p>
 </div>
 
 <div class="status">
-
-SERVER STATUS:
-<span id="serverStatus">CHECKING...</span>
-
-<p id="lastScan">Last Scan: Not Started</p>
-
+    SERVER STATUS:
+    <span id="serverStatus">CHECKING...</span>
+    <p id="lastScan">Last Scan: Not Started</p>
 </div>
 
 <div class="cards">
 
-<div class="card">
-<p>TOTAL STOCKS</p>
-<h2 class="blue" id="totalStocks">0</h2>
+    <div class="card">
+        <p>TOTAL STOCKS SCANNED</p>
+        <h2 class="blue" id="totalStocks">0</h2>
+    </div>
+
+    <div class="card">
+        <p>TOTAL SIGNALS</p>
+        <h2 id="totalSignals">0</h2>
+    </div>
+
+    <div class="card">
+        <p>BUY SIGNALS</p>
+        <h2 class="green" id="buyCount">0</h2>
+    </div>
+
+    <div class="card">
+        <p>SELL SIGNALS</p>
+        <h2 class="red" id="sellCount">0</h2>
+    </div>
+
 </div>
 
-<div class="card">
-<p>TOTAL SIGNALS</p>
-<h2 id="totalSignals">0</h2>
-</div>
-
-<div class="card">
-<p>BUY SIGNALS</p>
-<h2 class="green" id="buyCount">0</h2>
-</div>
-
-<div class="card">
-<p>SELL SIGNALS</p>
-<h2 class="red" id="sellCount">0</h2>
-</div>
-
-</div>
-
-<button class="scanBtn" onclick="startScan()">
-
-START F&O SCANNER
-
+<button class="scanBtn" id="scanButton" onclick="startScan()">
+    START F&O SCANNER
 </button>
 
 <button class="refreshBtn" onclick="checkStatus()">
-
-REFRESH SERVER STATUS
-
+    REFRESH SERVER STATUS
 </button>
 
 <div class="tabs">
 
-<button class="active"
-onclick="showTab('ALL',this)">ALL</button>
+    <button class="active" onclick="showTab('ALL',this)">
+        ALL
+    </button>
 
-<button onclick="showTab('BUY',this)">
-BUY
-</button>
+    <button onclick="showTab('BUY',this)">
+        BUY
+    </button>
 
-<button onclick="showTab('SELL',this)">
-SELL
-</button>
+    <button onclick="showTab('SELL',this)">
+        SELL
+    </button>
 
-<button onclick="showTab('STRONG',this)">
-STRONG
-</button>
+    <button onclick="showTab('STRONG',this)">
+        STRONG
+    </button>
 
 </div>
 
 <div class="section">
 
-<h3>LIVE SCANNER RESULTS</h3>
+    <h3>LIVE SCANNER RESULTS</h3>
 
-<div id="results">
-
-<div class="loading">
-Waiting for Scanner...
-</div>
-
-</div>
+    <div id="results">
+        <div class="loading">
+            Waiting for Scanner...
+        </div>
+    </div>
 
 </div>
 
 <div class="footer">
-
-SMART TRADE INDIA<br>
-
-Market Scanner Dashboard
-
+    SMART TRADE INDIA<br>
+    ORB + VOLUME BREAKOUT SCANNER
 </div>
 
 <script>
-
-// ==========================================
+    // ======================================
 // SMART TRADE INDIA
 // PART 2 - API CONNECTION
-// ==========================================
+// ======================================
 
 const API =
 "https://smart-trade-backend-ig6l.onrender.com";
 
 let allSignals = [];
-
 let currentTab = "ALL";
-
 let scanning = false;
 
-// ==========================================
+
+// ======================================
 // SERVER STATUS
-// ==========================================
+// ======================================
 
 async function checkStatus() {
 
     const status =
         document.getElementById("serverStatus");
 
+    status.innerText = "CONNECTING...";
+
+    const controller = new AbortController();
+
+    const timer = setTimeout(() => {
+        controller.abort();
+    }, 90000);
+
     try {
 
-        status.innerText = "CONNECTING...";
-
         const response = await fetch(
-            API + "/api/orb/status"
+            API + "/api/orb/status?t=" + Date.now(),
+            {
+                method: "GET",
+                cache: "no-store",
+                signal: controller.signal
+            }
         );
 
         if (!response.ok) {
-
-            throw new Error("Server Error");
-
+            throw new Error("HTTP ERROR: " + response.status);
         }
 
         const data = await response.json();
 
-        if (data.success) {
+        if (!data.success) {
+            throw new Error("Invalid server response");
+        }
 
-            status.innerText =
-                data.instrumentsLoaded
-                ? "🟢 CONNECTED"
-                : "🟡 MASTER NOT LOADED";
+        if (data.instrumentsLoaded) {
 
-            document.getElementById(
-                "totalStocks"
-            ).innerText =
-                data.totalFnoSymbols || 0;
+            status.innerText = "🟢 CONNECTED";
+
+        } else {
+
+            status.innerText = "🟡 MASTER NOT LOADED";
 
         }
 
+        document.getElementById("totalStocks").innerText =
+            data.totalFnoSymbols || 0;
+
     } catch (error) {
 
-        status.innerText = "🔴 OFFLINE";
+        if (error.name === "AbortError") {
 
-        console.error(error);
+            status.innerText = "🔴 SERVER TIMEOUT";
+
+        } else if (error.message === "Failed to fetch") {
+
+            status.innerText = "🔴 NETWORK / CORS ERROR";
+
+        } else {
+
+            status.innerText = "🔴 " + error.message;
+
+        }
+
+        console.error("STATUS ERROR:", error);
+
+    } finally {
+
+        clearTimeout(timer);
 
     }
-
 }
 
-// ==========================================
-// START SCANNER
-// ==========================================
+
+// ======================================
+// START F&O SCANNER
+// ======================================
 
 async function startScan() {
 
@@ -373,28 +388,44 @@ async function startScan() {
 
     scanning = true;
 
+    const button =
+        document.getElementById("scanButton");
+
     const results =
         document.getElementById("results");
 
+    button.disabled = true;
+    button.innerText = "SCANNING... PLEASE WAIT";
+
     results.innerHTML = `
         <div class="loading">
-            SCANNER STARTED...<br><br>
-            Please Wait...<br>
-            Loading F&O Stocks...
+            SCANNER STARTED...<br>
+            Loading NSE F&O Stocks...<br>
+            Please Wait...
         </div>
     `;
+
+    const controller = new AbortController();
+
+    const timer = setTimeout(() => {
+        controller.abort();
+    }, 600000);
 
     try {
 
         const response = await fetch(
-            API + "/api/orb/scan?type=FNO&refresh=1"
+            API + "/api/orb/scan?type=FNO&refresh=1",
+            {
+                method: "GET",
+                cache: "no-store",
+                signal: controller.signal
+            }
         );
 
         if (!response.ok) {
 
             throw new Error(
-                "Scanner API Error: " +
-                response.status
+                "SCANNER API ERROR: " + response.status
             );
 
         }
@@ -404,63 +435,72 @@ async function startScan() {
         if (!data.success) {
 
             throw new Error(
-                data.error || "Scan Failed"
+                data.error || "SCAN FAILED"
             );
 
         }
 
-        allSignals = data.signals || [];
+        allSignals = Array.isArray(data.signals)
+            ? data.signals
+            : [];
 
-        document.getElementById(
-            "totalStocks"
-        ).innerText = data.totalScanned || 0;
+        document.getElementById("totalStocks").innerText =
+            data.totalScanned || 0;
 
-        document.getElementById(
-            "totalSignals"
-        ).innerText = allSignals.length;
+        document.getElementById("totalSignals").innerText =
+            allSignals.length;
 
-        document.getElementById(
-            "buyCount"
-        ).innerText =
+        document.getElementById("buyCount").innerText =
             allSignals.filter(
                 x => x.signal === "BUY"
             ).length;
 
-        document.getElementById(
-            "sellCount"
-        ).innerText =
+        document.getElementById("sellCount").innerText =
             allSignals.filter(
                 x => x.signal === "SELL"
             ).length;
 
-        document.getElementById(
-            "lastScan"
-        ).innerText =
+        document.getElementById("lastScan").innerText =
             "Last Scan: " +
-            new Date(data.scanTime).toLocaleTimeString();
+            (data.scanTime
+                ? new Date(data.scanTime).toLocaleTimeString()
+                : new Date().toLocaleTimeString());
 
         renderSignals();
 
     } catch (error) {
 
+        let message = error.message;
+
+        if (error.name === "AbortError") {
+            message = "SCAN TIMEOUT. Server took too long.";
+        }
+
         results.innerHTML = `
             <div class="error">
                 SCANNER ERROR:<br>
-                ${escapeHTML(error.message)}
+                ${escapeHTML(message)}
             </div>
         `;
 
+        console.error("SCAN ERROR:", error);
+
     } finally {
+
+        clearTimeout(timer);
 
         scanning = false;
 
-    }
+        button.disabled = false;
+        button.innerText = "START F&O SCANNER";
 
+    }
 }
 
-// ==========================================
+
+// ======================================
 // TAB FILTER
-// ==========================================
+// ======================================
 
 function showTab(tab, button) {
 
@@ -469,9 +509,7 @@ function showTab(tab, button) {
     document.querySelectorAll(
         ".tabs button"
     ).forEach(btn => {
-
         btn.classList.remove("active");
-
     });
 
     button.classList.add("active");
@@ -480,9 +518,10 @@ function showTab(tab, button) {
 
 }
 
-// ==========================================
+
+// ======================================
 // RENDER SIGNALS
-// ==========================================
+// ======================================
 
 function renderSignals() {
 
@@ -511,7 +550,7 @@ function renderSignals() {
 
         filtered = allSignals.filter(
             x => x.smartMoney &&
-            x.smartMoney.score >= 80
+            Number(x.smartMoney.score || 0) >= 80
         );
 
     }
@@ -520,8 +559,7 @@ function renderSignals() {
 
         results.innerHTML = `
             <div class="loading">
-                NO SIGNAL FOUND
-                <br><br>
+                NO SIGNAL FOUND<br><br>
                 Wait for next completed candle.
             </div>
         `;
@@ -532,34 +570,25 @@ function renderSignals() {
 
     results.innerHTML = filtered.map(stock => {
 
-        const buy =
-            stock.signal === "BUY";
+        const buy = stock.signal === "BUY";
 
         const cls = buy ? "" : "sell";
 
-        const color =
-            buy ? "green" : "red";
+        const color = buy ? "green" : "red";
 
-        const indicators =
-            stock.indicators || {};
-
-        const trade =
-            stock.trade || {};
-
-        const oi =
-            stock.oi || {};
-
-        const smart =
-            stock.smartMoney || {};
+        const indicators = stock.indicators || {};
+        const trade = stock.trade || {};
+        const oi = stock.oi || {};
+        const smart = stock.smartMoney || {};
 
         return `
 
         <div class="signal ${cls}">
 
             <h3>
-                ${escapeHTML(stock.symbol)}
+                ${escapeHTML(stock.symbol || "-")}
                 <span class="${color}">
-                    ${escapeHTML(stock.signal)}
+                    ${escapeHTML(stock.signal || "-")}
                 </span>
             </h3>
 
@@ -606,7 +635,7 @@ function renderSignals() {
             </p>
 
             <p>
-                Volume:
+                Volume Ratio:
                 <strong>
                     ${Number(indicators.volumeRatio || 0).toFixed(2)} X
                 </strong>
@@ -657,7 +686,7 @@ function renderSignals() {
             </p>
 
             <p>
-                Time:
+                Candle Time:
                 ${escapeHTML(stock.candleTime || "-")}
             </p>
 
@@ -673,9 +702,10 @@ function renderSignals() {
 
 }
 
-// ==========================================
+
+// ======================================
 // HTML ESCAPE
-// ==========================================
+// ======================================
 
 function escapeHTML(value) {
 
@@ -692,14 +722,20 @@ function escapeHTML(value) {
 
 }
 
-// ==========================================
+
+// ======================================
 // INITIALIZE
-// ==========================================
+// ======================================
 
 checkStatus();
 
 setInterval(checkStatus, 60000);
 
-// ==========================================
+
+// ======================================
 // END
-// ==========================================
+// ======================================
+
+</script>
+</body>
+</html>
