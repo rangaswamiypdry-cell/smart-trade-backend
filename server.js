@@ -797,3 +797,149 @@ server.listen(PORT, "0.0.0.0", () => {
     console.log("==================================");
 
 });      
+// -------------------- HTTP SERVER --------------------
+function sendJson(res, status, payload) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  });
+  res.end(JSON.stringify(payload));
+}
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
+    return res.end();
+  }
+
+  if (req.method !== "GET") {
+    return sendJson(res, 405, { success: false, error: "GET only" });
+  }
+
+  const url = new URL(req.url, "http://localhost");
+  const path = url.pathname;
+
+  try {
+    if (path === "/" || path === "/health") {
+      return sendJson(res, 200, {
+        success: true,
+        status: "ONLINE",
+        scanner: "SMART TRADE INDIA ORB VOLUME V1",
+        tokenConfigured: Boolean(TOKEN),
+        marketHours: isMarketHours()
+      });
+    }
+
+    if (path === "/api/status") {
+      // Load the instrument master on first status request so counts are meaningful.
+      await loadMaster();
+      return sendJson(res, 200, {
+        success: true,
+        tokenConfigured: Boolean(TOKEN),
+        masterLoaded: equityMaster.length > 0,
+        equityInstruments: equityMaster.length,
+        futuresContracts: futuresMaster.length,
+        fnoUnderlyingCount: futuresBySymbol.size,
+        masterUpdatedAt,
+        scanRunning,
+        lastScanStatus,
+        settings: {
+          scanLimit: SCAN_LIMIT,
+          concurrency: CONCURRENCY,
+          volumeMultiplier: VOLUME_MULTIPLIER,
+          rsiBuy: RSI_BUY,
+          rsiSell: RSI_SELL,
+          requireFuturesOI: REQUIRE_FUTURES_OI,
+          requireVwapCross: REQUIRE_VWAP_CROSS,
+          requireRetest: REQUIRE_RETEST
+        }
+      });
+    }
+
+    if (path === "/api/master/refresh") {
+      await loadMaster(true);
+      scanCache = { at: 0, data: null };
+      return sendJson(res, 200, {
+        success: true,
+        equityInstruments: equityMaster.length,
+        futuresContracts: futuresMaster.length,
+        fnoUnderlyingCount: futuresBySymbol.size
+      });
+    }
+
+    if (path === "/api/fno-stocks") {
+      const stocks = await getFnoStocks();
+      return sendJson(res, 200, {
+        success: true,
+        count: stocks.length,
+        configuredLimit: SCAN_LIMIT,
+        data: stocks.map(x => ({
+          symbol: x.stock.trading_symbol,
+          company: x.stock.name || x.stock.trading_symbol,
+          equityInstrumentKey: x.stock.instrument_key,
+          futuresSymbol: x.future.trading_symbol,
+          futuresInstrumentKey: x.future.instrument_key,
+          expiry: x.future.expiry
+        }))
+      });
+    }
+
+    if (path === "/api/scan" || path === "/api/orb/scan") {
+      const refresh = url.searchParams.get("refresh") === "true";
+      return sendJson(res, 200, await runScan(refresh));
+    }
+
+    if (path === "/api/bullish" || path === "/api/orb/bullish") {
+      const result = await runScan();
+      return sendJson(res, 200, { success: true, total: result.buyCount, data: result.buy });
+    }
+
+    if (path === "/api/bearish" || path === "/api/orb/bearish") {
+      const result = await runScan();
+      return sendJson(res, 200, { success: true, total: result.sellCount, data: result.sell });
+    }
+
+    if (path === "/api/strong") {
+      const result = await runScan();
+      const data = result.data.filter(x =>
+        (x.signal === "BUY" || x.signal === "SELL") &&
+        Number(x.volumeRatio) >= VOLUME_MULTIPLIER
+      );
+      return sendJson(res, 200, { success: true, total: data.length, data });
+    }
+
+    return sendJson(res, 404, { success: false, error: "ROUTE NOT FOUND", path });
+  } catch (error) {
+    console.error("[SERVER ERROR]", error.stack || error.message);
+    return sendJson(res, 500, { success: false, error: error.message });
+  }
+});
+
+// IMPORTANT: This is the ONLY server.listen() call in this file.
+if (!server.listening) {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log("================================================");
+    console.log("SMART TRADE INDIA ORB + VOLUME SCANNER ONLINE");
+    console.log("PORT:", PORT);
+    console.log("UPSTOX TOKEN:", TOKEN ? "CONFIGURED" : "MISSING");
+    console.log("SCAN LIMIT:", SCAN_LIMIT);
+    console.log("CONCURRENCY:", CONCURRENCY);
+    console.log("VOLUME:", `${VOLUME_MULTIPLIER}x`);
+    console.log("RSI BUY / SELL:", `${RSI_BUY} / ${RSI_SELL}`);
+    console.log("FUTURES OI REQUIRED:", REQUIRE_FUTURES_OI);
+    console.log("VWAP CROSS REQUIRED:", REQUIRE_VWAP_CROSS);
+    console.log("ORB RETEST REQUIRED:", REQUIRE_RETEST);
+    console.log("================================================");
+  });
+}
+
+server.on("error", error => {
+  console.error("[HTTP SERVER ERROR]", error.message);
+  process.exitCode = 1;
+});
