@@ -8,269 +8,189 @@
 <meta name="viewport"
 content="width=device-width, initial-scale=1.0">
 
-<title>Smart Trade India - ORB V2 Scanner</title>
+<title>Smart Trade India Scanner</title>
 
 <style>
 
 * {
+    margin: 0;
+    padding: 0;
     box-sizing: border-box;
 }
 
 body {
-    margin: 0;
-    background: #0b1220;
-    color: #ffffff;
+    background: #080f1e;
+    color: white;
     font-family: Arial, sans-serif;
+    padding: 15px;
 }
 
-header {
-    background: #111c30;
-    padding: 22px 18px;
-    border-bottom: 1px solid #26364e;
+.header {
+    background: #111d32;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 15px;
 }
 
-header h1 {
-    margin: 0;
-    color: #35d399;
-    font-size: 26px;
+.header h2 {
+    color: #00e5a0;
+    font-size: 22px;
 }
 
-header p {
-    color: #9caec5;
-    margin: 10px 0 0;
-    font-size: 14px;
+.header p {
+    color: #aab7cc;
+    margin-top: 8px;
 }
-
-.container {
-    padding: 14px;
-    max-width: 1100px;
-    margin: auto;
-}
-
-/* API STATUS */
 
 .status {
-    background: #17263d;
-    border: 1px solid #263b59;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 14px;
-    line-height: 1.8;
+    background: #17253c;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
 }
 
-.online {
-    color: #22c55e;
+.status span {
+    color: #00e5a0;
+    font-weight: bold;
 }
 
-.offline {
-    color: #ef4444;
-}
-
-.yellow {
-    color: #facc15;
-}
-
-/* STATISTICS */
-
-.stats {
+.cards {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    gap: 12px;
+    margin-bottom: 15px;
 }
 
-.stat {
-    background: #17263d;
-    border: 1px solid #263b59;
+.card {
+    background: #17253c;
+    padding: 18px;
     border-radius: 12px;
-    padding: 16px;
 }
 
-.stat small {
-    color: #9caec5;
+.card p {
+    color: #aab7cc;
+    font-size: 13px;
 }
 
-.stat h2 {
-    margin: 8px 0 0;
-    font-size: 27px;
+.card h2 {
+    margin-top: 10px;
+    font-size: 25px;
 }
 
 .green {
-    color: #22c55e;
+    color: #00e5a0;
 }
 
 .red {
-    color: #ef4444;
+    color: #ff5268;
 }
 
-/* BUTTONS */
-
-.controls {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 15px 0;
+.blue {
+    color: #46a6ff;
 }
 
 button {
     border: none;
-    padding: 13px 12px;
+    padding: 13px;
     border-radius: 8px;
-    background: #263b59;
-    color: white;
     font-weight: bold;
     cursor: pointer;
-    flex: 1;
-    min-width: 100px;
 }
 
-button.active {
-    background: #0d9b69;
-}
-
-button:disabled {
-    opacity: 0.55;
-    cursor: wait;
-}
-
-.refresh {
+.scanBtn {
     width: 100%;
-    background: #087fce;
-    margin: 8px 0;
-}
-
-/* SEARCH */
-
-.search {
-    width: 100%;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #34465e;
-    background: #17263d;
-    color: white;
-    margin: 5px 0 12px;
+    background: #00d99a;
+    color: #071528;
     font-size: 16px;
+    margin-bottom: 12px;
 }
 
-/* STOCK CARD */
-
-.stock-card {
-    background: #17263d;
-    border: 1px solid #263b59;
-    border-radius: 12px;
-    padding: 15px;
-    margin: 12px 0;
+.refreshBtn {
+    width: 100%;
+    background: #2869d8;
+    color: white;
+    margin-bottom: 15px;
 }
 
-.stock-top {
+.tabs {
     display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    align-items: center;
+    gap: 7px;
+    margin-bottom: 15px;
 }
 
-.stock-name {
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.badge {
-    padding: 7px 9px;
-    border-radius: 6px;
+.tabs button {
+    flex: 1;
+    background: #17253c;
+    color: white;
     font-size: 12px;
-    font-weight: bold;
-    white-space: nowrap;
 }
 
-.buy {
-    background: #064e3b;
-    color: #4ade80;
+.tabs button.active {
+    background: #00d99a;
+    color: #071528;
 }
 
-.sell {
-    background: #7f1d1d;
-    color: #fca5a5;
+.section {
+    background: #111d32;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 15px;
 }
 
-.price {
-    font-size: 25px;
-    margin: 12px 0;
+.section h3 {
+    margin-bottom: 15px;
+    color: #00e5a0;
 }
 
-/* INDICATOR DETAILS */
-
-.details {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    font-size: 13px;
-}
-
-.details div {
-    background: #1c304c;
-    padding: 10px;
-    border-radius: 7px;
-}
-
-.details span {
-    color: #a9bad0;
-    display: block;
-    margin-bottom: 5px;
-}
-
-/* TRADE PLAN */
-
-.trade-plan {
-    margin-top: 12px;
-    padding: 12px;
-    background: #1b3048;
+.signal {
+    background: #17253c;
+    border-left: 4px solid #00e5a0;
+    padding: 14px;
+    margin-bottom: 12px;
     border-radius: 8px;
-    line-height: 1.8;
 }
 
-.trade-plan h4 {
-    margin: 0 0 7px;
-    color: #38bdf8;
+.signal.sell {
+    border-left-color: #ff5268;
 }
 
-/* MESSAGES */
+.signal h3 {
+    margin-bottom: 8px;
+    color: white;
+}
 
-.loading,
-.empty {
+.signal p {
+    font-size: 13px;
+    color: #b8c5d9;
+    margin-top: 6px;
+}
+
+.signal strong {
+    color: white;
+}
+
+.loading {
     text-align: center;
-    padding: 28px;
-    color: #9caec5;
+    padding: 20px;
+    color: #00e5a0;
 }
 
 .error {
-    background: #471d28;
-    color: #fca5a5;
-    padding: 12px;
-    border-radius: 8px;
-    margin: 10px 0;
-    overflow-wrap: anywhere;
+    color: #ff5268;
+    padding: 10px;
+    font-size: 13px;
 }
 
-.note {
-    color: #9caec5;
-    font-size: 12px;
-    line-height: 1.5;
-    margin-top: 12px;
-}
-
-footer {
+.footer {
     text-align: center;
+    color: #71829d;
     padding: 20px;
-    color: #71839d;
     font-size: 12px;
 }
 
-@media (min-width: 700px) {
+@media(min-width:700px) {
 
-    .stats {
-        grid-template-columns: repeat(4, 1fr);
-    }
-
-    .details {
+    .cards {
         grid-template-columns: repeat(4, 1fr);
     }
 
@@ -282,734 +202,470 @@ footer {
 
 <body>
 
-<!-- HEADER -->
+<div class="header">
 
-<header>
+<h2>SMART TRADE INDIA</h2>
 
-<h1>SMART TRADE INDIA</h1>
+<p>ORB + VOLUME + SMART MONEY SCANNER</p>
 
-<p>ORB + VOLUME BREAKOUT SCANNER V2</p>
+<p>5 MINUTE CLOSED CANDLE</p>
 
-</header>
-
-<main class="container">
-
-<!-- API STATUS -->
+</div>
 
 <div class="status">
 
-<div>
-API STATUS:
-<b id="apiStatus" class="yellow">
-CHECKING...
-</b>
-</div>
+SERVER STATUS:
+<span id="serverStatus">CHECKING...</span>
 
-<div>
-NSE MASTER:
-<b id="masterStatus">
-Loading...
-</b>
-</div>
-
-<div>
-F&O STOCKS:
-<b id="masterFno">--</b>
-</div>
-
-<div>
-Last Scan:
-<span id="lastScan">--</span>
-</div>
-
-<div class="note">
-Signals use completed 5-minute candles.
-Scanner data is for analysis, not an instruction
-to buy or sell.
-</div>
+<p id="lastScan">Last Scan: Not Started</p>
 
 </div>
 
-<!-- STATISTICS -->
+<div class="cards">
 
-<div class="stats">
-
-<div class="stat">
-<small>Stocks Scanned</small>
-<h2 id="totalStocks">0</h2>
+<div class="card">
+<p>TOTAL STOCKS</p>
+<h2 class="blue" id="totalStocks">0</h2>
 </div>
 
-<div class="stat">
-<small>F&O Stocks</small>
-<h2 id="fnoStocks">0</h2>
+<div class="card">
+<p>TOTAL SIGNALS</p>
+<h2 id="totalSignals">0</h2>
 </div>
 
-<div class="stat">
-<small>STRONG BUY</small>
+<div class="card">
+<p>BUY SIGNALS</p>
 <h2 class="green" id="buyCount">0</h2>
 </div>
 
-<div class="stat">
-<small>STRONG SELL</small>
+<div class="card">
+<p>SELL SIGNALS</p>
 <h2 class="red" id="sellCount">0</h2>
 </div>
 
 </div>
 
-<!-- NSE TYPE BUTTONS -->
+<button class="scanBtn" onclick="startScan()">
 
-<div class="controls" id="universeControls">
+START F&O SCANNER
 
-<button
-class="active"
-data-type="FNO"
-onclick="selectUniverse('FNO',this)">
-NSE F&O
 </button>
 
-<button
-data-type="ALL"
-onclick="selectUniverse('ALL',this)">
-ALL NSE
+<button class="refreshBtn" onclick="checkStatus()">
+
+REFRESH SERVER STATUS
+
 </button>
 
-</div>
+<div class="tabs">
 
-<!-- SIGNAL BUTTONS -->
+<button class="active"
+onclick="showTab('ALL',this)">ALL</button>
 
-<div class="controls" id="signalControls">
-
-<button
-class="active"
-data-signal="ALL"
-onclick="selectSignal('ALL',this)">
-ALL
+<button onclick="showTab('BUY',this)">
+BUY
 </button>
 
-<button
-data-signal="BUY"
-onclick="selectSignal('BUY',this)">
-🟢 BUY
+<button onclick="showTab('SELL',this)">
+SELL
 </button>
 
-<button
-data-signal="SELL"
-onclick="selectSignal('SELL',this)">
-🔴 SELL
-</button>
-
-<button
-data-signal="STRONG"
-onclick="selectSignal('STRONG',this)">
-⭐ STRONG
+<button onclick="showTab('STRONG',this)">
+STRONG
 </button>
 
 </div>
 
-<!-- SEARCH -->
+<div class="section">
 
-<input
-id="search"
-class="search"
-placeholder="Search stock name..."
-oninput="renderStocks()">
+<h3>LIVE SCANNER RESULTS</h3>
 
-<!-- REFRESH BUTTON -->
-
-<button
-class="refresh"
-id="refreshButton"
-onclick="loadScanner(true)">
-
-🔄 REFRESH SCANNER
-
-</button>
-
-<!-- MESSAGE -->
-
-<div id="message"></div>
-
-<!-- STOCK LIST -->
-
-<div id="stockList">
+<div id="results">
 
 <div class="loading">
-Connecting to scanner...
+Waiting for Scanner...
 </div>
 
 </div>
 
-</main>
+</div>
 
-<footer>
+<div class="footer">
 
 SMART TRADE INDIA<br>
-ORB + VOLUME BREAKOUT V2
 
-</footer>
+Market Scanner Dashboard
+
+</div>
+
 <script>
 
-// ======================================
-// SMART TRADE INDIA V2
-// FRONTEND JAVASCRIPT
-// ======================================
-
-// BACKEND URL
+// ==========================================
+// SMART TRADE INDIA
+// PART 2 - API CONNECTION
+// ==========================================
 
 const API =
 "https://smart-trade-backend-ig6l.onrender.com";
 
-// GLOBAL VARIABLES
+let allSignals = [];
 
-let currentType = "FNO";
+let currentTab = "ALL";
 
-let currentSignal = "ALL";
+let scanning = false;
 
-let stocks = [];
-
-let loading = false;
-
-// ======================================
-// API FETCH
-// ======================================
-
-async function apiFetch(path) {
-
-    const controller = new AbortController();
-
-    const timer = setTimeout(
-        () => controller.abort(),
-        120000
-    );
-
-    try {
-
-        const response = await fetch(
-            API + path,
-            {
-                cache: "no-store",
-                signal: controller.signal
-            }
-        );
-
-        const data = await response.json()
-            .catch(() => ({}));
-
-        if (!response.ok) {
-
-            throw new Error(
-                data.error ||
-                ("HTTP " + response.status)
-            );
-
-        }
-
-        return data;
-
-    } finally {
-
-        clearTimeout(timer);
-
-    }
-
-}
-
-// ======================================
-// CHECK API STATUS
-// ======================================
+// ==========================================
+// SERVER STATUS
+// ==========================================
 
 async function checkStatus() {
 
     const status =
-        document.getElementById("apiStatus");
+        document.getElementById("serverStatus");
 
     try {
 
-        const data = await apiFetch(
-            "/api/orb/status"
+        status.innerText = "CONNECTING...";
+
+        const response = await fetch(
+            API + "/api/orb/status"
         );
 
-        status.textContent =
-            data.tokenConfigured
-                ? "ONLINE"
-                : "ONLINE - TOKEN MISSING";
+        if (!response.ok) {
 
-        status.className =
-            data.tokenConfigured
-                ? "online"
-                : "yellow";
-
-        document.getElementById(
-            "masterStatus"
-        ).textContent =
-
-            data.instrumentsLoaded
-
-                ? "LOADED (" +
-                  data.totalInstruments + ")"
-
-                : data.masterLoading
-                    ? "LOADING..."
-                    : "NOT LOADED";
-
-        document.getElementById(
-            "masterFno"
-        ).textContent =
-            data.totalFnoStocks ?? "--";
-
-        document.getElementById(
-            "fnoStocks"
-        ).textContent =
-            data.totalFnoStocks ?? 0;
-
-        if (data.masterError) {
-
-            showError(
-                "NSE master: " + data.masterError
-            );
+            throw new Error("Server Error");
 
         }
 
-        if (data.lastScanError) {
+        const data = await response.json();
 
-            console.warn(
-                data.lastScanError
-            );
+        if (data.success) {
+
+            status.innerText =
+                data.instrumentsLoaded
+                ? "🟢 CONNECTED"
+                : "🟡 MASTER NOT LOADED";
+
+            document.getElementById(
+                "totalStocks"
+            ).innerText =
+                data.totalFnoSymbols || 0;
 
         }
 
     } catch (error) {
 
-        status.textContent = "OFFLINE";
+        status.innerText = "🔴 OFFLINE";
 
-        status.className = "offline";
-
-        document.getElementById(
-            "masterStatus"
-        ).textContent = "Unavailable";
-
-        showError(error.message);
+        console.error(error);
 
     }
 
 }
 
-// ======================================
-// SELECT NSE TYPE
-// ======================================
+// ==========================================
+// START SCANNER
+// ==========================================
 
-function selectUniverse(type, button) {
+async function startScan() {
 
-    currentType = type;
+    if (scanning) return;
 
-    document.querySelectorAll(
-        "#universeControls button"
-    ).forEach(b => {
+    scanning = true;
 
-        b.classList.remove("active");
+    const results =
+        document.getElementById("results");
 
-    });
-
-    button.classList.add("active");
-
-    loadScanner(true);
-
-}
-
-// ======================================
-// SELECT SIGNAL
-// ======================================
-
-function selectSignal(type, button) {
-
-    currentSignal = type;
-
-    document.querySelectorAll(
-        "#signalControls button"
-    ).forEach(b => {
-
-        b.classList.remove("active");
-
-    });
-
-    button.classList.add("active");
-
-    renderStocks();
-
-}
-
-// ======================================
-// LOAD SCANNER
-// ======================================
-
-async function loadScanner(force = false) {
-
-    if (loading) return;
-
-    loading = true;
-
-    const refreshButton =
-        document.getElementById(
-            "refreshButton"
-        );
-
-    refreshButton.disabled = true;
-
-    refreshButton.textContent =
-        "SCANNING... PLEASE WAIT";
-
-    document.getElementById(
-        "stockList"
-    ).innerHTML =
-
-        '<div class="loading">' +
-        'Scanning completed 5-minute candles. ' +
-        'Please wait...' +
-        '</div>';
-
-    document.getElementById(
-        "message"
-    ).innerHTML = "";
+    results.innerHTML = `
+        <div class="loading">
+            SCANNER STARTED...<br><br>
+            Please Wait...<br>
+            Loading F&O Stocks...
+        </div>
+    `;
 
     try {
 
-        const query =
+        const response = await fetch(
+            API + "/api/orb/scan?type=FNO&refresh=1"
+        );
 
-            "/api/orb/scan?type=" +
-
-            encodeURIComponent(currentType) +
-
-            (force ? "&refresh=1" : "");
-
-        const result =
-            await apiFetch(query);
-
-        if (!result.success) {
+        if (!response.ok) {
 
             throw new Error(
-                result.error ||
-                "Scanner failed"
+                "Scanner API Error: " +
+                response.status
             );
 
         }
 
-        stocks = Array.isArray(result.data)
-            ? result.data
-            : [];
+        const data = await response.json();
+
+        if (!data.success) {
+
+            throw new Error(
+                data.error || "Scan Failed"
+            );
+
+        }
+
+        allSignals = data.signals || [];
 
         document.getElementById(
             "totalStocks"
-        ).textContent =
-
-            result.totalScanned ??
-            result.totalStocks ??
-            0;
+        ).innerText = data.totalScanned || 0;
 
         document.getElementById(
-            "fnoStocks"
-        ).textContent =
-
-            result.fnoStocks ?? 0;
+            "totalSignals"
+        ).innerText = allSignals.length;
 
         document.getElementById(
             "buyCount"
-        ).textContent =
-
-            result.bullish ?? 0;
+        ).innerText =
+            allSignals.filter(
+                x => x.signal === "BUY"
+            ).length;
 
         document.getElementById(
             "sellCount"
-        ).textContent =
-
-            result.bearish ?? 0;
+        ).innerText =
+            allSignals.filter(
+                x => x.signal === "SELL"
+            ).length;
 
         document.getElementById(
             "lastScan"
-        ).textContent =
+        ).innerText =
+            "Last Scan: " +
+            new Date(data.scanTime).toLocaleTimeString();
 
-            result.scanTime
-
-                ? new Date(
-                    result.scanTime
-                  ).toLocaleString()
-
-                : "--";
-
-        if (result.scanErrors) {
-
-            document.getElementById(
-                "message"
-            ).innerHTML =
-
-                '<div class="note">' +
-
-                result.scanErrors +
-
-                ' instrument request(s) failed. ' +
-
-                'Check Render logs if many requests fail.' +
-
-                '</div>';
-
-        }
-
-        renderStocks();
-
-        await checkStatus();
+        renderSignals();
 
     } catch (error) {
 
-        stocks = [];
-
-        document.getElementById(
-            "stockList"
-        ).innerHTML = "";
-
-        showError(error.message);
+        results.innerHTML = `
+            <div class="error">
+                SCANNER ERROR:<br>
+                ${escapeHTML(error.message)}
+            </div>
+        `;
 
     } finally {
 
-        loading = false;
-
-        refreshButton.disabled = false;
-
-        refreshButton.textContent =
-            "🔄 REFRESH SCANNER";
+        scanning = false;
 
     }
 
 }
 
-// ======================================
-// RENDER STOCKS
-// ======================================
+// ==========================================
+// TAB FILTER
+// ==========================================
 
-function renderStocks() {
+function showTab(tab, button) {
 
-    const list =
-        document.getElementById(
-            "stockList"
-        );
+    currentTab = tab;
 
-    const search =
-        document.getElementById("search")
-        .value.trim().toUpperCase();
+    document.querySelectorAll(
+        ".tabs button"
+    ).forEach(btn => {
 
-    const filtered = stocks.filter(stock => {
-
-        const name = (
-
-            (stock.symbol || "") +
-
-            " " +
-
-            (stock.company || "")
-
-        ).toUpperCase();
-
-        const matchesSearch =
-            name.includes(search);
-
-        const matchesSignal =
-
-            currentSignal === "ALL" ||
-
-            (
-                currentSignal === "BUY" &&
-                stock.direction === "BUY"
-            ) ||
-
-            (
-                currentSignal === "SELL" &&
-                stock.direction === "SELL"
-            ) ||
-
-            (
-                currentSignal === "STRONG" &&
-
-                stock.volumeRatio >= 2.5 &&
-
-                (
-                    (
-                        stock.direction === "BUY" &&
-                        stock.rsi >= 65
-                    ) ||
-
-                    (
-                        stock.direction === "SELL" &&
-                        stock.rsi <= 35
-                    )
-                )
-            );
-
-        return matchesSearch && matchesSignal;
+        btn.classList.remove("active");
 
     });
 
-    if (!filtered.length) {
+    button.classList.add("active");
 
-        list.innerHTML =
+    renderSignals();
 
-            '<div class="empty">' +
+}
 
-            'No matching breakout signals found. ' +
+// ==========================================
+// RENDER SIGNALS
+// ==========================================
 
-            'This can be normal when all conditions ' +
+function renderSignals() {
 
-            'are not met.' +
+    const results =
+        document.getElementById("results");
 
-            '</div>';
+    let filtered = allSignals;
+
+    if (currentTab === "BUY") {
+
+        filtered = allSignals.filter(
+            x => x.signal === "BUY"
+        );
+
+    }
+
+    if (currentTab === "SELL") {
+
+        filtered = allSignals.filter(
+            x => x.signal === "SELL"
+        );
+
+    }
+
+    if (currentTab === "STRONG") {
+
+        filtered = allSignals.filter(
+            x => x.smartMoney &&
+            x.smartMoney.score >= 80
+        );
+
+    }
+
+    if (filtered.length === 0) {
+
+        results.innerHTML = `
+            <div class="loading">
+                NO SIGNAL FOUND
+                <br><br>
+                Wait for next completed candle.
+            </div>
+        `;
 
         return;
 
     }
 
-    list.innerHTML = filtered.map(stock => {
+    results.innerHTML = filtered.map(stock => {
 
-        const isBuy =
-            stock.direction === "BUY";
+        const buy =
+            stock.signal === "BUY";
 
-        const badge =
-            isBuy ? "buy" : "sell";
+        const cls = buy ? "" : "sell";
+
+        const color =
+            buy ? "green" : "red";
+
+        const indicators =
+            stock.indicators || {};
+
+        const trade =
+            stock.trade || {};
+
+        const oi =
+            stock.oi || {};
+
+        const smart =
+            stock.smartMoney || {};
 
         return `
 
-        <article class="stock-card">
+        <div class="signal ${cls}">
 
-            <div class="stock-top">
-
-                <div class="stock-name">
-
-                    ${escapeHTML(stock.symbol)}
-
-                    <div class="note">
-                        ${escapeHTML(
-                            stock.company || ""
-                        )}
-                    </div>
-
-                </div>
-
-                <span class="badge ${badge}">
-
+            <h3>
+                ${escapeHTML(stock.symbol)}
+                <span class="${color}">
                     ${escapeHTML(stock.signal)}
-
                 </span>
+            </h3>
 
-            </div>
+            <p>
+                Strength:
+                <strong>
+                    ${escapeHTML(stock.strength || "-")}
+                </strong>
+            </p>
 
-            <div class="price">
+            <p>
+                Price:
+                <strong>
+                    ₹${Number(stock.price || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                ₹${format(stock.price)}
+            <p>
+                Smart Money Score:
+                <strong>
+                    ${Number(smart.score || 0)}
+                </strong>
+            </p>
 
-            </div>
+            <p>
+                RSI:
+                <strong>
+                    ${Number(indicators.rsi || 0).toFixed(2)}
+                </strong>
+            </p>
 
-            <div class="details">
+            <p>
+                ADX:
+                <strong>
+                    ${Number(indicators.adx || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                <div>
-                    <span>ORB HIGH</span>
-                    ₹${format(stock.orbHigh)}
-                </div>
+            <p>
+                VWAP:
+                <strong>
+                    ₹${Number(indicators.vwap || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                <div>
-                    <span>ORB LOW</span>
-                    ₹${format(stock.orbLow)}
-                </div>
+            <p>
+                Volume:
+                <strong>
+                    ${Number(indicators.volumeRatio || 0).toFixed(2)} X
+                </strong>
+            </p>
 
-                <div>
-                    <span>VOLUME RATIO</span>
-                    ${format(stock.volumeRatio)}x
-                </div>
+            <p>
+                Futures OI Change:
+                <strong>
+                    ${Number(oi.oiChangePercent || 0).toFixed(2)}%
+                </strong>
+            </p>
 
-                <div>
-                    <span>VOLUME BREAKOUT</span>
-                    ${stock.volumeBreakout ? "YES" : "NO"}
-                </div>
+            <p>
+                OI Confirmation:
+                <strong>
+                    ${oi.pass ? "PASSED" : "NOT PASSED"}
+                </strong>
+            </p>
 
-                <div>
-                    <span>RSI 14</span>
-                    ${format(stock.rsi)}
-                </div>
+            <hr style="margin:12px 0;border-color:#35445d">
 
-                <div>
-                    <span>ADX 14</span>
-                    ${format(stock.adx)}
-                </div>
+            <p>
+                ENTRY:
+                <strong>
+                    ₹${Number(trade.entry || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                <div>
-                    <span>VWAP</span>
-                    ₹${format(stock.vwap)}
-                </div>
+            <p>
+                STOP LOSS:
+                <strong class="red">
+                    ₹${Number(trade.stopLoss || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                <div>
-                    <span>EMA 20</span>
-                    ₹${format(stock.ema20)}
-                </div>
+            <p>
+                TARGET 1:
+                <strong class="green">
+                    ₹${Number(trade.target1 || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                <div>
-                    <span>5-MIN CANDLE</span>
-                    ${formatTime(stock.candleTime)}
-                </div>
+            <p>
+                TARGET 2:
+                <strong class="green">
+                    ₹${Number(trade.target2 || 0).toFixed(2)}
+                </strong>
+            </p>
 
-                <div>
-                    <span>ATR 14</span>
-                    ${format(stock.atr)}
-                </div>
+            <p>
+                Time:
+                ${escapeHTML(stock.candleTime || "-")}
+            </p>
 
-            </div>
+            <p>
+                Timeframe: 5 MIN CLOSED CANDLE
+            </p>
 
-            <div class="trade-plan">
-
-                <h4>
-                    TRADE SETUP (ESTIMATED)
-                </h4>
-
-                <div>
-                    Entry:
-                    <b>
-                        ₹${format(stock.entry)}
-                    </b>
-                </div>
-
-                <div>
-                    Stop Loss:
-                    <b class="red">
-                        ₹${format(stock.stopLoss)}
-                    </b>
-                </div>
-
-                <div>
-                    Target 1:
-                    <b class="green">
-                        ₹${format(stock.target1)}
-                    </b>
-                </div>
-
-                <div>
-                    Target 2:
-                    <b class="green">
-                        ₹${format(stock.target2)}
-                    </b>
-                </div>
-
-                <div>
-                    Risk Reward:
-                    <b>
-                        ${escapeHTML(
-                            stock.riskReward || "--"
-                        )}
-                    </b>
-                </div>
-
-            </div>
-
-            <div class="note">
-
-                ${escapeHTML(stock.note || "")}
-
-            </div>
-
-        </article>
+        </div>
 
         `;
 
@@ -1017,111 +673,33 @@ function renderStocks() {
 
 }
 
-// ======================================
-// NUMBER FORMAT
-// ======================================
-
-function format(value) {
-
-    if (
-        value === null ||
-        value === undefined ||
-        value === ""
-    ) {
-        return "--";
-    }
-
-    const n = Number(value);
-
-    return Number.isFinite(n)
-        ? n.toFixed(2)
-        : "--";
-
-}
-
-// ======================================
-// CANDLE TIME
-// ======================================
-
-function formatTime(value) {
-
-    if (!value) {
-        return "--";
-    }
-
-    const date = new Date(value);
-
-    return Number.isNaN(date.getTime())
-        ? "--"
-        : date.toLocaleTimeString();
-
-}
-
-// ======================================
-// HTML SECURITY
-// ======================================
+// ==========================================
+// HTML ESCAPE
+// ==========================================
 
 function escapeHTML(value) {
 
-    return String(value ?? "")
-
-        .replace(/&/g, "&amp;")
-
-        .replace(/</g, "&lt;")
-
-        .replace(/>/g, "&gt;")
-
-        .replace(/"/g, "&quot;")
-
-        .replace(/'/g, "&#039;");
-
-}
-
-// ======================================
-// ERROR MESSAGE
-// ======================================
-
-function showError(message) {
-
-    document.getElementById(
-        "message"
-    ).innerHTML =
-
-        '<div class="error">' +
-
-        escapeHTML(message) +
-
-        '</div>';
+    return String(value).replace(
+        /[&<>"']/g,
+        char => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+        })[char]
+    );
 
 }
 
-// ======================================
-// INITIAL START
-// ======================================
+// ==========================================
+// INITIALIZE
+// ==========================================
 
 checkStatus();
 
-loadScanner(false);
+setInterval(checkStatus, 60000);
 
-// CHECK STATUS EVERY 60 SECONDS
-
-setInterval(() => {
-
-    checkStatus();
-
-}, 60000);
-
-// AUTO SCAN EVERY 60 SECONDS
-
-setInterval(() => {
-
-    loadScanner(false);
-
-}, 60000);
-
-</script>
-
-</body>
-
-    </html>
-    
+// ==========================================
+// END
+// ==========================================
