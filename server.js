@@ -251,13 +251,40 @@ async function loadMaster(force = false) {
   }
 }
 
+function expiryDate(value) {
+  if (value === null || value === undefined) return "";
+
+  let date;
+
+  if (typeof value === "number" || /^\d+$/.test(String(value))) {
+    let n = Number(value);
+    if (n < 1000000000000) n *= 1000;
+    date = new Date(n);
+  } else {
+    date = new Date(value);
+  }
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return istDate(date);
+}
+
 function nearestFuture(symbol) {
   const today = istDate();
 
   const contracts =
-    futuresBySymbol.get(String(symbol).toUpperCase()) || [];
+    futuresBySymbol.get(String(symbol).trim().toUpperCase()) || [];
 
-  return contracts.find(x => String(x.expiry) >= today) || null;
+  const valid = contracts
+    .filter(x => {
+      const expiry = expiryDate(x.expiry);
+      return expiry && expiry >= today;
+    })
+    .sort((a, b) =>
+      expiryDate(a.expiry).localeCompare(expiryDate(b.expiry))
+    );
+
+  return valid[0] || null;
 }
 
 async function getFnoStocks() {
