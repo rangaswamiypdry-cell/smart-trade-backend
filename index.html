@@ -5,321 +5,274 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0b1220">
 
-<title>Smart Trade India - ORB V4</title>
+<title>Smart Trade India Pro</title>
 
 <style>
-:root{
---bg:#0b1220;
---panel:#121d30;
---panel2:#17243a;
---line:#263650;
---text:#e8eef8;
---muted:#91a2bb;
---green:#20c997;
---red:#ff647c;
---yellow:#f6c85f;
---blue:#62a8ff;
+:root {
+  --bg: #0b1220;
+  --panel: #121d30;
+  --panel2: #17243a;
+  --line: #263650;
+  --text: #e8eef8;
+  --muted: #91a1b8;
+  --green: #00d68f;
+  --red: #ff5263;
+  --blue: #4b91ff;
+  --yellow: #ffc857;
 }
 
-*{
-box-sizing:border-box;
+* {
+  box-sizing: border-box;
 }
 
-body{
-margin:0;
-background:var(--bg);
-color:var(--text);
-font:14px/1.45 system-ui,Arial,sans-serif;
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, sans-serif;
 }
 
-header{
-padding:18px 16px;
-background:linear-gradient(135deg,#14243b,#0b1220);
-border-bottom:1px solid var(--line);
-position:sticky;
-top:0;
-z-index:5;
+header {
+  padding: 18px;
+  background: #101a2b;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.wrap{
-max-width:1400px;
-margin:auto;
+.logo {
+  font-size: 20px;
+  font-weight: bold;
 }
 
-.brand{
-display:flex;
-justify-content:space-between;
-align-items:center;
-gap:12px;
-flex-wrap:wrap;
+.logo span {
+  color: var(--green);
 }
 
-h1{
-font-size:20px;
-margin:0;
-font-weight:800;
+.status {
+  font-size: 12px;
+  color: var(--green);
+  padding: 7px 12px;
+  border: 1px solid var(--green);
+  border-radius: 20px;
 }
 
-.sub{
-color:var(--muted);
-font-size:12px;
-margin-top:4px;
+.container {
+  padding: 15px;
+  max-width: 1250px;
+  margin: auto;
 }
 
-.badge{
-padding:6px 10px;
-border-radius:20px;
-background:#173d36;
-color:#65e6bd;
-font-weight:700;
-font-size:12px;
+.top-info {
+  background: var(--panel);
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  border: 1px solid var(--line);
 }
 
-main{
-max-width:1400px;
-margin:auto;
-padding:16px;
+.top-info p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 7px 0;
 }
 
-.toolbar{
-display:flex;
-gap:9px;
-flex-wrap:wrap;
-margin-bottom:14px;
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
-button,select,input{
-font:inherit;
-border:1px solid var(--line);
-border-radius:9px;
-padding:11px 12px;
-background:var(--panel2);
-color:var(--text);
+.box {
+  background: var(--panel);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
 }
 
-button{
-cursor:pointer;
-font-weight:700;
+.box small {
+  color: var(--muted);
+  font-size: 12px;
 }
 
-button.primary{
-background:#1769d2;
-border-color:#1769d2;
+.box h2 {
+  margin: 10px 0 0;
+  font-size: 25px;
 }
 
-button:disabled{
-opacity:.55;
-cursor:wait;
+.green { color: var(--green); }
+.red { color: var(--red); }
+.blue { color: var(--blue); }
+.yellow { color: var(--yellow); }
+
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
 }
 
-select{
-min-width:120px;
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-weight: bold;
+  cursor: pointer;
 }
 
-#apiBase{
-flex:1;
-min-width:230px;
+.scan-btn {
+  background: var(--green);
+  color: #061b15;
 }
 
-.note{
-color:var(--muted);
-font-size:12px;
-margin:8px 0 16px;
+.refresh-btn {
+  background: var(--blue);
+  color: white;
 }
 
-.cards{
-display:grid;
-grid-template-columns:repeat(5,minmax(120px,1fr));
-gap:10px;
-margin:14px 0;
+button:disabled {
+  opacity: 0.5;
 }
 
-.card{
-background:var(--panel);
-border:1px solid var(--line);
-border-radius:12px;
-padding:13px;
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 15px;
 }
 
-.card .label{
-color:var(--muted);
-font-size:11px;
-text-transform:uppercase;
+.tab {
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid var(--line);
 }
 
-.card .value{
-font-size:23px;
-font-weight:800;
-margin-top:5px;
+.tab.active {
+  background: var(--blue);
+  border-color: var(--blue);
 }
 
-.panel{
-background:var(--panel);
-border:1px solid var(--line);
-border-radius:12px;
-margin:14px 0;
-overflow:hidden;
+.section-title {
+  font-size: 17px;
+  margin: 20px 0 12px;
 }
 
-.panelHead{
-display:flex;
-align-items:center;
-justify-content:space-between;
-gap:10px;
-padding:13px 14px;
-border-bottom:1px solid var(--line);
-flex-wrap:wrap;
+.stock-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
-.panelHead h2{
-font-size:15px;
-margin:0;
+.stock {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 15px;
 }
 
-.statusGrid{
-display:grid;
-grid-template-columns:repeat(4,1fr);
-gap:8px;
-padding:12px;
+.stock-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.statusItem{
-background:var(--panel2);
-padding:10px;
-border-radius:8px;
+.stock-name {
+  font-size: 17px;
+  font-weight: bold;
 }
 
-.statusItem small{
-display:block;
-color:var(--muted);
+.badge {
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: bold;
 }
 
-.statusItem strong{
-display:block;
-margin-top:3px;
+.buy {
+  background: rgba(0,214,143,.15);
+  color: var(--green);
 }
 
-.tableWrap{
-overflow:auto;
+.sell {
+  background: rgba(255,82,99,.15);
+  color: var(--red);
 }
 
-table{
-border-collapse:collapse;
-width:100%;
-min-width:1050px;
+.wait {
+  background: rgba(255,200,87,.15);
+  color: var(--yellow);
 }
 
-th,td{
-padding:10px 9px;
-border-bottom:1px solid var(--line);
-text-align:left;
-white-space:nowrap;
+.stock-data {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
 }
 
-th{
-font-size:11px;
-color:var(--muted);
-text-transform:uppercase;
-background:#101a2b;
+.data-item {
+  background: var(--panel2);
+  padding: 9px;
+  border-radius: 7px;
 }
 
-td{
-font-size:12px;
+.data-item small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 5px;
 }
 
-tr:hover{
-background:#17243a;
+.data-item strong {
+  font-size: 13px;
 }
 
-.signal{
-font-weight:800;
-border-radius:6px;
-padding:4px 7px;
-display:inline-block;
+.reason {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 12px;
+  line-height: 1.5;
 }
 
-.buy{
-color:#65e6bd;
-background:#123c34;
+.empty {
+  background: var(--panel);
+  padding: 25px;
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+  grid-column: 1 / -1;
 }
 
-.sell{
-color:#ff8294;
-background:#451f2b;
+.error {
+  color: var(--red);
+  padding: 12px;
+  font-size: 13px;
 }
 
-.wait{
-color:#c1ccdc;
-background:#263247;
+footer {
+  text-align: center;
+  color: var(--muted);
+  padding: 25px;
+  font-size: 12px;
 }
 
-.good{
-color:var(--green);
-}
+@media(max-width:700px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 
-.bad{
-color:var(--red);
-}
+  .stock-list {
+    grid-template-columns: 1fr;
+  }
 
-.warn{
-color:var(--yellow);
-}
-
-.filters{
-display:flex;
-gap:8px;
-flex-wrap:wrap;
-}
-
-.filters button{
-padding:7px 10px;
-font-size:12px;
-}
-
-.filters button.active{
-background:#244a77;
-border-color:#477fbd;
-}
-
-#message{
-padding:11px 13px;
-color:var(--muted);
-font-size:12px;
-}
-
-.error{
-color:#ff8294;
-}
-
-.success{
-color:#65e6bd;
-}
-
-.footer{
-color:var(--muted);
-font-size:11px;
-text-align:center;
-padding:20px 8px;
-}
-
-@media(max-width:800px){
-
-.cards{
-grid-template-columns:repeat(2,1fr);
-}
-
-.statusGrid{
-grid-template-columns:repeat(2,1fr);
-}
-
-h1{
-font-size:17px;
-}
-
-.card .value{
-font-size:20px;
-}
-
+  .box h2 {
+    font-size: 21px;
+  }
 }
 </style>
 </head>
@@ -327,612 +280,372 @@ font-size:20px;
 <body>
 
 <header>
-<div class="wrap brand">
-
-<div>
-<h1>SMART TRADE INDIA · ORB V4 PRO</h1>
-<div class="sub">
-NSE F&O · 5-minute completed candles · Upstox
-</div>
-</div>
-
-<div id="serverBadge" class="badge">
-CHECKING SERVER…
-</div>
-
-</div>
+  <div class="logo">SMART <span>TRADE INDIA</span></div>
+  <div class="status" id="serverStatus">CHECKING SERVER...</div>
 </header>
 
-<main>
+<div class="container">
 
-<div class="toolbar">
+  <div class="top-info">
+    <strong>ORB + VOLUME BREAKOUT SCANNER</strong>
+    <p>NSE F&O Stocks | 5 Minute Completed Candles</p>
+    <p id="lastUpdate">Last Update: Waiting...</p>
+    <p id="scanMessage">Connecting to scanner...</p>
+  </div>
 
-<input
-id="apiBase"
-value="https://smart-trade-backend-ig6l.onrender.com"
-aria-label="Backend URL"
->
+  <div class="grid">
 
-<select id="scanType">
-<option value="FNO">NSE F&O</option>
-<option value="ALL">ALL NSE EQUITY</option>
-</select>
+    <div class="box">
+      <small>TOTAL SCANNED</small>
+      <h2 class="blue" id="totalScanned">0</h2>
+    </div>
 
-<button class="primary" id="scanBtn"
-onclick="runScan(true)">
-SCAN NOW
-</button>
+    <div class="box">
+      <small>BULLISH SIGNALS</small>
+      <h2 class="green" id="bullishCount">0</h2>
+    </div>
 
-<button id="statusBtn" onclick="loadStatus()">
-STATUS
-</button>
+    <div class="box">
+      <small>BEARISH SIGNALS</small>
+      <h2 class="red" id="bearishCount">0</h2>
+    </div>
 
-<button id="autoBtn" onclick="toggleAuto()">
-AUTO: OFF
-</button>
+    <div class="box">
+      <small>WAITING STOCKS</small>
+      <h2 class="yellow" id="waitingCount">0</h2>
+    </div>
 
-</div>
+  </div>
 
-<div class="note">
-Backend URL ಅನ್ನು ಬದಲಾಯಿಸಬೇಕಾದರೆ ಮೇಲಿನ box ನಲ್ಲಿ
-ನಿಮ್ಮ Render URL ಹಾಕಿ.
-Scanner signals ಖಚಿತ ಲಾಭವಲ್ಲ.
-</div>
+  <div class="controls">
+    <button class="scan-btn" id="scanButton" onclick="startScan()">
+      🔍 SCAN NOW
+    </button>
 
-<section class="cards">
+    <button class="refresh-btn" onclick="loadStatus()">
+      ↻ REFRESH STATUS
+    </button>
+  </div>
 
-<div class="card">
-<div class="label">Total stocks</div>
-<div class="value" id="total">—</div>
-</div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('bullish',this)">
+      🟢 BULLISH
+    </button>
 
-<div class="card">
-<div class="label">Analysed</div>
-<div class="value" id="analysed">—</div>
-</div>
+    <button class="tab" onclick="showTab('bearish',this)">
+      🔴 BEARISH
+    </button>
 
-<div class="card">
-<div class="label">BUY signals</div>
-<div class="value good" id="bullish">—</div>
-</div>
+    <button class="tab" onclick="showTab('waiting',this)">
+      🟡 WAITING
+    </button>
+  </div>
 
-<div class="card">
-<div class="label">SELL signals</div>
-<div class="value bad" id="bearish">—</div>
-</div>
+  <h3 class="section-title" id="listTitle">
+    BULLISH STOCKS
+  </h3>
 
-<div class="card">
-<div class="label">WAIT</div>
-<div class="value warn" id="wait">—</div>
-</div>
+  <div class="stock-list" id="stockList">
+    <div class="empty">Please click SCAN NOW</div>
+  </div>
 
-</section>
-
-<section class="panel">
-
-<div class="panelHead">
-<h2>SERVER & SCANNER STATUS</h2>
-<span id="lastScan" class="sub">
-Last scan: —
-</span>
-</div>
-
-<div class="statusGrid">
-
-<div class="statusItem">
-<small>Server</small>
-<strong id="serverState">Checking…</strong>
-</div>
-
-<div class="statusItem">
-<small>Upstox token</small>
-<strong id="tokenState">—</strong>
-</div>
-
-<div class="statusItem">
-<small>NSE instruments</small>
-<strong id="instrumentCount">—</strong>
-</div>
-
-<div class="statusItem">
-<small>Futures contracts</small>
-<strong id="futureCount">—</strong>
-</div>
+  <div id="errorMessage" class="error"></div>
 
 </div>
 
-<div id="message">
-Connect to backend and press SCAN NOW.
-</div>
+<footer>
+  SMART TRADE INDIA PRO<br>
+  ORB + VOLUME + FUTURES OI + RSI + VWAP<br>
+  Signals are for research and paper testing, not guaranteed trade recommendations.
+</footer><script>
 
-</section>
+// YOUR RENDER BACKEND
+const API_BASE =
+"https://smart-trade-backend-ig6l.onrender.com";
 
-<section class="panel">
+let scanData = null;
+let currentTab = "bullish";
 
-<div class="panelHead">
+// ---------------- STATUS ----------------
 
-<h2>STOCK SCANNER RESULTS</h2>
+async function loadStatus() {
 
-<div class="filters">
+  const statusElement =
+    document.getElementById("serverStatus");
 
-<button class="active"
-onclick="setFilter('all',this)">ALL</button>
+  try {
 
-<button onclick="setFilter('buy',this)">BUY</button>
+    const response =
+      await fetch(API_BASE + "/api/status");
 
-<button onclick="setFilter('sell',this)">SELL</button>
+    if (!response.ok) {
+      throw new Error("Server response error");
+    }
 
-<button onclick="setFilter('strong',this)">STRONG</button>
+    const data = await response.json();
 
-<button onclick="setFilter('volume',this)">
-VOLUME BLAST
-</button>
+    statusElement.textContent =
+      data.status === "OK" && data.masterLoaded
+      ? "● SERVER LIVE"
+      : "● CHECK CONFIGURATION";
 
-<button onclick="setFilter('oi',this)">
-OI INCREASE
-</button>
+    document.getElementById("totalScanned").textContent =
+      data.fnoUnderlyingCount || 0;
 
-</div>
-</div>
+    document.getElementById("scanMessage").textContent =
+      "F&O Underlying Stocks: " +
+      (data.fnoUnderlyingCount || 0) +
+      " | Token: " +
+      (data.tokenConfigured ? "Configured" : "Missing");
 
-<div class="tableWrap">
+  } catch(error) {
 
-<table>
+    statusElement.textContent = "● SERVER ERROR";
 
-<thead>
-<tr>
-<th>Symbol</th>
-<th>Signal</th>
-<th>Strength</th>
-<th>Price</th>
-<th>RSI</th>
-<th>Volume x</th>
-<th>OI increase</th>
-<th>OI change</th>
-<th>VWAP</th>
-<th>ORB high</th>
-<th>ORB low</th>
-<th>Entry</th>
-<th>Stop loss</th>
-<th>Target 1</th>
-<th>Target 2</th>
-<th>Reason</th>
-</tr>
-</thead>
-
-<tbody id="rows">
-<tr>
-<td colspan="16">No scan data yet.</td>
-</tr>
-</tbody>
-
-</table>
-
-</div>
-</section>
-
-<div class="footer">
-Smart Trade India ORB V4 · Educational scanner only.
-Verify every signal on your chart before trading.
-</div>
-
-    </main>
-    <script>
-
-let scanData = [];
-
-let activeFilter = "all";
-
-let autoTimer = null;
-
-const $ = id => document.getElementById(id);
-
-
-// BACKEND URL
-
-function base(){
-
-return $("apiBase").value.trim().replace(/\/+$/,"");
-
+    document.getElementById("errorMessage").textContent =
+      error.message;
+  }
 }
 
+// ---------------- SCAN ----------------
 
-// NUMBER FORMAT
+async function startScan() {
 
-function fmt(v,d=2){
+  const button = document.getElementById("scanButton");
 
-return v===null || v===undefined || v===""
-? "—"
-: Number.isFinite(Number(v))
-? Number(v).toFixed(d)
-: "—";
+  button.disabled = true;
+  button.textContent = "SCANNING...";
 
+  document.getElementById("errorMessage").textContent =
+    "Scanning stocks. Please wait...";
+
+  try {
+
+    const response = await fetch(
+      API_BASE + "/api/scan?force=true"
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.status !== "SUCCESS") {
+      throw new Error(data.message || "Scanner failed");
+    }
+
+    scanData = data;
+
+    document.getElementById("totalScanned").textContent =
+      data.scanned || 0;
+
+    document.getElementById("bullishCount").textContent =
+      data.bullishCount || 0;
+
+    document.getElementById("bearishCount").textContent =
+      data.bearishCount || 0;
+
+    document.getElementById("waitingCount").textContent =
+      data.waitingCount || 0;
+
+    document.getElementById("lastUpdate").textContent =
+      "Last Update: " +
+      new Date(data.updatedAt || Date.now()).toLocaleString();
+
+    document.getElementById("scanMessage").textContent =
+      "Scanner completed successfully";
+
+    document.getElementById("errorMessage").textContent =
+      "API Errors: " + (data.errorCount || 0);
+
+    renderStocks(currentTab);
+
+  } catch(error) {
+
+    document.getElementById("errorMessage").textContent =
+      "Scanner Error: " + error.message;
+
+  } finally {
+
+    button.disabled = false;
+    button.textContent = "🔍 SCAN NOW";
+  }
 }
 
+// ---------------- TABS ----------------
 
-// MESSAGE
+function showTab(tab, button) {
 
-function setMessage(text,kind=""){
+  currentTab = tab;
 
-$("message").textContent=text;
+  document.querySelectorAll(".tab").forEach(x => {
+    x.classList.remove("active");
+  });
 
-$("message").className=kind;
+  button.classList.add("active");
 
+  const titles = {
+    bullish: "🟢 BULLISH STOCKS",
+    bearish: "🔴 BEARISH STOCKS",
+    waiting: "🟡 WAITING STOCKS"
+  };
+
+  document.getElementById("listTitle").textContent =
+    titles[tab];
+
+  renderStocks(tab);
 }
 
+// ---------------- STOCK DISPLAY ----------------
 
-// API CONNECTION
+function safeNumber(value) {
 
-async function api(path){
+  if (value === null || value === undefined ||
+      value === "") return "-";
 
-const response = await fetch(
-base()+path,
-{cache:"no-store"}
-);
+  const number = Number(value);
 
-const data = await response.json().catch(
-()=>({error:"Invalid JSON response"})
-);
-
-if(!response.ok || data.success===false){
-
-throw new Error(
-data.error || data.message || `HTTP ${response.status}`
-);
-
+  return Number.isFinite(number)
+    ? number.toFixed(2)
+    : "-";
 }
 
-return data;
+function createStockCard(stock, type) {
 
+  const badgeClass =
+    type === "bullish" ? "buy" :
+    type === "bearish" ? "sell" : "wait";
+
+  const badgeText =
+    type === "bullish" ? "BUY" :
+    type === "bearish" ? "SELL" : "WAIT";
+
+  return `
+    <div class="stock">
+
+      <div class="stock-head">
+        <div class="stock-name">
+          ${escapeHTML(stock.symbol || "UNKNOWN")}
+        </div>
+
+        <span class="badge ${badgeClass}">
+          ${badgeText}
+        </span>
+      </div>
+
+      <div class="stock-data">
+
+        <div class="data-item">
+          <small>PRICE</small>
+          <strong>₹${safeNumber(stock.price)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>RSI</small>
+          <strong>${safeNumber(stock.rsi)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>VOLUME RATIO</small>
+          <strong>${safeNumber(stock.volumeRatio)}x</strong>
+        </div>
+
+        <div class="data-item">
+          <small>VWAP</small>
+          <strong>₹${safeNumber(stock.vwap)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>ORB HIGH</small>
+          <strong>₹${safeNumber(stock.orbHigh)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>ORB LOW</small>
+          <strong>₹${safeNumber(stock.orbLow)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>FUTURES OI</small>
+          <strong>${safeNumber(stock.futuresOI)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>ENTRY</small>
+          <strong>₹${safeNumber(stock.entry)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>STOP LOSS</small>
+          <strong>₹${safeNumber(stock.stopLoss)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>TARGET 1</small>
+          <strong>₹${safeNumber(stock.target1)}</strong>
+        </div>
+
+        <div class="data-item">
+          <small>TARGET 2</small>
+          <strong>₹${safeNumber(stock.target2)}</strong>
+        </div>
+
+      </div>
+
+      <div class="reason">
+        ${escapeHTML(stock.reason || "No reason available")}
+        <br>
+        Candle: ${escapeHTML(stock.candleTime || "-")}
+        | Timeframe: ${escapeHTML(stock.timeframe || "5m")}
+        <br>
+        OI Increasing: ${stock.oiIncreasing ? "YES" : "NO"}
+      </div>
+
+    </div>
+  `;
 }
 
-
-// HEALTH CHECK
-
-async function loadHealth(){
-
-try{
-
-const h = await api("/health");
-
-$("serverBadge").textContent =
-"● "+(h.status || "ONLINE");
-
-$("serverState").textContent =
-h.status || "ONLINE";
-
-$("serverState").className="success";
-
-$("tokenState").textContent =
-h.upstoxTokenConfigured
-? "CONFIGURED"
-: "MISSING";
-
-$("tokenState").className =
-h.upstoxTokenConfigured
-? "success"
-: "error";
-
-}catch(e){
-
-$("serverBadge").textContent="SERVER ERROR";
-
-$("serverState").textContent="OFFLINE / ERROR";
-
-$("serverState").className="error";
-
-setMessage(
-"Health check failed: "+e.message,
-"error"
-);
-
+// Prevent API text from being interpreted as HTML.
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
 }
 
+// ---------------- RENDER ----------------
+
+function renderStocks(tab) {
+
+  const list = document.getElementById("stockList");
+
+  if (!scanData) {
+    list.innerHTML =
+      '<div class="empty">Please click SCAN NOW</div>';
+    return;
+  }
+
+  const stocks = scanData[tab] || [];
+
+  if (!stocks.length) {
+
+    list.innerHTML = `
+      <div class="empty">
+        No ${tab.toUpperCase()} stocks found.
+        <br><br>
+        Scanner may be waiting for confirmation.
+      </div>
+    `;
+
+    return;
+  }
+
+  list.innerHTML = stocks
+    .map(stock => createStockCard(stock, tab))
+    .join("");
 }
 
-
-// STATUS CHECK
-
-async function loadStatus(){
-
-try{
-
-const s = await api("/api/orb/status");
-
-$("instrumentCount").textContent =
-s.instrumentsLoaded ?? "—";
-
-$("futureCount").textContent =
-s.futuresContractsLoaded ?? "—";
-
-if(s.fnoStocks!==undefined){
-
-$("total").textContent=s.fnoStocks;
-
-}
-
-setMessage(
-"Status loaded. Scanner: "+
-(s.scanner||"ORB")+
-" · Timeframe: "+
-(s.timeframe||"5 MINUTES"),
-"success"
-);
-
-}catch(e){
-
-setMessage(
-"Status error: "+e.message,
-"error"
-);
-
-}
-
-}
-
-
-// MAIN SCANNER
-
-async function runScan(force=true){
-
-$("scanBtn").disabled=true;
-
-$("scanBtn").textContent="SCANNING…";
-
-setMessage(
-"Scanning completed 5-minute candles. Please wait…"
-);
-
-try{
-
-const type=$("scanType").value;
-
-const result=await api(
-`/api/orb/scan?type=${encodeURIComponent(type)}${force?"&refresh=1":""}`
-);
-
-scanData=Array.isArray(result.data)
-? result.data
-: [];
-
-$("total").textContent =
-result.totalStocks ?? "—";
-
-$("analysed").textContent =
-result.analysedStocks ?? "—";
-
-$("bullish").textContent =
-result.bullish ?? 0;
-
-$("bearish").textContent =
-result.bearish ?? 0;
-
-$("wait").textContent =
-result.wait ?? 0;
-
-$("lastScan").textContent =
-"Last scan: "+
-(result.scanTime
-? new Date(result.scanTime).toLocaleString()
-: "—");
-
-renderRows();
-
-setMessage(
-`Scan complete: ${result.analysedStocks} analysed · ${result.signals} signals · Volume threshold ${result.rules?.volumeMultiplier ?? "—"}x.`,
-"success"
-);
-
-await loadStatus();
-
-}catch(e){
-
-setMessage(
-"Scan failed: "+e.message,
-"error"
-);
-
-}finally{
-
-$("scanBtn").disabled=false;
-
-$("scanBtn").textContent="SCAN NOW";
-
-}
-
-}
-
-
-// FILTER
-
-function setFilter(filter,btn){
-
-activeFilter=filter;
-
-document.querySelectorAll(
-".filters button"
-).forEach(b=>b.classList.remove("active"));
-
-btn.classList.add("active");
-
-renderRows();
-
-}
-
-
-// DISPLAY RESULTS
-
-function renderRows(){
-
-let list=scanData;
-
-if(activeFilter==="buy"){
-
-list=list.filter(x=>
-x.signal==="BUY" ||
-x.signal==="STRONG BUY"
-);
-
-}
-
-if(activeFilter==="sell"){
-
-list=list.filter(x=>
-x.signal==="SELL" ||
-x.signal==="STRONG SELL"
-);
-
-}
-
-if(activeFilter==="strong"){
-
-list=list.filter(x=>
-String(x.signal).includes("STRONG") ||
-x.strength==="VERY_STRONG"
-);
-
-}
-
-if(activeFilter==="volume"){
-
-list=list.filter(x=>x.volumeBreakout);
-
-}
-
-if(activeFilter==="oi"){
-
-list=list.filter(x=>x.oiIncrease);
-
-}
-
-
-if(!list.length){
-
-$("rows").innerHTML=
-'<tr><td colspan="16">ಈ Filter ನಲ್ಲಿ ಯಾವುದೇ stock ಇಲ್ಲ.</td></tr>';
-
-return;
-
-}
-
-
-$("rows").innerHTML=list.map(x=>{
-
-const buy=String(x.signal).includes("BUY");
-
-const sell=String(x.signal).includes("SELL");
-
-const cls=buy?"buy":sell?"sell":"wait";
-
-const oi=x.oiIncrease===true
-? '<span class="good">YES</span>'
-: x.oiAvailable===false
-? '<span class="warn">N/A</span>'
-: 'NO';
-
-const reasons=Array.isArray(x.reasons)
-? x.reasons.join(", ")
-: "—";
-
-
-return `<tr>
-
-<td><b>${esc(x.symbol)}</b></td>
-
-<td>
-<span class="signal ${cls}">
-${esc(x.signal||"WAIT")}
-</span>
-</td>
-
-<td>${esc(x.strength||"—")}</td>
-
-<td>${fmt(x.price)}</td>
-
-<td>${fmt(x.rsi)}</td>
-
-<td class="${Number(x.volumeRatio)>=2.5?"good":""}">
-${fmt(x.volumeRatio)}x
-</td>
-
-<td>${oi}</td>
-
-<td>${fmt(x.oiChange,0)}</td>
-
-<td>${fmt(x.vwap)}</td>
-
-<td>${fmt(x.orbHigh)}</td>
-
-<td>${fmt(x.orbLow)}</td>
-
-<td>${fmt(x.entry)}</td>
-
-<td>${fmt(x.stopLoss)}</td>
-
-<td>${fmt(x.target1)}</td>
-
-<td>${fmt(x.target2)}</td>
-
-<td>${esc(reasons)}</td>
-
-</tr>`;
-
-}).join("");
-
-}
-
-
-// HTML ESCAPE
-
-function esc(value){
-
-return String(value??"—").replace(
-/[&<>"']/g,
-c=>({
-"&":"&amp;",
-"<":"&lt;",
-">":"&gt;",
-'"':"&quot;",
-"'":"&#39;"
-}[c])
-);
-
-}
-
-
-// AUTO SCAN
-
-function toggleAuto(){
-
-if(autoTimer){
-
-clearInterval(autoTimer);
-
-autoTimer=null;
-
-$("autoBtn").textContent="AUTO: OFF";
-
-setMessage("Auto scan stopped.");
-
-}else{
-
-autoTimer=setInterval(
-()=>runScan(true),
-60000
-);
-
-$("autoBtn").textContent="AUTO: ON (60s)";
-
-runScan(true);
-
-}
-
-}
-
-
-// START
-
-loadHealth();
+// ---------------- INITIAL LOAD ----------------
 
 loadStatus();
 
