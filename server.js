@@ -676,27 +676,41 @@ function analyseStock(candles, futureCandles, stock) {
   };
 }
 
-// -------------------- MARKET DATA --------------------
-async function getIntradayCandles(instrumentKey) {
+// HISTORICAL 5 MINUTE CANDLES
+
+async function getHistoricalCandles(instrumentKey) {
   const key = encodeURIComponent(instrumentKey);
 
-  const result = await upstox(
-    `/v3/historical-candle/intraday/${key}/minutes/5`
+  const toDate = istDate();
+
+  const fromDate = istDate(
+    new Date(Date.now() - 10 * 86400000)
   );
 
-  return getCompletedCandles(result?.data?.candles || []);
-}
-
-async function getFutureCandles(instrumentKey) {
-  const key = encodeURIComponent(instrumentKey);
-
   const result = await upstox(
-    `/v3/historical-candle/intraday/${key}/minutes/5`
+    `/v3/historical-candle/${key}/minutes/5/${toDate}/${fromDate}`
   );
 
-  return getCompletedCandles(result?.data?.candles || []);
+  return getCompletedCandles(
+    result?.data?.candles || []
+  );
 }
+// MERGE HISTORICAL + INTRADAY CANDLES
 
+function mergeCandles(historical, intraday) {
+
+  const map = new Map();
+
+  for (const candle of [
+    ...(historical || []),
+    ...(intraday || [])
+  ]) {
+    map.set(candle.time, candle);
+  }
+
+  return [...map.values()]
+    .sort((a, b) => a.time - b.time);
+}
 // -------------------- CONCURRENT WORKER --------------------
 async function runWorkers(items, worker, concurrency) {
   const results = new Array(items.length);
