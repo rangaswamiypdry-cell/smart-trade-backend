@@ -711,6 +711,30 @@ function mergeCandles(historical, intraday) {
   return [...map.values()]
     .sort((a, b) => a.time - b.time);
 }
+// STOCK INTRADAY CANDLES
+
+async function getIntradayCandles(instrumentKey) {
+  const key = encodeURIComponent(instrumentKey);
+
+  const historical = await getHistoricalCandles(instrumentKey);
+
+  const result = await upstox(
+    `/v3/historical-candle/intraday/${key}/minutes/5`
+  );
+
+  const intraday = getCompletedCandles(
+    result?.data?.candles || []
+  );
+
+  return mergeCandles(historical, intraday);
+}
+
+
+// FUTURES CANDLES
+
+async function getFutureCandles(instrumentKey) {
+  return getIntradayCandles(instrumentKey);
+}
 // -------------------- CONCURRENT WORKER --------------------
 async function runWorkers(items, worker, concurrency) {
   const results = new Array(items.length);
