@@ -1,7 +1,8 @@
 // ======================================================
-// SMART TRADE INDIA V7
-// ORB + VOLUME + LONG BUILDUP SCANNER
-// UPSTOX V3 | NODE.JS 20+
+// SMART TRADE INDIA V8 PRO
+// LIVE NSE F&O + ORB + OPTIONS SCANNER
+// PART 1 OF 3
+// NODE.JS 20+
 // ======================================================
 
 "use strict";
@@ -9,16 +10,18 @@
 const http = require("http");
 const zlib = require("zlib");
 
+// ======================================================
+// ENVIRONMENT
+// ======================================================
+
 const PORT = Number(process.env.PORT || 10000);
 
-const TOKEN =
-  process.env.UPSTOX_ACCESS_TOKEN || "";
+const TOKEN = process.env.UPSTOX_ACCESS_TOKEN || "";
 
-const API =
-  "https://api.upstox.com";
+const API = "https://api.upstox.com";
 
 const MASTER_URL =
-  "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
+"https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 
 // ======================================================
 // CONFIGURATION
@@ -26,29 +29,41 @@ const MASTER_URL =
 
 const CONFIG = {
 
-  VERSION: "V7_ORB_LONG_BUILDUP",
+    VERSION: "SMART_TRADE_INDIA_V8_PRO",
 
-  TIMEFRAME: 5,
+    TIMEFRAME: 5,
 
-  ORB_START: "09:15",
+    ORB_START: "09:15",
 
-  ORB_END: "09:30",
+    ORB_END: "09:30",
 
-  RSI_PERIOD: 14,
+    RSI_PERIOD: 14,
 
-  RSI_BUY: 55,
+    RSI_BUY: 55,
 
-  VOLUME_MULTIPLIER: 1.5,
+    RSI_SELL: 45,
 
-  STRONG_VOLUME: 2,
+    VOLUME_MULTIPLIER: 1.5,
 
-  MIN_CANDLES: 21,
+    STRONG_VOLUME: 2,
 
-  SCAN_LIMIT: 224,
+    MIN_CANDLES: 21,
 
-  CONCURRENCY: 3,
+    SCAN_LIMIT: 224,
 
-  CACHE_MS: 15000
+    CONCURRENCY: 3,
+
+    CACHE_MS: 10000,
+
+    OPTION_DELTA_MIN: 0.40,
+
+    OPTION_DELTA_MAX: 0.70,
+
+    OPTION_SL_PERCENT: 25,
+
+    OPTION_TARGET1_PERCENT: 50,
+
+    OPTION_TARGET2_PERCENT: 75
 
 };
 
@@ -71,19 +86,12 @@ let scanRunning = false;
 let scanCache = null;
 
 let lastScan = {
-
-  status: "IDLE",
-
-  scanned: 0,
-
-  strongBuy: 0,
-
-  longBuildup: 0,
-
-  shortBuildup: 0,
-
-  waiting: 0
-
+    status: "IDLE",
+    scanned: 0,
+    bullish: 0,
+    bearish: 0,
+    waiting: 0,
+    errors: 0
 };
 
 // ======================================================
@@ -92,47 +100,46 @@ let lastScan = {
 
 function round(value) {
 
-  const n = Number(value);
+    const n = Number(value);
 
-  return Number.isFinite(n)
-    ? Number(n.toFixed(2))
-    : null;
-
+    return Number.isFinite(n)
+        ? Number(n.toFixed(2))
+        : null;
 }
 
 function sleep(ms) {
 
-  return new Promise(resolve =>
-    setTimeout(resolve, ms)
-  );
+    return new Promise(resolve =>
+        setTimeout(resolve, ms)
+    );
 
 }
 
 function istDate(date = new Date()) {
 
-  return new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }
-  ).format(date);
+    return new Intl.DateTimeFormat(
+        "en-CA",
+        {
+            timeZone: "Asia/Kolkata",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+        }
+    ).format(date);
 
 }
 
 function istTime(date = new Date()) {
 
-  return new Intl.DateTimeFormat(
-    "en-GB",
-    {
-      timeZone: "Asia/Kolkata",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23"
-    }
-  ).format(date);
+    return new Intl.DateTimeFormat(
+        "en-GB",
+        {
+            timeZone: "Asia/Kolkata",
+            hour: "2-digit",
+            minute: "2-digit",
+            hourCycle: "h23"
+        }
+    ).format(date);
 
 }
 
@@ -142,69 +149,63 @@ function istTime(date = new Date()) {
 
 function isMarketOpen() {
 
-  const day = new Intl.DateTimeFormat(
-    "en-US",
-    {
-      timeZone: "Asia/Kolkata",
-      weekday: "short"
+    const day = new Intl.DateTimeFormat(
+        "en-US",
+        {
+            timeZone: "Asia/Kolkata",
+            weekday: "short"
+        }
+    ).format(new Date());
+
+    if (day === "Sat" || day === "Sun") {
+        return false;
     }
-  ).format(new Date());
 
-  if (day === "Sat" || day === "Sun") {
-    return false;
-  }
+    const time = istTime();
 
-  const time = istTime();
-
-  return time >= "09:15" && time <= "15:30";
+    return time >= "09:15" && time <= "15:30";
 
 }
 
 // ======================================================
-// UPSTOX API
+// UPSTOX API REQUEST
 // ======================================================
 
 async function upstoxGET(path) {
 
-  if (!TOKEN) {
+    if (!TOKEN) {
+        throw new Error(
+            "UPSTOX_ACCESS_TOKEN missing in Render"
+        );
+    }
 
-    throw new Error(
-      "UPSTOX_ACCESS_TOKEN missing"
+    const response = await fetch(
+        API + path,
+        {
+            method: "GET",
+
+            headers: {
+                Accept: "application/json",
+                Authorization: `Bearer ${TOKEN}`
+            },
+
+            signal: AbortSignal.timeout(20000)
+        }
     );
 
-  }
+    const data = await response.json();
 
-  const response = await fetch(
-    API + path,
-    {
-      method: "GET",
+    if (!response.ok) {
 
-      headers: {
-
-        Accept: "application/json",
-
-        Authorization: `Bearer ${TOKEN}`
-
-      },
-
-      signal: AbortSignal.timeout(20000)
+        throw new Error(
+            data?.errors?.[0]?.message ||
+            data?.message ||
+            `Upstox HTTP ${response.status}`
+        );
 
     }
-  );
 
-  const data = await response.json();
-
-  if (!response.ok) {
-
-    throw new Error(
-      data?.errors?.[0]?.message ||
-      data?.message ||
-      `Upstox HTTP ${response.status}`
-    );
-
-  }
-
-  return data;
+    return data;
 
 }
 
@@ -214,286 +215,274 @@ async function upstoxGET(path) {
 
 async function downloadMaster() {
 
-  const response = await fetch(
-    MASTER_URL,
-    {
-      signal: AbortSignal.timeout(60000)
+    const response = await fetch(
+        MASTER_URL,
+        {
+            signal: AbortSignal.timeout(60000)
+        }
+    );
+
+    if (!response.ok) {
+
+        throw new Error(
+            "Instrument Master Download Failed"
+        );
+
     }
-  );
 
-  if (!response.ok) {
-
-    throw new Error(
-      "Instrument Master Download Failed"
+    const buffer = Buffer.from(
+        await response.arrayBuffer()
     );
 
-  }
+    let rows;
 
-  const buffer = Buffer.from(
-    await response.arrayBuffer()
-  );
+    try {
 
-  let rows;
+        rows = JSON.parse(
+            zlib.gunzipSync(buffer).toString("utf8")
+        );
 
-  try {
+    } catch {
 
-    rows = JSON.parse(
-      zlib.gunzipSync(buffer).toString("utf8")
-    );
+        rows = JSON.parse(
+            buffer.toString("utf8")
+        );
 
-  } catch {
+    }
 
-    rows = JSON.parse(
-      buffer.toString("utf8")
-    );
+    if (!Array.isArray(rows)) {
 
-  }
+        throw new Error(
+            "Invalid Instrument Master"
+        );
 
-  if (!Array.isArray(rows)) {
+    }
 
-    throw new Error(
-      "Invalid Instrument Master"
-    );
-
-  }
-
-  return rows;
+    return rows;
 
 }
 
 // ======================================================
-// BUILD NSE F&O STOCKS
+// BUILD NSE F&O STOCK LIST
 // ======================================================
 
 function buildFnoStocks(rows) {
 
-  const equities = rows.filter(x =>
+    const equities = rows.filter(x =>
 
-    x.segment === "NSE_EQ" &&
+        x.segment === "NSE_EQ" &&
 
-    x.instrument_type === "EQ" &&
+        x.instrument_type === "EQ" &&
 
-    x.instrument_key &&
+        x.instrument_key &&
 
-    x.trading_symbol
-
-  );
-
-  const futures = rows.filter(x =>
-
-    x.segment === "NSE_FO" &&
-
-    x.instrument_type === "FUT" &&
-
-    x.instrument_key &&
-
-    x.underlying_symbol &&
-
-    x.expiry
-
-  );
-
-  const equityMap = new Map();
-
-  for (const item of equities) {
-
-    equityMap.set(
-
-      item.trading_symbol.toUpperCase(),
-
-      item
+        x.trading_symbol
 
     );
 
-  }
+    const futures = rows.filter(x =>
 
-  const today = istDate();
+        x.segment === "NSE_FO" &&
 
-  const futureMap = new Map();
+        x.instrument_type === "FUT" &&
 
-  for (const item of futures) {
+        x.instrument_key &&
 
-    const symbol =
-      String(item.underlying_symbol)
-        .toUpperCase();
+        x.underlying_symbol &&
 
-    const expiry =
-      String(item.expiry).slice(0, 10);
+        x.expiry
 
-    if (expiry < today) continue;
+    );
 
-    if (!futureMap.has(symbol)) {
+    const equityMap = new Map();
 
-      futureMap.set(symbol, []);
+    for (const item of equities) {
+
+        equityMap.set(
+            item.trading_symbol.toUpperCase(),
+            item
+        );
 
     }
 
-    futureMap.get(symbol).push(item);
+    const today = istDate();
 
-  }
+    const futureMap = new Map();
 
-  const result = [];
+    for (const item of futures) {
 
-  for (const [symbol, contracts] of futureMap) {
+        const symbol = String(
+            item.underlying_symbol
+        ).toUpperCase();
 
-    const equity = equityMap.get(symbol);
+        const expiry = String(
+            item.expiry
+        ).slice(0, 10);
 
-    if (!equity) continue;
+        if (expiry < today) continue;
 
-    contracts.sort((a, b) =>
+        if (!futureMap.has(symbol)) {
+            futureMap.set(symbol, []);
+        }
 
-      String(a.expiry).localeCompare(
-        String(b.expiry)
-      )
+        futureMap.get(symbol).push(item);
 
-    );
+    }
 
-    const future = contracts[0];
+    const result = [];
 
-    result.push({
+    for (const [symbol, contracts] of futureMap) {
 
-      symbol,
+        const equity = equityMap.get(symbol);
 
-      equityKey: equity.instrument_key,
+        if (!equity) continue;
 
-      futuresKey: future.instrument_key,
+        contracts.sort((a, b) =>
+            String(a.expiry).localeCompare(
+                String(b.expiry)
+            )
+        );
 
-      futuresSymbol: future.trading_symbol,
+        const future = contracts[0];
 
-      expiry: future.expiry
+        result.push({
 
-    });
+            symbol,
 
-  }
+            equityKey: equity.instrument_key,
 
-  return result
+            futuresKey: future.instrument_key,
 
-    .sort((a, b) =>
-      a.symbol.localeCompare(b.symbol)
-    )
+            futuresSymbol: future.trading_symbol,
 
-    .slice(0, CONFIG.SCAN_LIMIT);
+            expiry: future.expiry
+
+        });
+
+    }
+
+    return result
+        .sort((a, b) =>
+            a.symbol.localeCompare(b.symbol)
+        )
+        .slice(0, CONFIG.SCAN_LIMIT);
 
 }
 
 // ======================================================
-// LOAD MASTER
+// LOAD INSTRUMENT MASTER
 // ======================================================
 
 async function loadMaster(force = false) {
 
-  if (masterLoading) {
+    if (masterLoading) {
 
-    while (masterLoading) {
-      await sleep(200);
+        while (masterLoading) {
+            await sleep(200);
+        }
+
+        return;
+
     }
 
-    return;
+    if (masterLoaded && !force) return;
 
-  }
+    masterLoading = true;
 
-  if (masterLoaded && !force) return;
+    try {
 
-  masterLoading = true;
+        const rows = await downloadMaster();
 
-  try {
+        equityMaster = rows.filter(x =>
 
-    const rows = await downloadMaster();
+            x.segment === "NSE_EQ" &&
 
-    equityMaster = rows.filter(x =>
+            x.instrument_type === "EQ"
 
-      x.segment === "NSE_EQ" &&
+        );
 
-      x.instrument_type === "EQ"
+        futuresMaster = rows.filter(x =>
 
-    );
+            x.segment === "NSE_FO" &&
 
-    futuresMaster = rows.filter(x =>
+            x.instrument_type === "FUT"
 
-      x.segment === "NSE_FO" &&
+        );
 
-      x.instrument_type === "FUT"
+        fnoStocks = buildFnoStocks(rows);
 
-    );
+        masterLoaded = true;
 
-    fnoStocks = buildFnoStocks(rows);
+        console.log(
+            "[V8] Equity:",
+            equityMaster.length
+        );
 
-    masterLoaded = true;
+        console.log(
+            "[V8] Futures:",
+            futuresMaster.length
+        );
 
-    console.log(
-      "[V7] Equity:",
-      equityMaster.length
-    );
+        console.log(
+            "[V8] F&O Stocks:",
+            fnoStocks.length
+        );
 
-    console.log(
-      "[V7] Futures:",
-      futuresMaster.length
-    );
+    } finally {
 
-    console.log(
-      "[V7] F&O Stocks:",
-      fnoStocks.length
-    );
+        masterLoading = false;
 
-  } finally {
-
-    masterLoading = false;
-
-  }
+    }
 
 }
 
 // ======================================================
-// GET 5 MINUTE CANDLES
+// GET COMPLETED 5 MINUTE CANDLES
 // ======================================================
 
 async function getFiveMinuteCandles(instrumentKey) {
 
-  const key = encodeURIComponent(
-    instrumentKey
-  );
+    const key = encodeURIComponent(instrumentKey);
 
-  const result = await upstoxGET(
+    const result = await upstoxGET(
 
-    `/v3/historical-candle/intraday/${key}/minutes/5`
+        `/v3/historical-candle/intraday/${key}/minutes/5`
 
-  );
-
-  const raw = result?.data?.candles || [];
-
-  const now = Date.now();
-
-  return raw
-
-    .map(c => ({
-
-      time: new Date(c[0]).getTime(),
-
-      open: Number(c[1]),
-
-      high: Number(c[2]),
-
-      low: Number(c[3]),
-
-      close: Number(c[4]),
-
-      volume: Number(c[5] || 0),
-
-      oi: Number(c[6] || 0)
-
-    }))
-
-    .filter(c =>
-
-      Number.isFinite(c.time) &&
-
-      c.time + 5 * 60 * 1000 <= now
-
-    )
-
-    .sort((a, b) =>
-      a.time - b.time
     );
+
+    const raw = result?.data?.candles || [];
+
+    const now = Date.now();
+
+    return raw
+
+        .map(c => ({
+
+            time: new Date(c[0]).getTime(),
+
+            open: Number(c[1]),
+
+            high: Number(c[2]),
+
+            low: Number(c[3]),
+
+            close: Number(c[4]),
+
+            volume: Number(c[5] || 0),
+
+            oi: Number(c[6] || 0)
+
+        }))
+
+        .filter(c =>
+
+            Number.isFinite(c.time) &&
+
+            c.time + 5 * 60 * 1000 <= now
+
+        )
+
+        .sort((a, b) => a.time - b.time);
 
 }
 
@@ -503,36 +492,34 @@ async function getFiveMinuteCandles(instrumentKey) {
 
 async function getFuturesQuotes(stocks) {
 
-  const quotes = {};
+    const quotes = {};
 
-  const keys = stocks
+    const keys = stocks
+        .map(x => x.futuresKey)
+        .filter(Boolean);
 
-    .map(x => x.futuresKey)
+    for (let i = 0; i < keys.length; i += 100) {
 
-    .filter(Boolean);
+        const batch = keys.slice(i, i + 100);
 
-  for (let i = 0; i < keys.length; i += 100) {
+        const query = encodeURIComponent(
+            batch.join(",")
+        );
 
-    const batch = keys.slice(i, i + 100);
+        const result = await upstoxGET(
 
-    const query = encodeURIComponent(
-      batch.join(",")
-    );
+            `/v3/market-quote/quotes?instrument_key=${query}`
 
-    const result = await upstoxGET(
+        );
 
-      `/v3/market-quote/quotes?instrument_key=${query}`
+        Object.assign(
+            quotes,
+            result.data || {}
+        );
 
-    );
+    }
 
-    Object.assign(
-      quotes,
-      result.data || {}
-    );
-
-  }
-
-  return quotes;
+    return quotes;
 
 }
 
@@ -542,118 +529,15 @@ async function getFuturesQuotes(stocks) {
 
 function findFuturesQuote(stock, quotes) {
 
-  const key = stock.futuresKey;
+    const key = stock.futuresKey;
 
-  if (quotes[key]) return quotes[key];
+    if (quotes[key]) return quotes[key];
 
-  return Object.values(quotes).find(q =>
+    return Object.values(quotes).find(q =>
 
-    q.instrument_token === key
+        q.instrument_token === key
 
-  ) || null;
-
-}
-
-// ======================================================
-// LONG BUILDUP DETECTION
-// ======================================================
-
-function detectLongBuildup(quote) {
-
-  if (!quote) {
-
-    return {
-
-      valid: false,
-
-      reason: "Futures quote unavailable"
-
-    };
-
-  }
-
-  const oi = Number(quote.oi || 0);
-
-  const previousOI =
-    Number(quote.previous_oi || 0);
-
-  const price =
-    Number(quote.last_price || 0);
-
-  const previousClose =
-    Number(quote.prev_close_price || 0);
-
-  if (
-    oi <= 0 ||
-    previousOI <= 0 ||
-    price <= 0 ||
-    previousClose <= 0
-  ) {
-
-    return {
-
-      valid: false,
-
-      reason: "Futures OI data unavailable"
-
-    };
-
-  }
-
-  const oiChange = oi - previousOI;
-
-  const priceChange = price - previousClose;
-
-  const oiChangePercent =
-    (oiChange / previousOI) * 100;
-
-  const longBuildup =
-
-    oiChange > 0 &&
-
-    priceChange > 0;
-
-  return {
-
-    valid: true,
-
-    longBuildup,
-
-    oi,
-
-    previousOI,
-
-    oiChange,
-
-    oiChangePercent: round(oiChangePercent),
-
-    futuresPrice: price,
-
-    previousClose,
-
-    priceChange: round(priceChange),
-
-    classification:
-
-      longBuildup
-
-        ? "LONG_BUILDUP"
-
-        : oiChange > 0 && priceChange < 0
-
-          ? "SHORT_BUILDUP"
-
-          : oiChange < 0 && priceChange > 0
-
-            ? "SHORT_COVERING"
-
-            : oiChange < 0 && priceChange < 0
-
-              ? "LONG_UNWINDING"
-
-              : "NEUTRAL"
-
-  };
+    ) || null;
 
 }
 
@@ -663,45 +547,50 @@ function detectLongBuildup(quote) {
 
 function calculateRSI(closes, period = 14) {
 
-  if (closes.length <= period) return null;
+    if (closes.length <= period) return null;
 
-  let gains = 0;
-  let losses = 0;
+    let gains = 0;
 
-  for (let i = 1; i <= period; i++) {
+    let losses = 0;
 
-    const change = closes[i] - closes[i - 1];
+    for (let i = 1; i <= period; i++) {
 
-    if (change > 0) gains += change;
-    else losses -= change;
+        const change = closes[i] - closes[i - 1];
 
-  }
+        if (change > 0) gains += change;
+        else losses -= change;
 
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
+    }
 
-  for (let i = period + 1; i < closes.length; i++) {
+    let avgGain = gains / period;
 
-    const change = closes[i] - closes[i - 1];
+    let avgLoss = losses / period;
 
-    avgGain =
-      (avgGain * (period - 1) + Math.max(change, 0))
-      / period;
+    for (let i = period + 1; i < closes.length; i++) {
 
-    avgLoss =
-      (avgLoss * (period - 1) + Math.max(-change, 0))
-      / period;
+        const change = closes[i] - closes[i - 1];
 
-  }
+        avgGain =
+            (
+                avgGain * (period - 1) +
+                Math.max(change, 0)
+            ) / period;
 
-  if (avgLoss === 0) return 100;
+        avgLoss =
+            (
+                avgLoss * (period - 1) +
+                Math.max(-change, 0)
+            ) / period;
 
-  return round(
-    100 - 100 / (1 + avgGain / avgLoss)
-  );
+    }
+
+    if (avgLoss === 0) return 100;
+
+    return round(
+        100 - 100 / (1 + avgGain / avgLoss)
+    );
 
 }
-
 
 // ======================================================
 // VWAP
@@ -709,91 +598,707 @@ function calculateRSI(closes, period = 14) {
 
 function calculateVWAP(candles) {
 
-  let totalPV = 0;
-  let totalVolume = 0;
+    let totalPV = 0;
 
-  for (const c of candles) {
+    let totalVolume = 0;
 
-    const typical =
-      (c.high + c.low + c.close) / 3;
+    for (const c of candles) {
 
-    totalPV += typical * c.volume;
+        const typical =
+            (c.high + c.low + c.close) / 3;
 
-    totalVolume += c.volume;
+        totalPV += typical * c.volume;
 
-  }
+        totalVolume += c.volume;
 
-  if (totalVolume === 0) return null;
+    }
 
-  return round(totalPV / totalVolume);
+    if (totalVolume === 0) return null;
+
+    return round(totalPV / totalVolume);
 
 }
 
-
 // ======================================================
-// GET TODAY CANDLES
+// TODAY CANDLES
 // ======================================================
 
 function getTodayCandles(candles) {
 
-  const today = istDate();
+    const today = istDate();
 
-  return candles.filter(c =>
+    return candles.filter(c =>
 
-    istDate(new Date(c.time)) === today
+        istDate(new Date(c.time)) === today
 
-  );
+    );
+
+}
+
+// ======================================================
+// SMART TRADE INDIA V8 PRO
+// PART 2 OF 3
+// AUTOMATIC CE / PE STRIKE SELECTOR
+// ======================================================
+
+
+// ======================================================
+// OPTION CONTRACT CACHE
+// ======================================================
+
+const optionContractCache = new Map();
+
+const optionChainCache = new Map();
+
+
+// ======================================================
+// GET OPTION CONTRACTS
+// ======================================================
+
+async function getOptionContracts(instrumentKey) {
+
+    const cached = optionContractCache.get(instrumentKey);
+
+    if (
+        cached &&
+        Date.now() - cached.time < 60000
+    ) {
+        return cached.data;
+    }
+
+    const key = encodeURIComponent(instrumentKey);
+
+    const result = await upstoxGET(
+        `/v2/option/contract?instrument_key=${key}`
+    );
+
+    const contracts = result?.data || [];
+
+    if (!Array.isArray(contracts)) {
+        throw new Error("Invalid option contracts response");
+    }
+
+    optionContractCache.set(instrumentKey, {
+        time: Date.now(),
+        data: contracts
+    });
+
+    return contracts;
+}
+
+
+// ======================================================
+// FIND NEAREST VALID EXPIRY
+// ======================================================
+
+function findNearestExpiry(contracts) {
+
+    const today = istDate();
+
+    const expiries = [
+
+        ...new Set(
+
+            contracts
+
+                .map(x => String(x.expiry || "").slice(0, 10))
+
+                .filter(x =>
+                    /^\d{4}-\d{2}-\d{2}$/.test(x) &&
+                    x >= today
+                )
+
+        )
+
+    ].sort();
+
+    return expiries[0] || null;
+}
+
+
+// ======================================================
+// GET OPTION CHAIN
+// ======================================================
+
+async function getOptionChain(instrumentKey, expiry) {
+
+    const cacheKey = `${instrumentKey}_${expiry}`;
+
+    const cached = optionChainCache.get(cacheKey);
+
+    if (
+        cached &&
+        Date.now() - cached.time < 5000
+    ) {
+        return cached.data;
+    }
+
+    const key = encodeURIComponent(instrumentKey);
+
+    const exp = encodeURIComponent(expiry);
+
+    const result = await upstoxGET(
+
+        `/v2/option/chain?instrument_key=${key}&expiry_date=${exp}`
+
+    );
+
+    const chain = result?.data || [];
+
+    if (!Array.isArray(chain)) {
+        throw new Error("Invalid option chain response");
+    }
+
+    optionChainCache.set(cacheKey, {
+        time: Date.now(),
+        data: chain
+    });
+
+    return chain;
+}
+
+
+// ======================================================
+// OPTION MARKET DATA
+// ======================================================
+
+function getOptionMarketData(option) {
+
+    const market = option?.market_data || {};
+
+    const greeks = option?.option_greeks || {};
+
+    return {
+
+        instrumentKey:
+            option?.instrument_key || null,
+
+        ltp:
+            Number(market.ltp || 0),
+
+        closePrice:
+            Number(market.close_price || 0),
+
+        volume:
+            Number(market.volume || 0),
+
+        oi:
+            Number(market.oi || 0),
+
+        previousOI:
+            Number(market.prev_oi || 0),
+
+        bidPrice:
+            Number(market.bid_price || 0),
+
+        bidQty:
+            Number(market.bid_qty || 0),
+
+        askPrice:
+            Number(market.ask_price || 0),
+
+        askQty:
+            Number(market.ask_qty || 0),
+
+        delta:
+            Number(greeks.delta || 0),
+
+        gamma:
+            Number(greeks.gamma || 0),
+
+        theta:
+            Number(greeks.theta || 0),
+
+        iv:
+            Number(greeks.iv || 0)
+
+    };
 
 }
 
 
 // ======================================================
-// ORB HIGH LOW
-// 09:15 TO 09:30
+// OPTION LIQUIDITY CHECK
+// ======================================================
+
+function checkOptionLiquidity(data) {
+
+    if (
+        !data.instrumentKey ||
+        data.ltp <= 0 ||
+        data.volume <= 0 ||
+        data.oi <= 0
+    ) {
+        return {
+            valid: false,
+            reason: "Insufficient option liquidity data"
+        };
+    }
+
+    if (
+        data.bidPrice <= 0 ||
+        data.askPrice <= 0
+    ) {
+        return {
+            valid: false,
+            reason: "Bid/Ask unavailable"
+        };
+    }
+
+    if (data.askPrice < data.bidPrice) {
+        return {
+            valid: false,
+            reason: "Invalid bid ask spread"
+        };
+    }
+
+    const spread =
+        data.askPrice - data.bidPrice;
+
+    const spreadPercent =
+        (spread / data.ltp) * 100;
+
+    if (spreadPercent > 3) {
+        return {
+            valid: false,
+            reason: "Spread too high"
+        };
+    }
+
+    return {
+
+        valid: true,
+
+        spread: round(spread),
+
+        spreadPercent: round(spreadPercent)
+
+    };
+
+}
+
+
+// ======================================================
+// SCORE OPTION CONTRACT
+// ======================================================
+
+function scoreOption(data, direction) {
+
+    const liquidity = checkOptionLiquidity(data);
+
+    if (!liquidity.valid) {
+        return null;
+    }
+
+    const delta = Math.abs(data.delta);
+
+    if (
+        delta < CONFIG.OPTION_DELTA_MIN ||
+        delta > CONFIG.OPTION_DELTA_MAX
+    ) {
+        return null;
+    }
+
+    let score = 0;
+
+    // DELTA SCORE
+
+    score += 30 -
+        Math.abs(delta - 0.55) * 100;
+
+    // VOLUME SCORE
+
+    if (data.volume >= 10000) {
+        score += 20;
+    } else if (data.volume >= 3000) {
+        score += 15;
+    } else if (data.volume >= 1000) {
+        score += 8;
+    }
+
+    // OPEN INTEREST SCORE
+
+    if (data.oi >= 100000) {
+        score += 15;
+    } else if (data.oi >= 30000) {
+        score += 10;
+    } else if (data.oi >= 10000) {
+        score += 5;
+    }
+
+    // BID ASK SPREAD SCORE
+
+    if (liquidity.spreadPercent <= 0.5) {
+        score += 20;
+    } else if (liquidity.spreadPercent <= 1) {
+        score += 15;
+    } else if (liquidity.spreadPercent <= 2) {
+        score += 8;
+    }
+
+    // BID / ASK QUANTITY
+
+    if (
+        data.bidQty > 0 &&
+        data.askQty > 0
+    ) {
+        score += 5;
+    }
+
+    // OI INCREASE
+
+    if (
+        data.previousOI > 0 &&
+        data.oi > data.previousOI
+    ) {
+        score += 10;
+    }
+
+    return {
+
+        score: round(score),
+
+        liquidity,
+
+        direction
+
+    };
+
+}
+
+
+// ======================================================
+// SELECT BEST CE / PE STRIKE
+// ======================================================
+
+async function selectBestOption(stock, stockSignal) {
+
+    try {
+
+        if (!stock || !stock.equityKey) {
+
+            return {
+                success: false,
+                reason: "Underlying instrument key missing"
+            };
+
+        }
+
+        let optionType;
+
+        let direction;
+
+        if (stockSignal.signal === "BUY") {
+
+            optionType = "CE";
+
+            direction = "BULLISH";
+
+        } else if (stockSignal.signal === "SELL") {
+
+            optionType = "PE";
+
+            direction = "BEARISH";
+
+        } else {
+
+            return {
+                success: false,
+                reason: "No confirmed stock signal"
+            };
+
+        }
+
+        // GET AVAILABLE CONTRACTS
+
+        const contracts = await getOptionContracts(
+            stock.equityKey
+        );
+
+        if (!contracts.length) {
+
+            return {
+                success: false,
+                reason: "No option contracts found"
+            };
+
+        }
+
+        // FIND NEAREST EXPIRY
+
+        const expiry = findNearestExpiry(contracts);
+
+        if (!expiry) {
+
+            return {
+                success: false,
+                reason: "No valid future expiry"
+            };
+
+        }
+
+        // GET OPTION CHAIN
+
+        const chain = await getOptionChain(
+            stock.equityKey,
+            expiry
+        );
+
+        if (!chain.length) {
+
+            return {
+                success: false,
+                reason: "Option chain unavailable"
+            };
+
+        }
+
+        const candidates = [];
+
+        for (const row of chain) {
+
+            const option = optionType === "CE"
+                ? row.call_options
+                : row.put_options;
+
+            if (!option) continue;
+
+            const data = getOptionMarketData(option);
+
+            const result = scoreOption(
+                data,
+                direction
+            );
+
+            if (!result) continue;
+
+            candidates.push({
+
+                symbol: stock.symbol,
+
+                direction,
+
+                optionType,
+
+                strikePrice: Number(row.strike_price),
+
+                expiry,
+
+                instrumentKey: data.instrumentKey,
+
+                tradingSymbol:
+                    contracts.find(c =>
+                        c.instrument_key === data.instrumentKey
+                    )?.trading_symbol || null,
+
+                premium: data.ltp,
+
+                volume: data.volume,
+
+                oi: data.oi,
+
+                previousOI: data.previousOI,
+
+                oiChange:
+                    data.oi - data.previousOI,
+
+                bidPrice: data.bidPrice,
+
+                askPrice: data.askPrice,
+
+                bidQty: data.bidQty,
+
+                askQty: data.askQty,
+
+                delta: round(data.delta),
+
+                gamma: round(data.gamma),
+
+                theta: round(data.theta),
+
+                iv: round(data.iv),
+
+                spread: result.liquidity.spread,
+
+                spreadPercent:
+                    result.liquidity.spreadPercent,
+
+                score: result.score
+
+            });
+
+        }
+
+        if (!candidates.length) {
+
+            return {
+                success: false,
+                reason: "No liquid option matched selector filters"
+            };
+
+        }
+
+        // BEST SCORE FIRST
+
+        candidates.sort((a, b) =>
+            b.score - a.score
+        );
+
+        const best = candidates[0];
+
+        // OPTION ENTRY
+
+        const entry = best.askPrice;
+
+        if (!Number.isFinite(entry) || entry <= 0) {
+
+            return {
+                success: false,
+                reason: "Invalid option entry premium"
+            };
+
+        }
+
+        // PREMIUM RISK
+
+        const stopLoss = round(
+            entry * (
+                1 - CONFIG.OPTION_SL_PERCENT / 100
+            )
+        );
+
+        const target1 = round(
+            entry * (
+                1 + CONFIG.OPTION_TARGET1_PERCENT / 100
+            )
+        );
+
+        const target2 = round(
+            entry * (
+                1 + CONFIG.OPTION_TARGET2_PERCENT / 100
+            )
+        );
+
+        return {
+
+            success: true,
+
+            signal: `BUY_${optionType}`,
+
+            symbol: best.symbol,
+
+            optionType: best.optionType,
+
+            direction: best.direction,
+
+            tradingSymbol: best.tradingSymbol,
+
+            instrumentKey: best.instrumentKey,
+
+            strikePrice: best.strikePrice,
+
+            expiry: best.expiry,
+
+            premium: best.premium,
+
+            entry,
+
+            stopLoss,
+
+            target1,
+
+            target2,
+
+            volume: best.volume,
+
+            oi: best.oi,
+
+            oiChange: best.oiChange,
+
+            bidPrice: best.bidPrice,
+
+            askPrice: best.askPrice,
+
+            spreadPercent: best.spreadPercent,
+
+            delta: best.delta,
+
+            score: best.score,
+
+            selectionMethod:
+                "DELTA + VOLUME + OI + BID ASK LIQUIDITY",
+
+            updatedAt: new Date().toISOString()
+
+        };
+
+    } catch (error) {
+
+        console.error(
+            "[V8 OPTION SELECTOR]",
+            stock?.symbol,
+            error.message
+        );
+
+        return {
+
+            success: false,
+
+            symbol: stock?.symbol || null,
+
+            reason: error.message
+
+        };
+
+    }
+
+}
+
+
+
+// ======================================================
+// ORB CALCULATION
 // ======================================================
 
 function calculateORB(candles) {
 
-  const todayCandles = getTodayCandles(candles);
+    const todayCandles = getTodayCandles(candles);
 
-  const opening = todayCandles.filter(c => {
+    const openingCandles = todayCandles.filter(c => {
 
-    const time = istTime(new Date(c.time));
+        const time = istTime(new Date(c.time));
 
-    return (
-      time >= CONFIG.ORB_START &&
-      time < CONFIG.ORB_END
-    );
+        return (
+            time >= CONFIG.ORB_START &&
+            time < CONFIG.ORB_END
+        );
 
-  });
+    });
 
-  if (opening.length < 3) {
+    if (openingCandles.length < 3) {
+
+        return {
+            ready: false,
+            reason: "WAITING_FOR_ORB_CANDLES"
+        };
+
+    }
 
     return {
 
-      ready: false,
+        ready: true,
 
-      reason: "Waiting for 3 completed ORB candles"
+        high: Math.max(
+            ...openingCandles.map(c => c.high)
+        ),
+
+        low: Math.min(
+            ...openingCandles.map(c => c.low)
+        ),
+
+        candles: openingCandles.length
 
     };
-
-  }
-
-  return {
-
-    ready: true,
-
-    high: Math.max(
-      ...opening.map(c => c.high)
-    ),
-
-    low: Math.min(
-      ...opening.map(c => c.low)
-    ),
-
-    candles: opening.length
-
-  };
 
 }
 
@@ -804,101 +1309,86 @@ function calculateORB(candles) {
 
 function analyseVolume(candles) {
 
-  if (candles.length < CONFIG.MIN_CANDLES) {
+    if (candles.length < CONFIG.MIN_CANDLES) {
+
+        return {
+            valid: false,
+            volumePass: false,
+            ratio: 0
+        };
+
+    }
+
+    const previous = candles.slice(
+        -CONFIG.MIN_CANDLES,
+        -1
+    );
+
+    const averageVolume =
+        previous.reduce(
+            (sum, c) => sum + c.volume,
+            0
+        ) / previous.length;
+
+    const last = candles[candles.length - 1];
+
+    const ratio = averageVolume > 0
+        ? last.volume / averageVolume
+        : 0;
 
     return {
 
-      valid: false,
+        valid: true,
 
-      ratio: 0,
+        latestVolume: last.volume,
 
-      averageVolume: 0,
+        averageVolume: round(averageVolume),
 
-      volumePass: false
+        ratio: round(ratio),
+
+        volumePass:
+            ratio >= CONFIG.VOLUME_MULTIPLIER,
+
+        strongVolume:
+            ratio >= CONFIG.STRONG_VOLUME
 
     };
 
-  }
-
-  const previous = candles.slice(
-    -(CONFIG.MIN_CANDLES),
-    -1
-  );
-
-  const volumes = previous.map(c => c.volume);
-
-  const averageVolume =
-
-    volumes.reduce((a, b) => a + b, 0) /
-    volumes.length;
-
-  const latest =
-    candles[candles.length - 1];
-
-  const ratio = averageVolume > 0
-
-    ? latest.volume / averageVolume
-
-    : 0;
-
-  return {
-
-    valid: true,
-
-    latestVolume: latest.volume,
-
-    averageVolume: round(averageVolume),
-
-    ratio: round(ratio),
-
-    volumePass:
-      ratio >= CONFIG.VOLUME_MULTIPLIER,
-
-    strongVolume:
-      ratio >= CONFIG.STRONG_VOLUME
-
-  };
-
 }
 
 
 // ======================================================
-// CANDLE DIRECTION
+// CANDLE CONFIRMATION
 // ======================================================
 
-function isBullishCandle(c) {
+function isBullishCandle(candle) {
 
-  const range = c.high - c.low;
+    const range = candle.high - candle.low;
 
-  if (range <= 0) return false;
+    if (range <= 0) return false;
 
-  const body = c.close - c.open;
+    const body = candle.close - candle.open;
 
-  return (
-
-    body > 0 &&
-
-    body / range >= 0.45
-
-  );
+    return (
+        body > 0 &&
+        body / range >= 0.45
+    );
 
 }
 
-function isBearishCandle(c) {
 
-  const range = c.high - c.low;
+function isBearishCandle(candle) {
 
-  if (range <= 0) return false;
+    const range = candle.high - candle.low;
 
-  const body = c.open - c.close;
+    if (range <= 0) return false;
 
-  return (
+    const body = candle.open - candle.close;
 
-    body > 0 &&
-
-    body / range >= 0.45
-
-  );
+    return (
+        body > 0 &&
+        body / range >= 0.45
+    );
 
 }
 
@@ -909,57 +1399,55 @@ function isBearishCandle(c) {
 
 function detectORBBreakout(candles, orb) {
 
-  if (!orb.ready) {
+    if (!orb.ready) {
+
+        return {
+            valid: false,
+            reason: orb.reason
+        };
+
+    }
+
+    const today = getTodayCandles(candles);
+
+    const afterORB = today.filter(c =>
+        istTime(new Date(c.time)) >= CONFIG.ORB_END
+    );
+
+    if (afterORB.length < 2) {
+
+        return {
+            valid: false,
+            reason: "WAITING_POST_ORB"
+        };
+
+    }
+
+    const last = afterORB[afterORB.length - 1];
+
+    const previous = afterORB[afterORB.length - 2];
+
+    const valid =
+
+        last.close > orb.high &&
+
+        last.close > last.open &&
+
+        previous.close <= orb.high;
 
     return {
-      valid: false,
-      reason: orb.reason
+
+        valid,
+
+        level: orb.high,
+
+        breakoutPrice: last.close,
+
+        reason: valid
+            ? "ORB_BREAKOUT_CONFIRMED"
+            : "NO_BREAKOUT"
+
     };
-
-  }
-
-  const today = getTodayCandles(candles);
-
-  const afterORB = today.filter(c =>
-
-    istTime(new Date(c.time)) >= CONFIG.ORB_END
-
-  );
-
-  if (afterORB.length < 2) {
-
-    return {
-      valid: false,
-      reason: "Waiting for post-ORB candles"
-    };
-
-  }
-
-  const last = afterORB[afterORB.length - 1];
-
-  const previous = afterORB[afterORB.length - 2];
-
-  const breakout =
-
-    last.close > orb.high &&
-
-    last.close > last.open &&
-
-    previous.close <= orb.high;
-
-  return {
-
-    valid: breakout,
-
-    breakoutPrice: last.close,
-
-    level: orb.high,
-
-    reason: breakout
-      ? "ORB HIGH BREAKOUT CONFIRMED"
-      : "ORB breakout not confirmed"
-
-  };
 
 }
 
@@ -970,57 +1458,142 @@ function detectORBBreakout(candles, orb) {
 
 function detectORBBreakdown(candles, orb) {
 
-  if (!orb.ready) {
+    if (!orb.ready) {
+
+        return {
+            valid: false,
+            reason: orb.reason
+        };
+
+    }
+
+    const today = getTodayCandles(candles);
+
+    const afterORB = today.filter(c =>
+        istTime(new Date(c.time)) >= CONFIG.ORB_END
+    );
+
+    if (afterORB.length < 2) {
+
+        return {
+            valid: false,
+            reason: "WAITING_POST_ORB"
+        };
+
+    }
+
+    const last = afterORB[afterORB.length - 1];
+
+    const previous = afterORB[afterORB.length - 2];
+
+    const valid =
+
+        last.close < orb.low &&
+
+        last.close < last.open &&
+
+        previous.close >= orb.low;
 
     return {
-      valid: false,
-      reason: orb.reason
+
+        valid,
+
+        level: orb.low,
+
+        breakdownPrice: last.close,
+
+        reason: valid
+            ? "ORB_BREAKDOWN_CONFIRMED"
+            : "NO_BREAKDOWN"
+
     };
 
-  }
+}
 
-  const today = getTodayCandles(candles);
 
-  const afterORB = today.filter(c =>
+// ======================================================
+// FUTURES OI ANALYSIS
+// ======================================================
 
-    istTime(new Date(c.time)) >= CONFIG.ORB_END
+function detectLongBuildup(quote) {
 
-  );
+    if (!quote) {
 
-  if (afterORB.length < 2) {
+        return {
+            valid: false,
+            classification: "UNKNOWN"
+        };
+
+    }
+
+    const oi = Number(quote.oi || 0);
+
+    const previousOI =
+        Number(quote.previous_oi || 0);
+
+    const price =
+        Number(quote.last_price || 0);
+
+    const previousClose =
+        Number(quote.prev_close_price || 0);
+
+    if (
+        oi <= 0 ||
+        previousOI <= 0 ||
+        price <= 0 ||
+        previousClose <= 0
+    ) {
+
+        return {
+            valid: false,
+            classification: "UNKNOWN"
+        };
+
+    }
+
+    const oiChange = oi - previousOI;
+
+    const priceChange = price - previousClose;
+
+    let classification = "NEUTRAL";
+
+    if (oiChange > 0 && priceChange > 0) {
+        classification = "LONG_BUILDUP";
+    }
+
+    else if (oiChange > 0 && priceChange < 0) {
+        classification = "SHORT_BUILDUP";
+    }
+
+    else if (oiChange < 0 && priceChange > 0) {
+        classification = "SHORT_COVERING";
+    }
+
+    else if (oiChange < 0 && priceChange < 0) {
+        classification = "LONG_UNWINDING";
+    }
 
     return {
-      valid: false,
-      reason: "Waiting for post-ORB candles"
+
+        valid: true,
+
+        oi,
+
+        previousOI,
+
+        oiChange,
+
+        oiChangePercent: round(
+            oiChange / previousOI * 100
+        ),
+
+        futuresPrice: price,
+
+        previousClose,
+
+        classification
+
     };
-
-  }
-
-  const last = afterORB[afterORB.length - 1];
-
-  const previous = afterORB[afterORB.length - 2];
-
-  const breakdown =
-
-    last.close < orb.low &&
-
-    last.close < last.open &&
-
-    previous.close >= orb.low;
-
-  return {
-
-    valid: breakdown,
-
-    breakdownPrice: last.close,
-
-    level: orb.low,
-
-    reason: breakdown
-      ? "ORB LOW BREAKDOWN CONFIRMED"
-      : "ORB breakdown not confirmed"
-
-  };
 
 }
 
@@ -1031,318 +1604,265 @@ function detectORBBreakdown(candles, orb) {
 
 function analyseStock(stock, candles, futureQuote) {
 
-  if (!Array.isArray(candles) ||
-      candles.length < CONFIG.MIN_CANDLES) {
+    if (
+        !Array.isArray(candles) ||
+        candles.length < CONFIG.MIN_CANDLES
+    ) {
+
+        return {
+            symbol: stock.symbol,
+            signal: "WAIT",
+            signalType: "WAITING",
+            reason: "INSUFFICIENT_CANDLES"
+        };
+
+    }
+
+    const today = getTodayCandles(candles);
+
+    if (today.length < 5) {
+
+        return {
+            symbol: stock.symbol,
+            signal: "WAIT",
+            signalType: "WAITING",
+            reason: "INSUFFICIENT_TODAY_CANDLES"
+        };
+
+    }
+
+    const last = candles[candles.length - 1];
+
+    const closes = candles.map(c => c.close);
+
+    const rsi = calculateRSI(
+        closes,
+        CONFIG.RSI_PERIOD
+    );
+
+    const vwap = calculateVWAP(today);
+
+    const orb = calculateORB(candles);
+
+    const volume = analyseVolume(candles);
+
+    const oi = detectLongBuildup(futureQuote);
+
+    const breakout = detectORBBreakout(
+        candles,
+        orb
+    );
+
+    const breakdown = detectORBBreakdown(
+        candles,
+        orb
+    );
+
+    const longBuildup =
+        oi.valid &&
+        oi.classification === "LONG_BUILDUP";
+
+    const shortBuildup =
+        oi.valid &&
+        oi.classification === "SHORT_BUILDUP";
+
+    const aboveVWAP =
+        vwap !== null &&
+        last.close > vwap;
+
+    const belowVWAP =
+        vwap !== null &&
+        last.close < vwap;
+
+    const rsiBullish =
+        rsi !== null &&
+        rsi > CONFIG.RSI_BUY;
+
+    const rsiBearish =
+        rsi !== null &&
+        rsi < (CONFIG.RSI_SELL || 45);
+
+    const strongBuy =
+
+        breakout.valid &&
+
+        volume.volumePass &&
+
+        longBuildup &&
+
+        aboveVWAP &&
+
+        rsiBullish &&
+
+        isBullishCandle(last);
+
+    const strongSell =
+
+        breakdown.valid &&
+
+        volume.volumePass &&
+
+        shortBuildup &&
+
+        belowVWAP &&
+
+        rsiBearish &&
+
+        isBearishCandle(last);
+
+    const longCandidate =
+
+        longBuildup &&
+        volume.volumePass &&
+        aboveVWAP &&
+        rsiBullish;
+
+    const shortCandidate =
+
+        shortBuildup &&
+        volume.volumePass &&
+        belowVWAP &&
+        rsiBearish;
+
+    let signal = "WAIT";
+
+    let signalType = "WAITING";
+
+    if (strongBuy) {
+
+        signal = "BUY";
+
+        signalType = "STRONG_BUY";
+
+    }
+
+    else if (strongSell) {
+
+        signal = "SELL";
+
+        signalType = "STRONG_SELL";
+
+    }
+
+    else if (longCandidate) {
+
+        signalType = "LONG_BUILDUP";
+
+    }
+
+    else if (shortCandidate) {
+
+        signalType = "SHORT_BUILDUP";
+
+    }
+
+    // ENTRY AND RISK
+
+    const entry = last.close;
+
+    let risk = 0;
+
+    if (signal === "BUY") {
+
+        risk = Math.max(
+            entry - Math.min(last.low, orb.low),
+            entry * 0.002
+        );
+
+    }
+
+    else if (signal === "SELL") {
+
+        risk = Math.max(
+            Math.max(last.high, orb.high) - entry,
+            entry * 0.002
+        );
+
+    }
+
+    const stopLoss = signal === "BUY"
+        ? round(entry - risk)
+        : signal === "SELL"
+            ? round(entry + risk)
+            : null;
+
+    const target1 = signal === "BUY"
+        ? round(entry + risk * 2)
+        : signal === "SELL"
+            ? round(entry - risk * 2)
+            : null;
+
+    const target2 = signal === "BUY"
+        ? round(entry + risk * 3)
+        : signal === "SELL"
+            ? round(entry - risk * 3)
+            : null;
 
     return {
 
-      symbol: stock.symbol,
+        symbol: stock.symbol,
 
-      signal: "WAIT",
+        signal,
 
-      reason: "Insufficient completed candles"
+        signalType,
+
+        reason: signalType,
+
+        price: round(last.close),
+
+        rsi,
+
+        vwap,
+
+        volume: last.volume,
+
+        averageVolume: volume.averageVolume,
+
+        volumeRatio: volume.ratio,
+
+        volumePass: volume.volumePass,
+
+        orbHigh: orb.high ?? null,
+
+        orbLow: orb.low ?? null,
+
+        breakout: breakout.valid,
+
+        breakdown: breakdown.valid,
+
+        futuresSymbol: stock.futuresSymbol,
+
+        futuresPrice: oi.futuresPrice ?? null,
+
+        futuresOI: oi.oi ?? 0,
+
+        previousOI: oi.previousOI ?? 0,
+
+        oiChange: oi.oiChange ?? 0,
+
+        oiChangePercent: oi.oiChangePercent ?? 0,
+
+        oiClassification: oi.classification,
+
+        longBuildup,
+
+        shortBuildup,
+
+        entry: signal === "WAIT" ? null : round(entry),
+
+        stopLoss,
+
+        target1,
+
+        target2,
+
+        option: null,
+
+        candleTime: istTime(new Date(last.time)),
+
+        timeframe: "5 MINUTES"
 
     };
-
-  }
-
-  const today = getTodayCandles(candles);
-
-  if (today.length < 5) {
-
-    return {
-
-      symbol: stock.symbol,
-
-      signal: "WAIT",
-
-      reason: "Insufficient today's candles"
-
-    };
-
-  }
-
-  const last = candles[candles.length - 1];
-
-  const closes = candles.map(c => c.close);
-
-  const rsi = calculateRSI(
-    closes,
-    CONFIG.RSI_PERIOD
-  );
-
-  const vwap = calculateVWAP(today);
-
-  const orb = calculateORB(candles);
-
-  const volume = analyseVolume(candles);
-
-  const oi = detectLongBuildup(futureQuote);
-
-  const breakout = detectORBBreakout(
-    candles,
-    orb
-  );
-
-  const breakdown = detectORBBreakdown(
-    candles,
-    orb
-  );
-
-  const longBuildup =
-
-    oi.valid &&
-
-    oi.classification === "LONG_BUILDUP";
-
-  const shortBuildup =
-
-    oi.valid &&
-
-    oi.classification === "SHORT_BUILDUP";
-
-  const aboveVWAP =
-
-    vwap !== null &&
-
-    last.close > vwap;
-
-  const belowVWAP =
-
-    vwap !== null &&
-
-    last.close < vwap;
-
-  const rsiBullish =
-
-    rsi !== null &&
-
-    rsi > CONFIG.RSI_BUY;
-
-  const rsiBearish =
-
-    rsi !== null &&
-
-    rsi < 45;
-
-  // STRONG BUY
-
-  const strongBuy =
-
-    breakout.valid &&
-
-    volume.volumePass &&
-
-    longBuildup &&
-
-    aboveVWAP &&
-
-    rsiBullish &&
-
-    isBullishCandle(last);
-
-  // STRONG SELL
-
-  const strongSell =
-
-    breakdown.valid &&
-
-    volume.volumePass &&
-
-    shortBuildup &&
-
-    belowVWAP &&
-
-    rsiBearish &&
-
-    isBearishCandle(last);
-
-  // LONG BUILDUP CANDIDATE
-
-  const longCandidate =
-
-    longBuildup &&
-
-    volume.volumePass &&
-
-    aboveVWAP &&
-
-    rsiBullish;
-
-  // SHORT BUILDUP CANDIDATE
-
-  const shortCandidate =
-
-    shortBuildup &&
-
-    volume.volumePass &&
-
-    belowVWAP &&
-
-    rsiBearish;
-
-  let signal = "WAIT";
-
-  let signalType = "WAITING";
-
-  if (strongBuy) {
-
-    signal = "BUY";
-
-    signalType = "STRONG_BUY";
-
-  }
-
-  else if (strongSell) {
-
-    signal = "SELL";
-
-    signalType = "STRONG_SELL";
-
-  }
-
-  else if (longCandidate) {
-
-    signalType = "LONG_BUILDUP";
-
-  }
-
-  else if (shortCandidate) {
-
-    signalType = "SHORT_BUILDUP";
-
-  }
-
-  // ENTRY AND RISK
-
-  const entry = last.close;
-
-  const risk = Math.max(
-
-    entry - Math.min(last.low, orb.low),
-
-    entry * 0.002
-
-  );
-
-  const stopLoss = signal === "BUY"
-
-    ? round(entry - risk)
-
-    : signal === "SELL"
-
-      ? round(entry + risk)
-
-      : null;
-
-  const target1 = signal === "BUY"
-
-    ? round(entry + risk * 2)
-
-    : signal === "SELL"
-
-      ? round(entry - risk * 2)
-
-      : null;
-
-  const target2 = signal === "BUY"
-
-    ? round(entry + risk * 3)
-
-    : signal === "SELL"
-
-      ? round(entry - risk * 3)
-
-      : null;
-
-  const reasons = [];
-
-  if (!orb.ready)
-    reasons.push("ORB_NOT_READY");
-
-  if (!breakout.valid && !breakdown.valid)
-    reasons.push("ORB_NOT_BROKEN");
-
-  if (!volume.volumePass)
-    reasons.push("VOLUME_LOW");
-
-  if (!oi.valid)
-    reasons.push("OI_DATA_MISSING");
-
-  else if (!longBuildup && !shortBuildup)
-    reasons.push("OI_PRICE_CONFIRMATION_MISSING");
-
-  if (!aboveVWAP && !belowVWAP)
-    reasons.push("VWAP_NOT_CONFIRMED");
-
-  if (!rsiBullish && !rsiBearish)
-    reasons.push("RSI_NOT_CONFIRMED");
-
-  return {
-
-    symbol: stock.symbol,
-
-    signal,
-
-    signalType,
-
-    reason: reasons.length
-      ? reasons.join(", ")
-      : "ALL CONDITIONS CONFIRMED",
-
-    price: round(last.close),
-
-    rsi,
-
-    vwap,
-
-    volume: last.volume,
-
-    averageVolume: volume.averageVolume,
-
-    volumeRatio: volume.ratio,
-
-    volumePass: volume.volumePass,
-
-    orbHigh: orb.high ?? null,
-
-    orbLow: orb.low ?? null,
-
-    breakout: breakout.valid,
-
-    breakdown: breakdown.valid,
-
-    futuresSymbol: stock.futuresSymbol,
-
-    futuresPrice: oi.futuresPrice ?? null,
-
-    futuresOI: oi.oi ?? 0,
-
-    previousOI: oi.previousOI ?? 0,
-
-    oiChange: oi.oiChange ?? 0,
-
-    oiChangePercent: oi.oiChangePercent ?? 0,
-
-    oiClassification: oi.classification,
-
-    longBuildup,
-
-    shortBuildup,
-
-    entry: signal === "WAIT" ? null : entry,
-
-    stopLoss,
-
-    target1,
-
-    target2,
-
-    candleTime: istTime(new Date(last.time)),
-
-    timeframe: "5 MINUTES"
-
-  };
 
 }
 
@@ -1353,56 +1873,60 @@ function analyseStock(stock, candles, futureQuote) {
 
 async function runWorkers(items, worker, limit) {
 
-  const results = new Array(items.length);
+    const results = new Array(items.length);
 
-  let index = 0;
+    let index = 0;
 
-  async function run() {
+    async function run() {
 
-    while (true) {
+        while (true) {
 
-      const current = index++;
+            const current = index++;
 
-      if (current >= items.length) return;
+            if (current >= items.length) return;
 
-      try {
+            try {
 
-        results[current] =
-          await worker(items[current]);
+                results[current] =
+                    await worker(items[current]);
 
-      } catch (error) {
+            }
 
-        results[current] = {
+            catch (error) {
 
-          symbol: items[current].symbol,
+                results[current] = {
 
-          signal: "ERROR",
+                    symbol: items[current].symbol,
 
-          reason: error.message
+                    signal: "ERROR",
 
-        };
+                    signalType: "ERROR",
 
-      }
+                    reason: error.message
+
+                };
+
+            }
+
+        }
 
     }
 
-  }
+    await Promise.all(
 
-  await Promise.all(
+        Array.from(
+            {
+                length: Math.min(
+                    limit,
+                    items.length
+                )
+            },
+            () => run()
+        )
 
-    Array.from(
+    );
 
-      {
-        length: Math.min(limit, items.length)
-      },
-
-      () => run()
-
-    )
-
-  );
-
-  return results;
+    return results;
 
 }
 
@@ -1413,196 +1937,293 @@ async function runWorkers(items, worker, limit) {
 
 async function runScan(force = false) {
 
-  if (
+    if (
+        !force &&
+        scanCache &&
+        Date.now() - scanCache.time < CONFIG.CACHE_MS
+    ) {
 
-    !force &&
+        return scanCache.data;
 
-    scanCache &&
+    }
 
-    Date.now() - scanCache.time < CONFIG.CACHE_MS
+    if (scanRunning) {
 
-  ) {
+        if (scanCache) return scanCache.data;
 
-    return scanCache.data;
+        throw new Error("SCANNER_ALREADY_RUNNING");
 
-  }
+    }
 
-  if (scanRunning) {
+    scanRunning = true;
 
-    if (scanCache) return scanCache.data;
+    try {
 
-    throw new Error("Scanner already running");
+        const currentTime = istTime();
 
-  }
+        // ORB must finish first
 
-  scanRunning = true;
+        if (currentTime < CONFIG.ORB_END) {
 
-  try {
+            return {
 
-    await loadMaster();
+                status: "WAITING",
 
-    // Get all Futures OI quotes
+                message: "WAITING_FOR_09_30_ORB_COMPLETION",
 
-    const futureQuotes =
-      await getFuturesQuotes(fnoStocks);
+                marketTime: currentTime,
 
-    // Scan all stocks
+                scanned: 0,
 
-    const results = await runWorkers(
+                strongBuyCount: 0,
 
-      fnoStocks,
+                strongSellCount: 0,
 
-      async stock => {
+                bullish: [],
 
-        const candles =
-          await getFiveMinuteCandles(stock.equityKey);
+                bearish: []
 
-        const quote =
-          findFuturesQuote(stock, futureQuotes);
+            };
 
-        return analyseStock(
-          stock,
-          candles,
-          quote
+        }
+
+        await loadMaster();
+
+        if (!fnoStocks.length) {
+
+            throw new Error("NO_NSE_FNO_STOCKS_FOUND");
+
+        }
+
+        const futureQuotes =
+            await getFuturesQuotes(fnoStocks);
+
+        const results = await runWorkers(
+
+            fnoStocks,
+
+            async stock => {
+
+                const candles =
+                    await getFiveMinuteCandles(
+                        stock.equityKey
+                    );
+
+                const quote =
+                    findFuturesQuote(
+                        stock,
+                        futureQuotes
+                    );
+
+                return analyseStock(
+                    stock,
+                    candles,
+                    quote
+                );
+
+            },
+
+            CONFIG.CONCURRENCY || 3
+
         );
 
-      },
+        let strongBuy = results.filter(x =>
+            x.signalType === "STRONG_BUY"
+        );
 
-      CONFIG.CONCURRENCY
+        let strongSell = results.filter(x =>
+            x.signalType === "STRONG_SELL"
+        );
 
-    );
+        const longBuildup = results.filter(x =>
+            x.signalType === "LONG_BUILDUP"
+        );
 
-    const strongBuy = results.filter(x =>
-      x.signalType === "STRONG_BUY"
-    );
+        const shortBuildup = results.filter(x =>
+            x.signalType === "SHORT_BUILDUP"
+        );
 
-    const strongSell = results.filter(x =>
-      x.signalType === "STRONG_SELL"
-    );
+        const waiting = results.filter(x =>
+            x.signalType === "WAITING"
+        );
 
-    const longBuildup = results.filter(x =>
-      x.signalType === "LONG_BUILDUP"
-    );
+        const errors = results.filter(x =>
+            x.signalType === "ERROR"
+        );
 
-    const shortBuildup = results.filter(x =>
-      x.signalType === "SHORT_BUILDUP"
-    );
+        // Limit option-chain calls to avoid excessive API requests.
 
-    const waiting = results.filter(x =>
-      x.signal === "WAIT" &&
-      x.signalType === "WAITING"
-    );
+        const optionCandidates = [
 
-    const errors = results.filter(x =>
-      x.signal === "ERROR"
-    );
+            ...strongBuy.slice(0, 5),
 
-    const data = {
+            ...strongSell.slice(0, 5)
 
-      status: "SUCCESS",
+        ];
 
-      scanner: CONFIG.VERSION,
+        const optionResults = await runWorkers(
 
-      timeframe: "5 MINUTES",
+            optionCandidates,
 
-      scanned: fnoStocks.length,
+            async signal => {
 
-      strongBuyCount: strongBuy.length,
+                const stock = fnoStocks.find(
+                    x => x.symbol === signal.symbol
+                );
 
-      strongSellCount: strongSell.length,
+                if (!stock) return signal;
 
-      longBuildupCount: longBuildup.length,
+                try {
 
-      shortBuildupCount: shortBuildup.length,
+                    const selected =
+                        await selectBestOption(
+                            stock,
+                            signal
+                        );
 
-      waitingCount: waiting.length,
+                    return {
 
-      errorCount: errors.length,
+                        ...signal,
 
-      bullish: strongBuy,
+                        option: selected || null
 
-      bearish: strongSell,
+                    };
 
-      strongBuy,
+                }
 
-      strongSell,
+                catch (error) {
 
-      longBuildup,
+                    return {
 
-      shortBuildup,
+                        ...signal,
 
-      waiting,
+                        option: null,
 
-      errors,
+                        optionError: error.message
 
-      updatedAt: new Date().toISOString()
+                    };
 
-    };
+                }
 
-    lastScan = {
+            },
 
-      status: "SUCCESS",
+            2
 
-      scanned: data.scanned,
+        );
 
-      strongBuy: data.strongBuyCount,
+        for (const item of optionResults) {
 
-      strongSell: data.strongSellCount,
+            const indexBuy = strongBuy.findIndex(
+                x => x.symbol === item.symbol
+            );
 
-      longBuildup: data.longBuildupCount,
+            if (indexBuy >= 0) {
 
-      shortBuildup: data.shortBuildupCount,
+                strongBuy[indexBuy] = item;
 
-      waiting: data.waitingCount
+            }
 
-    };
+            const indexSell = strongSell.findIndex(
+                x => x.symbol === item.symbol
+            );
 
-    scanCache = {
+            if (indexSell >= 0) {
 
-      time: Date.now(),
+                strongSell[indexSell] = item;
 
-      data
+            }
 
-    };
+        }
 
-    return data;
+        const data = {
 
-  } finally {
+            status: "SUCCESS",
 
-    scanRunning = false;
+            scanner: CONFIG.VERSION,
 
-  }
+            market: "NSE",
 
-}
+            segment: "FNO_STOCKS",
 
+            timeframe: "5 MINUTES",
 
-// ======================================================
-// GENERIC LIVE QUOTES
-// ======================================================
+            scanned: fnoStocks.length,
 
-async function getLiveQuotes(keys) {
+            strongBuyCount: strongBuy.length,
 
-  if (!keys.length) {
+            strongSellCount: strongSell.length,
 
-    throw new Error("Instrument keys required");
+            longBuildupCount: longBuildup.length,
 
-  }
+            shortBuildupCount: shortBuildup.length,
 
-  if (keys.length > 500) {
+            waitingCount: waiting.length,
 
-    throw new Error("Maximum 500 instrument keys");
+            errorCount: errors.length,
 
-  }
+            // Frontend compatibility
 
-  const query = encodeURIComponent(
-    keys.join(",")
-  );
+            bullishCount: strongBuy.length,
 
-  return await upstoxGET(
+            bearishCount: strongSell.length,
 
-    `/v3/market-quote/quotes?instrument_key=${query}`
+            bullish: strongBuy,
 
-  );
+            bearish: strongSell,
+
+            strongBuy,
+
+            strongSell,
+
+            longBuildup,
+
+            shortBuildup,
+
+            waiting,
+
+            errors,
+
+            updatedAt: new Date().toISOString(),
+
+            marketTime: istTime()
+
+        };
+
+        lastScan = {
+
+            status: "SUCCESS",
+
+            scanned: data.scanned,
+
+            strongBuy: data.strongBuyCount,
+
+            strongSell: data.strongSellCount,
+
+            longBuildup: data.longBuildupCount,
+
+            shortBuildup: data.shortBuildupCount,
+
+            waiting: data.waitingCount
+
+        };
+
+        scanCache = {
+
+            time: Date.now(),
+
+            data
+
+        };
+
+        return data;
+
+    }
+
+    finally {
+
+        scanRunning = false;
+
+    }
 
 }
 
@@ -1613,24 +2234,24 @@ async function getLiveQuotes(keys) {
 
 function sendJson(res, status, data) {
 
-  res.writeHead(status, {
+    res.writeHead(status, {
 
-    "Content-Type":
-      "application/json; charset=utf-8",
+        "Content-Type":
+            "application/json; charset=utf-8",
 
-    "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": "*",
 
-    "Access-Control-Allow-Methods":
-      "GET, OPTIONS",
+        "Access-Control-Allow-Methods":
+            "GET, OPTIONS",
 
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization",
+        "Access-Control-Allow-Headers":
+            "Content-Type, Authorization",
 
-    "Cache-Control": "no-store"
+        "Cache-Control": "no-store"
 
-  });
+    });
 
-  res.end(JSON.stringify(data));
+    res.end(JSON.stringify(data));
 
 }
 
@@ -1640,287 +2261,269 @@ function sendJson(res, status, data) {
 // ======================================================
 
 const server = http.createServer(
-  async (req, res) => {
+    async (req, res) => {
 
-    if (req.method === "OPTIONS") {
+        if (req.method === "OPTIONS") {
 
-      res.writeHead(204, {
+            res.writeHead(204, {
 
-        "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Origin": "*",
 
-        "Access-Control-Allow-Methods":
-          "GET, OPTIONS",
+                "Access-Control-Allow-Methods":
+                    "GET, OPTIONS",
 
-        "Access-Control-Allow-Headers":
-          "Content-Type, Authorization"
+                "Access-Control-Allow-Headers":
+                    "Content-Type, Authorization"
 
-      });
+            });
 
-      return res.end();
-
-    }
-
-    const url = new URL(
-      req.url,
-      `http://${req.headers.host || "localhost"}`
-    );
-
-    const path = url.pathname;
-
-    try {
-
-      // HEALTH
-
-      if (
-        path === "/" ||
-        path === "/health"
-      ) {
-
-        return sendJson(res, 200, {
-
-          status: "OK",
-
-          app: "SMART TRADE INDIA",
-
-          version: CONFIG.VERSION,
-
-          tokenConfigured: Boolean(TOKEN),
-
-          marketOpen: isMarketOpen()
-
-        });
-
-      }
-
-
-      // STATUS
-
-      if (path === "/api/status") {
-
-        return sendJson(res, 200, {
-
-          status: "OK",
-
-          version: CONFIG.VERSION,
-
-          tokenConfigured: Boolean(TOKEN),
-
-          masterLoaded,
-
-          equityInstruments: equityMaster.length,
-
-          futuresContracts: futuresMaster.length,
-
-          fnoStockCount: fnoStocks.length,
-
-          fnoUnderlyingCount: fnoStocks.length,
-
-          lastScan
-
-        });
-
-      }
-
-
-      // FNO STOCKS
-
-      if (
-        path === "/api/fno-stocks" ||
-        path === "/api/nse-stocks"
-      ) {
-
-        await loadMaster();
-
-        return sendJson(res, 200, {
-
-          status: "SUCCESS",
-
-          count: fnoStocks.length,
-
-          stocks: fnoStocks.map(x => ({
-
-            symbol: x.symbol,
-
-            equityKey: x.equityKey,
-
-            instrumentKey: x.equityKey,
-
-            futuresKey: x.futuresKey,
-
-            futuresSymbol: x.futuresSymbol,
-
-            expiry: x.expiry
-
-          }))
-
-        });
-
-      }
-
-
-      // LIVE QUOTES
-
-      if (path === "/api/market/live-quotes") {
-
-        const keys = (
-          url.searchParams.get("instrument_keys") || ""
-        )
-
-          .split(",")
-
-          .filter(Boolean);
-
-        if (!keys.length) {
-
-          return sendJson(res, 400, {
-
-            success: false,
-
-            message: "instrument_keys required"
-
-          });
+            return res.end();
 
         }
 
-        const result =
-          await getLiveQuotes(keys);
+        const url = new URL(
+            req.url,
+            `http://${req.headers.host || "localhost"}`
+        );
 
-        return sendJson(res, 200, {
+        const path = url.pathname;
 
-          success: true,
+        try {
 
-          source: "UPSTOX V3",
+            // HEALTH
 
-          timestamp: new Date().toISOString(),
+            if (
+                path === "/" ||
+                path === "/health"
+            ) {
 
-          data: result.data || {}
+                return sendJson(res, 200, {
 
-        });
+                    status: "OK",
 
-      }
+                    app: "SMART TRADE INDIA",
 
+                    version: CONFIG.VERSION,
 
-      // SCANNER
+                    tokenConfigured:
+                        Boolean(TOKEN),
 
-      if (path === "/api/scan") {
+                    marketOpen: isMarketOpen(),
 
-        const force =
-          url.searchParams.get("force") === "true";
+                    marketTime: istTime()
 
-        const data = await runScan(force);
+                });
 
-        return sendJson(res, 200, data);
+            }
 
-      }
+            // STATUS
 
+            if (path === "/api/status") {
 
-      // LONG BUILDUP
+                return sendJson(res, 200, {
 
-      if (path === "/api/long-buildup") {
+                    status: "OK",
 
-        const data = await runScan();
+                    version: CONFIG.VERSION,
 
-        return sendJson(res, 200, {
+                    tokenConfigured:
+                        Boolean(TOKEN),
 
-          status: data.status,
+                    masterLoaded,
 
-          count: data.longBuildupCount,
+                    fnoStockCount:
+                        fnoStocks.length,
 
-          stocks: data.longBuildup
+                    lastScan
 
-        });
+                });
 
-      }
+            }
 
+            // NSE F&O STOCKS
 
-      // STRONG BUY
+            if (path === "/api/fno-stocks") {
 
-      if (path === "/api/strong-buy") {
+                await loadMaster();
 
-        const data = await runScan();
+                return sendJson(res, 200, {
 
-        return sendJson(res, 200, {
+                    status: "SUCCESS",
 
-          status: data.status,
+                    count: fnoStocks.length,
 
-          count: data.strongBuyCount,
+                    stocks: fnoStocks.map(x => ({
 
-          stocks: data.strongBuy
+                        symbol: x.symbol,
 
-        });
+                        equityKey: x.equityKey,
 
-      }
+                        futuresKey: x.futuresKey,
 
+                        futuresSymbol:
+                            x.futuresSymb
+                      expiry: x.expiry
 
-      // STRONG SELL
+                    }))
 
-      if (path === "/api/strong-sell") {
+                });
 
-        const data = await runScan();
+            }
 
-        return sendJson(res, 200, {
+            // MAIN SCANNER
 
-          status: data.status,
+            if (path === "/api/scan") {
 
-          count: data.strongSellCount,
+                const force =
+                    url.searchParams.get("force") === "true";
 
-          stocks: data.strongSell
+                const data = await runScan(force);
 
-        });
+                return sendJson(res, 200, data);
 
-      }
+            }
 
+            // STRONG BUY
 
-      // MASTER REFRESH
+            if (path === "/api/strong-buy") {
 
-      if (path === "/api/master/refresh") {
+                const data = await runScan();
 
-        await loadMaster(true);
+                return sendJson(res, 200, {
 
-        scanCache = null;
+                    status: data.status,
 
-        return sendJson(res, 200, {
+                    count: data.strongBuyCount || 0,
 
-          status: "SUCCESS",
+                    stocks: data.strongBuy || []
 
-          fnoStockCount: fnoStocks.length
+                });
 
-        });
+            }
 
-      }
+            // STRONG SELL
 
+            if (path === "/api/strong-sell") {
 
-      // 404
+                const data = await runScan();
 
-      return sendJson(res, 404, {
+                return sendJson(res, 200, {
 
-        status: "ERROR",
+                    status: data.status,
 
-        message: "Route not found",
+                    count: data.strongSellCount || 0,
 
-        path
+                    stocks: data.strongSell || []
 
-      });
+                });
 
-    } catch (error) {
+            }
 
-      console.error(
-        "[V7 API ERROR]",
-        path,
-        error.message
-      );
+            // LONG BUILDUP
 
-      return sendJson(res, 500, {
+            if (path === "/api/long-buildup") {
 
-        status: "ERROR",
+                const data = await runScan();
 
-        message: error.message
+                return sendJson(res, 200, {
 
-      });
+                    status: data.status,
+
+                    count: data.longBuildupCount || 0,
+
+                    stocks: data.longBuildup || []
+
+                });
+
+            }
+
+            // SHORT BUILDUP
+
+            if (path === "/api/short-buildup") {
+
+                const data = await runScan();
+
+                return sendJson(res, 200, {
+
+                    status: data.status,
+
+                    count: data.shortBuildupCount || 0,
+
+                    stocks: data.shortBuildup || []
+
+                });
+
+            }
+
+            // OPTION SCAN
+
+            if (path === "/api/options/auto-scan") {
+
+                const data = await runScan();
+
+                return sendJson(res, 200, {
+
+                    status: data.status,
+
+                    bullish: data.strongBuy || [],
+
+                    bearish: data.strongSell || []
+
+                });
+
+            }
+
+            // MASTER REFRESH
+
+            if (path === "/api/master/refresh") {
+
+                await loadMaster(true);
+
+                scanCache = null;
+
+                return sendJson(res, 200, {
+
+                    status: "SUCCESS",
+
+                    fnoStockCount: fnoStocks.length
+
+                });
+
+            }
+
+            // 404
+
+            return sendJson(res, 404, {
+
+                status: "ERROR",
+
+                message: "ROUTE_NOT_FOUND",
+
+                path
+
+            });
+
+        }
+
+        catch (error) {
+
+            console.error(
+                "[V8 API ERROR]",
+                path,
+                error.message
+            );
+
+            return sendJson(res, 500, {
+
+                status: "ERROR",
+
+                message: error.message
+
+            });
+
+        }
 
     }
-
-  }
 
 );
 
@@ -1931,25 +2534,27 @@ const server = http.createServer(
 
 server.listen(PORT, "0.0.0.0", () => {
 
-  console.log("====================================");
+    console.log("====================================");
 
-  console.log(" SMART TRADE INDIA V7 STARTED");
+    console.log(" SMART TRADE INDIA V8 PRO STARTED");
 
-  console.log(" ORB + VOLUME + LONG BUILDUP");
+    console.log(" NSE F&O STOCK SCANNER");
 
-  console.log(" PORT:", PORT);
+    console.log(" ORB + VOLUME + OI + RSI + VWAP");
 
-  console.log(" SCAN LIMIT:", CONFIG.SCAN_LIMIT);
+    console.log(" AUTOMATIC CE / PE SELECTOR");
 
-  console.log("====================================");
+    console.log(" PORT:", PORT);
 
-  loadMaster().catch(error => {
+    console.log("====================================");
 
-    console.error(
-      "[MASTER LOAD ERROR]",
-      error.message
-    );
+    loadMaster().catch(error => {
 
-  });
+        console.error(
+            "[MASTER LOAD ERROR]",
+            error.message
+        );
+
+    });
 
 });
