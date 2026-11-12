@@ -61,6 +61,7 @@ header p {
     display:flex;
     justify-content:space-between;
     align-items:center;
+    gap:10px;
     background:var(--panel);
     padding:14px;
     border-radius:12px;
@@ -70,6 +71,7 @@ header p {
 .live {
     color:var(--green);
     font-weight:bold;
+    margin-top:6px;
 }
 
 button {
@@ -80,6 +82,10 @@ button {
     cursor:pointer;
     background:var(--green);
     color:#001b13;
+}
+
+button:disabled {
+    opacity:.6;
 }
 
 .stats {
@@ -131,6 +137,7 @@ button {
     display:flex;
     justify-content:space-between;
     align-items:center;
+    gap:10px;
 }
 
 .signal-header h3 {
@@ -155,6 +162,11 @@ button {
     color:var(--red);
 }
 
+.neutral {
+    background:#263650;
+    color:var(--yellow);
+}
+
 .details {
     display:grid;
     grid-template-columns:repeat(2,1fr);
@@ -166,6 +178,8 @@ button {
     background:var(--panel2);
     padding:10px;
     border-radius:7px;
+    min-width:0;
+    overflow-wrap:anywhere;
 }
 
 .details small {
@@ -178,6 +192,13 @@ button {
     display:block;
     margin-top:5px;
     font-size:14px;
+}
+
+.option-box {
+    margin-top:12px;
+    padding:12px;
+    background:var(--panel2);
+    border-radius:8px;
 }
 
 .empty {
@@ -195,7 +216,16 @@ button {
     font-size:11px;
 }
 
+.error {
+    color:var(--red);
+    background:#461c28;
+    padding:12px;
+    border-radius:8px;
+    margin-top:12px;
+}
+
 @media(min-width:650px) {
+
     .stats {
         grid-template-columns:repeat(4,1fr);
     }
@@ -203,6 +233,7 @@ button {
     .details {
         grid-template-columns:repeat(4,1fr);
     }
+
 }
 
 </style>
@@ -227,11 +258,14 @@ button {
     <div class="live" id="serverStatus">CONNECTING...</div>
 </div>
 
-<button onclick="loadScanner()">
+<button id="scanButton" onclick="loadScanner()">
     ↻ SCAN NOW
 </button>
 
 </div>
+
+
+<!-- STATISTICS -->
 
 <div class="stats">
 
@@ -277,6 +311,9 @@ button {
 
 </div>
 
+
+<!-- STRONG BUY -->
+
 <div class="section">
 
 <h3 class="green">🟢 STRONG BUY SIGNALS</h3>
@@ -287,6 +324,9 @@ button {
 
 </div>
 
+
+<!-- STRONG SELL -->
+
 <div class="section">
 
 <h3 class="red">🔴 STRONG SELL SIGNALS</h3>
@@ -296,6 +336,35 @@ button {
 </div>
 
 </div>
+
+
+<!-- LONG BUILDUP -->
+
+<div class="section">
+
+<h3 class="green">📈 LONG BUILDUP STOCKS</h3>
+
+<div id="longBuildSignals">
+<div class="empty">Waiting for LONG BUILDUP...</div>
+</div>
+
+</div>
+
+
+<!-- SHORT BUILDUP -->
+
+<div class="section">
+
+<h3 class="red">📉 SHORT BUILDUP STOCKS</h3>
+
+<div id="shortBuildSignals">
+<div class="empty">Waiting for SHORT BUILDUP...</div>
+</div>
+
+</div>
+
+
+<!-- LAST SCAN -->
 
 <div class="section">
 
@@ -313,16 +382,20 @@ button {
 
 <p>API Errors: <b id="errors">0</b></p>
 
-</div>
+<p id="errorMessage"></p>
 
 </div>
 
 </div>
+
+</div>
+
 
 <div class="footer">
 SMART TRADE INDIA V8 PRO<br>
 Market data powered by Upstox
 </div>
+
 
 <script>
 
@@ -344,7 +417,9 @@ function number(value) {
 
 function setText(id,value) {
 
-    document.getElementById(id).textContent = value;
+    const el = document.getElementById(id);
+
+    if (el) el.textContent = value;
 
 }
 
@@ -369,7 +444,21 @@ function signalCard(item,type) {
 
     const option = item.option || {};
 
-    const isBuy = type === "BUY";
+    const isBuy =
+        type === "BUY" ||
+        type === "LONG BUILDUP";
+
+    const badgeClass =
+        type === "BUY" || type === "LONG BUILDUP"
+        ? "buy"
+        : type === "SELL" || type === "SHORT BUILDUP"
+        ? "sell"
+        : "neutral";
+
+    const signalName =
+        item.signalType ||
+        item.signal ||
+        type;
 
     return `
 
@@ -379,10 +468,8 @@ function signalCard(item,type) {
 
             <h3>${escapeHTML(item.symbol)}</h3>
 
-            <span class="badge ${isBuy ? "buy":"sell"}">
-
-                ${escapeHTML(item.signal || type)}
-
+            <span class="badge ${badgeClass}">
+                ${escapeHTML(signalName)}
             </span>
 
         </div>
@@ -426,14 +513,40 @@ function signalCard(item,type) {
 
             <div>
                 <small>BREAKOUT / BREAKDOWN</small>
-                <b>${item.breakout ? "BREAKOUT" : item.breakdown ? "BREAKDOWN" : "--"}</b>
+                <b>
+                    ${item.breakout
+                        ? "BREAKOUT"
+                        : item.breakdown
+                        ? "BREAKDOWN"
+                        : "--"}
+                </b>
+            </div>
+
+            <div>
+                <small>VOLUME PASS</small>
+                <b>${item.volumePass ? "YES" : "NO"}</b>
+            </div>
+
+            <div>
+                <small>FUTURES SYMBOL</small>
+                <b>${escapeHTML(item.futuresSymbol || "--")}</b>
+            </div>
+
+            <div>
+                <small>ENTRY</small>
+                <b>${item.entry == null ? "--" : number(item.entry).toFixed(2)}</b>
+            </div>
+
+            <div>
+                <small>STOP LOSS</small>
+                <b>${item.stopLoss == null ? "--" : number(item.stopLoss).toFixed(2)}</b>
             </div>
 
         </div>
 
         ${option.success ? `
 
-        <div class="card" style="margin-top:12px">
+        <div class="option-box">
 
             <b class="blue">OPTION DETAILS</b>
 
@@ -462,9 +575,11 @@ function renderSignals(items,type) {
 
     if (!Array.isArray(items) || items.length === 0) {
 
-        return `<div class="empty">
-            No ${type} signals currently.
-        </div>`;
+        return `
+            <div class="empty">
+                No ${escapeHTML(type)} signals currently.
+            </div>
+        `;
 
     }
 
@@ -477,13 +592,23 @@ function renderSignals(items,type) {
 
 async function loadScanner() {
 
+    const button =
+        document.getElementById("scanButton");
+
+    button.disabled = true;
+
     setText("serverStatus","SCANNING...");
+
+    setText("errorMessage","");
 
     try {
 
         const response = await fetch(SCAN_URL, {
+
             method:"GET",
+
             cache:"no-store"
+
         });
 
         const data = await response.json();
@@ -496,7 +621,13 @@ async function loadScanner() {
 
         }
 
+
+        // SERVER STATUS
+
         setText("serverStatus","● LIVE SUCCESS");
+
+
+        // COUNTS
 
         setText("scanned",number(data.scanned));
 
@@ -516,23 +647,64 @@ async function loadScanner() {
 
         setText("errors",number(data.errorCount));
 
-        setText("lastUpdated",new Date().toLocaleTimeString());
+
+        // TIME
+
+        setText(
+            "lastUpdated",
+            new Date().toLocaleTimeString()
+        );
+
+
+        // SIGNAL ARRAYS
 
         const buys =
-            data.strongBuy?.length
+            Array.isArray(data.strongBuy)
             ? data.strongBuy
-            : data.bullish || [];
+            : Array.isArray(data.bullish)
+            ? data.bullish
+            : [];
 
         const sells =
-            data.strongSell?.length
+            Array.isArray(data.strongSell)
             ? data.strongSell
-            : data.bearish || [];
+            : Array.isArray(data.bearish)
+            ? data.bearish
+            : [];
+
+        const longBuilds =
+            Array.isArray(data.longBuildUp)
+            ? data.longBuildUp
+            : [];
+
+        const shortBuilds =
+            Array.isArray(data.shortBuildUp)
+            ? data.shortBuildUp
+            : [];
+
+
+        // DISPLAY BUY
 
         document.getElementById("buySignals").innerHTML =
             renderSignals(buys,"BUY");
 
+
+        // DISPLAY SELL
+
         document.getElementById("sellSignals").innerHTML =
             renderSignals(sells,"SELL");
+
+
+        // DISPLAY LONG BUILDUP
+
+        document.getElementById("longBuildSignals").innerHTML =
+            renderSignals(longBuilds,"LONG BUILDUP");
+
+
+        // DISPLAY SHORT BUILDUP
+
+        document.getElementById("shortBuildSignals").innerHTML =
+            renderSignals(shortBuilds,"SHORT BUILDUP");
 
     }
 
@@ -540,8 +712,14 @@ async function loadScanner() {
 
         setText("serverStatus","API ERROR");
 
-        document.getElementById("buySignals").innerHTML =
-            `<div class="empty">${escapeHTML(error.message)}</div>`;
+        document.getElementById("errorMessage").innerHTML =
+            `<span class="error">${escapeHTML(error.message)}</span>`;
+
+    }
+
+    finally {
+
+        button.disabled = false;
 
     }
 
