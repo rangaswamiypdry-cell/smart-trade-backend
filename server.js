@@ -2353,19 +2353,12 @@ const server = http.createServer(
                     count: fnoStocks.length,
 
                     stocks: fnoStocks.map(x => ({
-
-                        symbol: x.symbol,
-
-                        equityKey: x.equityKey,
-
-                        futuresKey: x.futuresKey,
-
-                        futuresSymbol:
-                            x.futuresSymb
-                      expiry: x.expiry
-
-                    }))
-
+    symbol: x.symbol,
+    equityKey: x.equityKey,
+    futuresKey: x.futuresKey,
+    futuresSymbol: x.futuresSymbol,
+    expiry: x.expiry
+}))
                 });
 
             }
