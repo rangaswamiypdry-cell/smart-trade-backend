@@ -265,67 +265,78 @@ async function downloadMaster() {
 // ======================================================
 // BUILD NSE F&O STOCK LIST
 // ======================================================
-
 function buildFnoStocks(rows) {
 
-    const equities = rows.filter(x =>
+    const today = istDate();
 
-        x.segment === "NSE_EQ" &&
-
-        x.instrument_type === "EQ" &&
-
-        x.instrument_key &&
-
-        x.trading_symbol
-
-    );
-
-    const futures = rows.filter(x =>
-
-        x.segment === "NSE_FO" &&
-
-        x.instrument_type === "FUT" &&
-
-        x.instrument_key &&
-
-        x.underlying_symbol &&
-
-        x.expiry
-
-    );
+    // EQUITY MAP USING INSTRUMENT KEY
 
     const equityMap = new Map();
 
-    for (const item of equities) {
+    for (const e of rows) {
+
+        if (
+            e.segment !== "NSE_EQ" ||
+            e.instrument_type !== "EQ" ||
+            !e.instrument_key
+        ) continue;
 
         equityMap.set(
-            item.trading_symbol.toUpperCase(),
-            item
+            e.instrument_key,
+            e
         );
 
     }
 
-    const today = istDate();
+    // FILTER STOCK FUTURES ONLY
+
+    const futures = rows.filter(f =>
+
+        f.segment === "NSE_FO" &&
+
+        f.instrument_type === "FUT" &&
+
+        f.underlying_type === "EQUITY" &&
+
+        f.underlying_key &&
+
+        f.instrument_key
+
+    );
 
     const futureMap = new Map();
 
-    for (const item of futures) {
+    for (const f of futures) {
+
+        const equity = equityMap.get(
+            f.underlying_key
+        );
+
+        if (!equity) continue;
+
+        const expiry = normalizeExpiry(
+            f.expiry
+        );
+
+        if (!expiry || expiry < today) continue;
 
         const symbol = String(
-            item.underlying_symbol
+            equity.trading_symbol
         ).toUpperCase();
-
-        const expiry = String(
-            item.expiry
-        ).slice(0, 10);
-
-        if (expiry < today) continue;
 
         if (!futureMap.has(symbol)) {
             futureMap.set(symbol, []);
         }
 
-        futureMap.get(symbol).push(item);
+        futureMap.get(symbol).push({
+
+            equity,
+
+            future: f,
+
+            expiry
+
+        });
 
     }
 
@@ -333,39 +344,35 @@ function buildFnoStocks(rows) {
 
     for (const [symbol, contracts] of futureMap) {
 
-        const equity = equityMap.get(symbol);
-
-        if (!equity) continue;
-
         contracts.sort((a, b) =>
-            String(a.expiry).localeCompare(
-                String(b.expiry)
-            )
+            a.expiry.localeCompare(b.expiry)
         );
 
-        const future = contracts[0];
+        const selected = contracts[0];
 
         result.push({
 
             symbol,
 
-            equityKey: equity.instrument_key,
+            equityKey:
+                selected.equity.instrument_key,
 
-            futuresKey: future.instrument_key,
+            futuresKey:
+                selected.future.instrument_key,
 
-            futuresSymbol: future.trading_symbol,
+            futuresSymbol:
+                selected.future.trading_symbol,
 
-            expiry: future.expiry
+            expiry:
+                selected.expiry
 
         });
 
     }
 
-    return result
-        .sort((a, b) =>
-            a.symbol.localeCompare(b.symbol)
-        )
-        .slice(0, CONFIG.SCAN_LIMIT);
+    return result.sort((a, b) =>
+        a.symbol.localeCompare(b.symbol)
+    );
 
 }
 
