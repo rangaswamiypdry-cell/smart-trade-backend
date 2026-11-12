@@ -2470,17 +2470,23 @@ const server = http.createServer(
 
             if (path === "/api/master/refresh") {
 
-                await loadMaster(true);
+    await loadMaster(true);
 
-                scanCache = null;
+    scanCache = null;
 
-                return sendJson(res, 200, {
+    return sendJson(res, 200, {
 
-                    status: "SUCCESS",
+        status: "SUCCESS",
 
-                    fnoStockCount: fnoStocks.length
+        equityCount: equityMaster.length,
 
-                });
+        futuresCount: futuresMaster.length,
+
+        fnoStockCount: fnoStocks.length,
+
+        sample: fnoStocks.slice(0, 10)
+
+    });
 
             }
 
