@@ -261,7 +261,50 @@ async function downloadMaster() {
     return rows;
 
 }
+// ==========================================
+// NORMALIZE EXPIRY FIX
+// ==========================================
 
+function normalizeExpiry(value) {
+
+    if (!value) return null;
+
+    let date;
+
+    if (
+        typeof value === "number" ||
+        /^\d+$/.test(String(value))
+    ) {
+
+        let timestamp = Number(value);
+
+        if (timestamp < 1000000000000) {
+            timestamp *= 1000;
+        }
+
+        date = new Date(timestamp);
+
+    } else {
+
+        date = new Date(value);
+
+    }
+
+    if (isNaN(date.getTime())) {
+        return null;
+    }
+
+    return new Intl.DateTimeFormat(
+        "en-CA",
+        {
+            timeZone: "Asia/Kolkata",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+        }
+    ).format(date);
+
+}
 // ======================================================
 // BUILD NSE F&O STOCK LIST
 // ======================================================
