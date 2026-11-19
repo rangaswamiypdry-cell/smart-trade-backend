@@ -854,20 +854,6 @@ async function runFullScan() {
 
 // Replace the OI calculation inside scanOneIndex:
 
-const previousCandle = candles[candles.length - 2];
-const lastCandle = candles[candles.length - 1];
-
-const oldOI = previousCandle?.oi || 0;
-const currentOI = lastCandle?.oi || 0;
-
-const oiData = {
-  ready: oldOI > 0 && currentOI > 0,
-  change: currentOI - oldOI,
-  percent: oldOI > 0
-    ? ((currentOI - oldOI) / oldOI) * 100
-    : 0,
-  increasing: currentOI > oldOI
-};
 
 // ------------------------------------------------------
 // MARKET TIME - INDIA
