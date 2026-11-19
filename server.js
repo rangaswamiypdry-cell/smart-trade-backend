@@ -1,11 +1,10 @@
-
 "use strict";
 
 // ======================================================
 // SMART TRADE INDIA V10 PRO
 // VERY STRONG OPTION SELLING SCANNER
 // UPSTOX API | NODE.JS 20+
-// PART 1 OF 2
+// PART 1 OF 4
 // ======================================================
 
 const http = require("http");
@@ -118,8 +117,14 @@ async function getLiveQuote(instrumentKey) {
 
   const quote = values[0];
 
+  const price = Number(quote?.last_price);
+
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error("Invalid live price: " + instrumentKey);
+  }
+
   return {
-    price: Number(quote.last_price || 0),
+    price,
     fetchedAt: Date.now(),
     raw: quote
   };
@@ -180,18 +185,17 @@ async function getOptionChain(index, expiry) {
 
   const result = await upstoxRequest(path);
 
-  if (!Array.isArray(result.data)) {
-    throw new Error("Invalid option chain");
+  const chain = result.data || [];
+
+  if (!Array.isArray(chain) || !chain.length) {
+    throw new Error("Option chain unavailable");
   }
 
-  return {
-    chain: result.data,
-    fetchedAt: Date.now()
-  };
+  return chain;
 }
 
 // ======================================================
-// 5 MINUTE COMPLETED CANDLES
+// 5 MINUTE CANDLES
 // ======================================================
 
 async function getFiveMinuteCandles(index) {
@@ -205,29 +209,38 @@ async function getFiveMinuteCandles(index) {
 
   const candles = result.data?.candles || [];
 
+  if (!Array.isArray(candles) || !candles.length) {
+    throw new Error("5 minute candles unavailable");
+  }
+
   const now = Date.now();
 
   return candles
     .filter(c => {
+      if (!Array.isArray(c) || !c[0]) return false;
 
-      const start = new Date(c[0]).getTime();
+      const candleTime = new Date(c[0]).getTime();
 
-      return Number.isFinite(start) &&
-        now >= start + 300000;
+      return (
+        Number.isFinite(candleTime) &&
+        candleTime + 300000 <= now
+      );
     })
-    .sort((a, b) =>
-      new Date(b[0]).getTime() -
-      new Date(a[0]).getTime()
+    .sort(
+      (a, b) =>
+        new Date(b[0]).getTime() -
+        new Date(a[0]).getTime()
     );
-}
-
+  }
 // ======================================================
 // EMA CALCULATION
 // ======================================================
 
 function calculateEMA(values, period) {
 
-  if (values.length < period) return null;
+  if (!Array.isArray(values) || values.length < period) {
+    return null;
+  }
 
   const multiplier = 2 / (period + 1);
 
@@ -235,15 +248,17 @@ function calculateEMA(values, period) {
     .slice(-period)
     .reduce((a, b) => a + b, 0) / period;
 
-  for (let i = values.length - period + 1;
-       i < values.length; i++) {
-
+  for (
+    let i = values.length - period + 1;
+    i < values.length;
+    i++
+  ) {
     ema =
       values[i] * multiplier +
       ema * (1 - multiplier);
   }
 
-  return ema;
+  return Number.isFinite(ema) ? ema : null;
 }
 
 // ======================================================
@@ -252,7 +267,9 @@ function calculateEMA(values, period) {
 
 function calculateRSI(values, period = 14) {
 
-  if (values.length <= period) return null;
+  if (!Array.isArray(values) || values.length <= period) {
+    return null;
+  }
 
   let gains = 0;
   let losses = 0;
@@ -261,8 +278,11 @@ function calculateRSI(values, period = 14) {
 
     const change = values[i] - values[i - 1];
 
-    if (change > 0) gains += change;
-    else losses += Math.abs(change);
+    if (change > 0) {
+      gains += change;
+    } else {
+      losses += Math.abs(change);
+    }
   }
 
   let avgGain = gains / period;
@@ -304,6 +324,15 @@ function calculateVWAP(candles) {
     const close = Number(c[4]);
     const volume = Number(c[5] || 0);
 
+    if (
+      !Number.isFinite(high) ||
+      !Number.isFinite(low) ||
+      !Number.isFinite(close) ||
+      !Number.isFinite(volume)
+    ) {
+      continue;
+    }
+
     const typical = (high + low + close) / 3;
 
     totalPV += typical * volume;
@@ -316,16 +345,16 @@ function calculateVWAP(candles) {
 }
 
 // ======================================================
-// CANDLE ANALYSIS
+// 5 MINUTE CANDLE ANALYSIS
 // ======================================================
 
 function analyseCandles(candles) {
 
-  if (!candles || candles.length < 21) {
-
+  if (!Array.isArray(candles) || candles.length < 21) {
     return {
       ready: false,
-      direction: "WAIT"
+      direction: "WAIT",
+      reason: "INSUFFICIENT CANDLES"
     };
   }
 
@@ -341,6 +370,18 @@ function analyseCandles(candles) {
   const close = Number(latest[4]);
   const open = Number(latest[1]);
 
+  if (
+    !Number.isFinite(close) ||
+    !Number.isFinite(open) ||
+    !Number.isFinite(Number(previous[4]))
+  ) {
+    return {
+      ready: false,
+      direction: "WAIT",
+      reason: "INVALID CANDLE DATA"
+    };
+  }
+
   const ema20 = calculateEMA(closes, 20);
 
   const rsi = calculateRSI(
@@ -349,6 +390,18 @@ function analyseCandles(candles) {
   );
 
   const vwap = calculateVWAP(ordered);
+
+  if (
+    !Number.isFinite(ema20) ||
+    !Number.isFinite(rsi) ||
+    !Number.isFinite(vwap)
+  ) {
+    return {
+      ready: false,
+      direction: "WAIT",
+      reason: "INVALID TECHNICAL DATA"
+    };
+  }
 
   const averageVolume =
     volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
@@ -390,14 +443,6 @@ function analyseCandles(candles) {
     fetchedAt: Date.now()
   };
 }
-
-
-// ======================================================
-// SMART TRADE INDIA V10 PRO
-// PART 2 OF 2
-// SCANNER + VERY STRONG SELL + DASHBOARD
-// ======================================================
-
 // ======================================================
 // OPTION SNAPSHOT
 // ======================================================
@@ -405,9 +450,9 @@ function analyseCandles(candles) {
 function getOptionChanges(key, market) {
 
   const current = {
-    price: Number(market.ltp || 0),
-    oi: Number(market.oi || 0),
-    volume: Number(market.volume || 0),
+    price: Number(market?.ltp || 0),
+    oi: Number(market?.oi || 0),
+    volume: Number(market?.volume || 0),
     time: Date.now()
   };
 
@@ -439,14 +484,15 @@ function selectOTM(chain, direction, spot) {
 
   const candidates = [];
 
-  for (const row of chain) {
+  for (const row of (chain || [])) {
 
-    const strike = Number(row.strike_price);
+    const strike = Number(row?.strike_price);
 
-    if (direction === "UP" &&
-        strike < spot &&
-        row.put_options) {
-
+    if (
+      direction === "UP" &&
+      strike < spot &&
+      row?.put_options
+    ) {
       candidates.push({
         strike,
         type: "PE",
@@ -454,10 +500,11 @@ function selectOTM(chain, direction, spot) {
       });
     }
 
-    if (direction === "DOWN" &&
-        strike > spot &&
-        row.call_options) {
-
+    if (
+      direction === "DOWN" &&
+      strike > spot &&
+      row?.call_options
+    ) {
       candidates.push({
         strike,
         type: "CE",
@@ -477,8 +524,7 @@ function selectOTM(chain, direction, spot) {
 }
 
 // ======================================================
-// VERY STRONG SELL ANALYSIS
-// SIX CONDITIONS MANDATORY
+// VERY STRONG SELL — ALL SIX CONDITIONS
 // ======================================================
 
 function analyseSignal(selected, technical, direction) {
@@ -496,6 +542,7 @@ function analyseSignal(selected, technical, direction) {
   const askQty = Number(market.ask_qty || 0);
 
   if (
+    !Number.isFinite(premium) ||
     premium < CONFIG.MIN_OPTION_PREMIUM ||
     premium > CONFIG.MAX_OPTION_PREMIUM ||
     !bid || !ask || ask < bid ||
@@ -509,7 +556,6 @@ function analyseSignal(selected, technical, direction) {
     market
   );
 
-  // First snapshot is baseline only.
   if (!changes.ready) return null;
 
   const bullish = direction === "UP";
@@ -517,7 +563,7 @@ function analyseSignal(selected, technical, direction) {
 
   if (!bullish && !bearish) return null;
 
-  // All six must pass.
+  // ORIGINAL SIX CONDITIONS
   const conditions = bullish ? {
 
     priceAboveEMA20:
@@ -564,10 +610,9 @@ function analyseSignal(selected, technical, direction) {
 
   if (!passed) return null;
 
-  // Correct option type is mandatory.
   if (
-    bullish && selected.type !== "PE" ||
-    bearish && selected.type !== "CE"
+    (bullish && selected.type !== "PE") ||
+    (bearish && selected.type !== "CE")
   ) {
     return null;
   }
@@ -636,29 +681,30 @@ async function scanOneIndex(symbol, index) {
 
     const [quote, candles, contractData] =
       await Promise.all([
-
         getLiveQuote(index.key),
-
         getFiveMinuteCandles(index),
-
         getOptionContracts(index)
-
       ]);
 
     const spot = quote.price;
 
-    if (!spot) {
+    if (!Number.isFinite(spot) || spot <= 0) {
       throw new Error("Invalid index price");
     }
 
     const technical = analyseCandles(candles);
 
-    if (!technical.ready) {
-
+    if (
+      !technical.ready ||
+      !Number.isFinite(technical.close) ||
+      !Number.isFinite(technical.ema20) ||
+      !Number.isFinite(technical.rsi) ||
+      !Number.isFinite(technical.vwap)
+    ) {
       return {
         symbol,
         name: index.name,
-        status: "WAITING FOR 21 CANDLES"
+        status: "WAITING FOR VALID CANDLES"
       };
     }
 
@@ -692,14 +738,13 @@ async function scanOneIndex(symbol, index) {
 
     if (direction === "SIDEWAYS") return result;
 
-    // Option chain for nearest expiry.
     const expiry = contractData.expiry;
 
-    const chainData =
-      await getOptionChain(index, expiry);
+    const chainData = await getOptionChain(index, expiry);
 
+    // UPDATED: PASS chainData DIRECTLY
     const selected = selectOTM(
-      chainData.chain,
+      chainData,
       direction,
       spot
     );
@@ -744,77 +789,78 @@ async function scanOneIndex(symbol, index) {
 }
 
 // ======================================================
-// RUN ALL THREE INDEXES
+// RUN ALL INDEXES
 // ======================================================
 
 async function runScan() {
 
-  if (scanRunning) return latestResults;
+  if (scanRunning) {
+    return latestResults;
+  }
 
   scanRunning = true;
 
   try {
 
-    const results = await Promise.all(
+    const entries = Object.entries(INDEXES);
 
-      Object.entries(INDEXES).map(
-        ([symbol, index]) =>
-          scanOneIndex(symbol, index)
+    const results = await Promise.all(
+      entries.map(([symbol, index]) =>
+        scanOneIndex(symbol, index)
       )
     );
 
     const signals = results
-      .filter(r => r.signal)
-      .map(r => r.signal);
+      .filter(item => item.signal)
+      .map(item => item.signal);
+
+    const errors = results
+      .filter(item => item.status === "ERROR")
+      .map(item => ({
+        index: item.symbol,
+        error: item.error
+      }));
 
     latestResults = {
-
       status: "SUCCESS",
-
       version: CONFIG.VERSION,
-
       updatedAt: new Date().toISOString(),
-
       indexes: results,
-
       signals,
-
       signalCount: signals.length,
-
-      errors: results
-        .filter(r => r.error)
-        .map(r => ({
-          index: r.symbol,
-          error: r.error
-        }))
+      errors
     };
+
+    return latestResults;
+
+  } catch (error) {
+
+    latestResults.status = "ERROR";
+
+    latestResults.errors = [
+      { error: error.message }
+    ];
 
     return latestResults;
 
   } finally {
 
     scanRunning = false;
+
   }
 }
-
 // ======================================================
-// HTTP JSON RESPONSE
+// JSON RESPONSE
 // ======================================================
 
-function sendJson(res, status, data) {
+function sendJson(res, statusCode, data) {
 
-  res.writeHead(status, {
-
-    "Content-Type": "application/json",
-
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
-
     "Access-Control-Allow-Methods": "GET, OPTIONS",
-
     "Access-Control-Allow-Headers": "Content-Type",
-
     "Cache-Control": "no-store"
-
   });
 
   res.end(JSON.stringify(data));
@@ -827,113 +873,287 @@ function sendJson(res, status, data) {
 const dashboardHTML = `<!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>SMART TRADE INDIA V10 PRO</title>
+
 <style>
 body {
-  margin:0;
-  padding:16px;
-  background:#101820;
-  color:white;
-  font-family:Arial;
+  background: #101827;
+  color: white;
+  font-family: Arial;
+  margin: 0;
+  padding: 15px;
 }
-h2 {color:#00e5a8}
-.card {
-  background:#202d39;
-  padding:15px;
-  margin:12px 0;
-  border-radius:12px;
+
+h1 {
+  color: #00e5a8;
+  text-align: center;
 }
+
 button {
-  padding:12px 20px;
-  background:#00c896;
-  border:0;
-  border-radius:8px;
-  font-weight:bold;
+  padding: 13px;
+  margin: 5px;
+  border: 0;
+  border-radius: 8px;
+  background: #00c896;
+  color: black;
+  font-weight: bold;
 }
-.good {color:#00e5a8}
-.bad {color:#ff6262}
-.small {color:#b6c3cf;font-size:13px}
+
+.card {
+  background: #1d293b;
+  padding: 14px;
+  margin: 12px 0;
+  border-radius: 10px;
+  border: 1px solid #35445c;
+}
+
+.good {
+  color: #00e5a8;
+}
+
+.bad {
+  color: #ff6565;
+}
+
+.small {
+  color: #b8c4d6;
+  font-size: 12px;
+}
+
+.signal {
+  border-left: 5px solid #00e5a8;
+}
+
+#status {
+  text-align: center;
+  color: #ffd166;
+  padding: 10px;
+}
 </style>
 </head>
+
 <body>
 
-<h2>SMART TRADE INDIA V10 PRO</h2>
+<h1>SMART TRADE INDIA V10 PRO</h1>
 
-<p id="status">Connecting...</p>
+<div id="status">Connecting...</div>
 
 <button onclick="scan()">SCAN NOW</button>
 
+<button id="soundButton" onclick="enableSound()">
+ENABLE SOUND
+</button>
+
+<p class="small" id="soundStatus">
+Sound is OFF. Tap Enable Sound.
+</p>
+
+<h2>LIVE INDEX DATA</h2>
+
 <div id="indexes"></div>
 
-<h3>VERY STRONG SELL ALERTS</h3>
+<h2>VERY STRONG SELL ALERTS</h2>
 
 <div id="signals"></div>
 
+<h2>SERVER ERRORS</h2>
+
+<div id="errors"></div>
+
 <script>
+
+let soundEnabled = false;
+let audioContext = null;
+let lastAlertKeys = new Set();
+
+function enableSound() {
+
+  try {
+
+    const AudioCtx =
+      window.AudioContext ||
+      window.webkitAudioContext;
+
+    if (!AudioCtx) {
+      throw new Error("Audio not supported");
+    }
+
+    audioContext = audioContext || new AudioCtx();
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
+    soundEnabled = true;
+
+    document.getElementById("soundStatus").innerText =
+      "Sound alert enabled";
+
+    document.getElementById("soundButton").innerText =
+      "SOUND ON";
+
+  } catch (error) {
+
+    document.getElementById("soundStatus").innerText =
+      error.message;
+  }
+}
+
+function playAlert() {
+
+  if (!soundEnabled || !audioContext) return;
+
+  try {
+
+    const oscillator = audioContext.createOscillator();
+
+    const gain = audioContext.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.frequency.value = 880;
+    gain.gain.value = 0.12;
+
+    oscillator.start();
+
+    oscillator.stop(audioContext.currentTime + 0.35);
+
+  } catch (error) {
+
+    console.log(error);
+  }
+}
+
+// ======================================================
+// SCAN API
+// ======================================================
 
 async function scan() {
 
   document.getElementById("status").innerText =
-    "Scanning...";
+    "Scanning live market...";
 
   try {
 
-    const response = await fetch("/api/scan");
+    const response = await fetch("/api/scan", {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
 
     const data = await response.json();
 
     render(data);
 
-  } catch(error) {
+  } catch (error) {
 
     document.getElementById("status").innerText =
-      "API ERROR: " + error.message;
+      "ERROR: " + error.message;
   }
 }
+
+// ======================================================
+// RENDER DASHBOARD
+// ======================================================
 
 function render(data) {
 
   document.getElementById("status").innerText =
-    data.status + " | " + data.version;
+    (data.status || "UNKNOWN") +
+    " | " +
+    (data.version || "");
+
+  const indexes = data.indexes || [];
+  const signals = data.signals || [];
+  const errors = data.errors || [];
+
+  let indexHTML = "";
+
+  indexes.forEach(item => {
+
+    indexHTML +=
+      '<div class="card">' +
+      '<h3>' + (item.name || item.symbol || "-") + '</h3>' +
+      '<p>Spot: ' + (item.spot ?? "-") + '</p>' +
+      '<p>Direction: ' + (item.direction || "-") + '</p>' +
+      '<p>RSI: ' + (item.rsi ?? "-") + '</p>' +
+      '<p>Status: ' + (item.status || "-") + '</p>' +
+      '</div>';
+  });
 
   document.getElementById("indexes").innerHTML =
-    (data.indexes || []).map(x => \`
-      <div class="card">
-        <h3>\${x.name || x.symbol}</h3>
-        <p>Price: \${x.spot ?? "-"}</p>
-        <p>Direction: \${x.direction || "-"}</p>
-        <p>RSI: \${x.rsi ?? "-"}</p>
-        <p>EMA20: \${x.ema20 ?? "-"}</p>
-        <p>VWAP: \${x.vwap ?? "-"}</p>
-        <p>Status: \${x.status}</p>
-      </div>
-    \`).join("");
+    indexHTML || "No index data";
 
-  const signals = data.signals || [];
+  // NEW SIGNAL SOUND
+  const currentKeys = new Set(
+    signals.map(s =>
+      [
+        s.index,
+        s.optionType,
+        s.strike,
+        s.expiry,
+        s.instrumentKey
+      ].join("|")
+    )
+  );
+
+  let newSignal = false;
+
+  currentKeys.forEach(key => {
+    if (!lastAlertKeys.has(key)) {
+      newSignal = true;
+    }
+  });
+
+  if (newSignal) playAlert();
+
+  lastAlertKeys = currentKeys;
+
+  let signalHTML = "";
+
+  signals.forEach(s => {
+
+    signalHTML +=
+      '<div class="card signal">' +
+      '<h3 class="good">VERY STRONG SELL</h3>' +
+      '<h2>' + (s.indexName || s.index || "-") + '</h2>' +
+      '<h2>' + (s.action || "-") + '</h2>' +
+      '<p>Strike: ' + (s.strike ?? "-") + '</p>' +
+      '<p>Premium: ' + (s.premium ?? "-") + '</p>' +
+      '<p>OI Change: ' + (s.oiChange ?? "-") + '</p>' +
+      '<p>RSI: ' + (s.rsi ?? "-") + '</p>' +
+      '<p class="good">6/6 ALL CONDITIONS PASSED</p>' +
+      '</div>';
+  });
 
   document.getElementById("signals").innerHTML =
-    signals.length ? signals.map(s => \`
-      <div class="card">
-        <h3 class="good">\${s.signal}</h3>
-        <h2>\${s.indexName}</h2>
-        <h2>\${s.action}</h2>
-        <p>Strike: \${s.strike}</p>
-        <p>Premium: \${s.premium}</p>
-        <p>OI Change: \${s.oiChange}</p>
-        <p>Volume Change: \${s.volumeChange}</p>
-        <p>RSI: \${s.rsi}</p>
-        <p>\${s.strength}</p>
-      </div>
-    \`).join("") :
-    "<div class='card'>NO CONFIRMED SIGNAL</div>";
+    signalHTML || '<div class="card">NO CONFIRMED SIGNAL</div>';
+
+  document.getElementById("errors").innerHTML =
+    errors.map(e =>
+      '<div class="card bad">' +
+      (e.index || "") + " " + (e.error || "") +
+      '</div>'
+    ).join("") || "No errors";
+
 }
+
+// ======================================================
+// AUTOMATIC REFRESH
+// ======================================================
 
 scan();
 
 setInterval(scan, 60000);
 
 </script>
+
 </body>
 </html>`;
 
@@ -943,19 +1163,25 @@ setInterval(scan, 60000);
 
 const server = http.createServer(async (req, res) => {
 
-  const path = new URL(
-    req.url,
-    "http://localhost"
-  ).pathname;
-
   if (req.method === "OPTIONS") {
-    res.writeHead(204);
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
     return res.end();
   }
 
+  const url = new URL(
+    req.url,
+    "http://" + (req.headers.host || "localhost")
+  );
+
+  const path = url.pathname;
+
   try {
 
-    if (path === "/") {
+    if (path === "/" && req.method === "GET") {
 
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8"
@@ -969,16 +1195,16 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         status: "OK",
         version: CONFIG.VERSION,
-        tokenConfigured: Boolean(TOKEN),
-        indexes: Object.keys(INDEXES),
-        time: new Date().toISOString()
+        serverTime: new Date().toISOString(),
+        upstoxTokenConfigured: Boolean(TOKEN)
       });
     }
 
     if (path === "/api/indexes") {
 
       return sendJson(res, 200, {
-        indexes: INDEXES
+        indexes: INDEXES,
+        version: CONFIG.VERSION
       });
     }
 
@@ -992,29 +1218,25 @@ const server = http.createServer(async (req, res) => {
     if (path === "/api/signals") {
 
       return sendJson(res, 200, {
-        count: latestResults.signals.length,
-        signals: latestResults.signals,
+        status: latestResults.status,
+        signals: latestResults.signals || [],
+        count: (latestResults.signals || []).length,
         updatedAt: latestResults.updatedAt
       });
     }
 
     if (path === "/api/status") {
 
-      return sendJson(res, 200, {
-        status: latestResults.status,
-        version: CONFIG.VERSION,
-        lastUpdate: latestResults.updatedAt,
-        indexes: latestResults.indexes,
-        errors: latestResults.errors
-      });
+      return sendJson(res, 200, latestResults);
     }
 
     return sendJson(res, 404, {
       status: "ERROR",
-      message: "Route not found"
+      message: "Route not found",
+      path
     });
 
-  } catch(error) {
+  } catch (error) {
 
     return sendJson(res, 500, {
       status: "ERROR",
@@ -1029,42 +1251,25 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
 
-  console.log(
-    "SMART TRADE INDIA V10 PRO RUNNING: " + PORT
-  );
-
-  console.log(
-    "NIFTY + BANKNIFTY + SENSEX"
-  );
-
-  console.log(
-    "VERY STRONG SELL: ALL SIX CONDITIONS"
-  );
-
-  console.log(
-    "BULLISH = PE SELL | BEARISH = CE SELL"
-  );
-
-  if (!TOKEN) {
-    console.log("WARNING: UPSTOX TOKEN MISSING");
-  }
-});
-
-// ======================================================
-// AUTOMATIC SCAN
-// ======================================================
-
-setInterval(() => {
+  console.log("----------------------------------");
+  console.log(CONFIG.VERSION);
+  console.log("SERVER RUNNING ON PORT " + PORT);
+  console.log("NIFTY 50 ENABLED");
+  console.log("BANKNIFTY ENABLED");
+  console.log("SENSEX ENABLED");
+  console.log("VERY STRONG SELL 6/6 ONLY");
+  console.log("----------------------------------");
 
   runScan().catch(error => {
-    console.error("SCAN ERROR:", error.message);
+    console.error("Initial scan error:", error.message);
   });
 
-}, CONFIG.POLL_MS);
+  setInterval(() => {
 
-// INITIAL SCAN
+    runScan().catch(error => {
+      console.error("Auto scan error:", error.message);
+    });
 
-runScan().catch(error => {
-  console.error("INITIAL SCAN ERROR:", error.message);
+  }, CONFIG.POLL_MS);
+
 });
-                                               
