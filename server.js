@@ -1,8 +1,6 @@
-
 // ============================================================
 // SMART TRADE INDIA PRO - LIVE 4 INDEX SELL SCANNER
-// PART 1 OF 2 | NODE.JS 20+
-// LIVE FUTURES PRICE + CLOSED 5M CANDLES
+// PART 1A
 // ============================================================
 
 "use strict";
@@ -50,6 +48,7 @@ let scanCache = null;
 const optionContractsCache = new Map();
 const optionChainCache = new Map();
 const alertHistory = new Map();
+const futuresOISnapshots = new Map();
 
 let lastScan = {
   status: "STARTING",
@@ -58,10 +57,6 @@ let lastScan = {
   bearishCount: 0,
   updatedAt: null
 };
-
-// ============================================================
-// BASIC HELPERS
-// ============================================================
 
 function round(value) {
   const n = Number(value);
@@ -116,7 +111,6 @@ function normalizeExpiry(value) {
   }
 
   if (!Number.isFinite(date.getTime())) return null;
-
   return istDate(date);
 }
 
@@ -149,9 +143,7 @@ function getIndexName(row) {
   return null;
 }
 
-// ============================================================
 // UPSTOX API REQUEST
-// ============================================================
 
 async function upstoxGET(path) {
   if (!TOKEN) {
@@ -180,9 +172,7 @@ async function upstoxGET(path) {
   return data;
 }
 
-// ============================================================
 // INSTRUMENT MASTER
-// ============================================================
 
 async function downloadMaster() {
   const response = await fetch(MASTER_URL, {
@@ -229,11 +219,9 @@ function buildIndexFutures(rows) {
     if (!row.instrument_key || !row.underlying_key) continue;
 
     const symbol = getIndexName(row);
-
     if (!symbol || !INDEX_NAMES.includes(symbol)) continue;
 
     const expiry = normalizeExpiry(row.expiry);
-
     if (!expiry || expiry < today) continue;
 
     const item = {
@@ -256,9 +244,7 @@ function buildIndexFutures(rows) {
   return INDEX_NAMES
     .filter(name => selected.has(name))
     .map(name => selected.get(name));
-}
-
-async function loadMaster(force = false) {
+}async function loadMaster(force = false) {
   if (masterLoading) {
     while (masterLoading) await sleep(200);
     return;
@@ -270,7 +256,6 @@ async function loadMaster(force = false) {
 
   try {
     const rows = await downloadMaster();
-
     indexFutures = buildIndexFutures(rows);
     masterLoaded = true;
 
@@ -297,9 +282,7 @@ async function loadMaster(force = false) {
   }
 }
 
-// ============================================================
-// GET CLOSED 5-MINUTE CANDLES
-// ============================================================
+// CLOSED 5-MINUTE CANDLES
 
 async function getClosedCandles(instrumentKey) {
   const key = encodeURIComponent(instrumentKey);
@@ -311,39 +294,33 @@ async function getClosedCandles(instrumentKey) {
   const raw = result?.data?.candles || [];
   const now = Date.now();
 
-  return raw
-    .map(c => ({
-      time: new Date(c[0]).getTime(),
-      open: Number(c[1]),
-      high: Number(c[2]),
-      low: Number(c[3]),
-      close: Number(c[4]),
-      volume: Number(c[5] || 0),
-      oi: Number(c[6] || 0)
-    }))
-    .filter(c => {
-      const valid =
-        Number.isFinite(c.time) &&
-        Number.isFinite(c.open) &&
-        Number.isFinite(c.high) &&
-        Number.isFinite(c.low) &&
-        Number.isFinite(c.close) &&
-        c.open > 0 &&
-        c.high > 0 &&
-        c.low > 0 &&
-        c.close > 0 &&
-        c.high >= Math.max(c.open, c.close, c.low) &&
-        c.low <= Math.min(c.open, c.close, c.high);
+  return raw.map(c => ({
+    time: new Date(c[0]).getTime(),
+    open: Number(c[1]),
+    high: Number(c[2]),
+    low: Number(c[3]),
+    close: Number(c[4]),
+    volume: Number(c[5] || 0),
+    oi: Number(c[6] || 0)
+  })).filter(c => {
+    const valid =
+      Number.isFinite(c.time) &&
+      Number.isFinite(c.open) &&
+      Number.isFinite(c.high) &&
+      Number.isFinite(c.low) &&
+      Number.isFinite(c.close) &&
+      c.open > 0 &&
+      c.high > 0 &&
+      c.low > 0 &&
+      c.close > 0 &&
+      c.high >= Math.max(c.open, c.close, c.low) &&
+      c.low <= Math.min(c.open, c.close, c.high);
 
-      return valid &&
-        c.time + 300000 <= now;
-    })
-    .sort((a, b) => a.time - b.time);
+    return valid && c.time + 300000 <= now;
+  }).sort((a, b) => a.time - b.time);
 }
 
-// ============================================================
 // LIVE FUTURES QUOTES
-// ============================================================
 
 async function getLiveQuotes(items) {
   const keys = items.map(x => x.futuresKey).filter(Boolean);
@@ -359,15 +336,11 @@ async function getLiveQuotes(items) {
       `/v3/market-quote/quotes?instrument_key=${query}`
     );
 
-    const data = result?.data || {};
-
-    Object.assign(output, data);
+    Object.assign(output, result?.data || {});
   }
 
   return output;
 }
-
-// IMPORTANT: ROBUST QUOTE MATCHING
 
 function findQuote(item, quotes) {
   if (!quotes || !item?.futuresKey) return null;
@@ -409,9 +382,7 @@ function extractLivePrice(quote) {
   return null;
 }
 
-// ============================================================
 // RSI 14
-// ============================================================
 
 function calculateRSI(closes, period = 14) {
   if (!Array.isArray(closes) || closes.length <= period) {
@@ -448,9 +419,7 @@ function calculateRSI(closes, period = 14) {
   return round(100 - 100 / (1 + avgGain / avgLoss));
 }
 
-// ============================================================
 // TODAY CANDLES AND VWAP
-// ============================================================
 
 function getTodayCandles(candles) {
   const today = istDate();
@@ -466,43 +435,33 @@ function calculateVWAP(candles) {
 
   for (const c of candles) {
     const typical = (c.high + c.low + c.close) / 3;
-
     totalPV += typical * c.volume;
     totalVolume += c.volume;
   }
 
   if (totalVolume <= 0) return null;
-
   return round(totalPV / totalVolume);
 }
 
-// ============================================================
 // CANDLE CONFIRMATION
-// ============================================================
 
 function bullishCandle(c) {
   const range = c.high - c.low;
-
   if (range <= 0) return false;
 
   const body = c.close - c.open;
-
   return body > 0 && body / range >= 0.45;
 }
 
 function bearishCandle(c) {
   const range = c.high - c.low;
-
   if (range <= 0) return false;
 
   const body = c.open - c.close;
-
   return body > 0 && body / range >= 0.45;
 }
 
-// ============================================================
 // VOLUME ANALYSIS
-// ============================================================
 
 function analyseVolume(candles) {
   if (candles.length < CONFIG.MIN_CANDLES) {
@@ -532,47 +491,129 @@ function analyseVolume(candles) {
     averageVolume: round(averageVolume),
     ratio: round(ratio)
   };
-}
-
-// ============================================================
-// OI ANALYSIS
+}// ============================================================
+// FUTURES OI ANALYSIS - LIVE OI + CANDLE OI
 // ============================================================
 
-function analyseOI(candles) {
-  if (candles.length < 2) {
-    return {
-      valid: false,
-      increase: false,
-      change: 0
-    };
+function extractQuoteOI(quote) {
+  if (!quote) return null;
+
+  const values = [
+    quote.oi,
+    quote.open_interest,
+    quote.openInterest
+  ];
+
+  for (const value of values) {
+    const n = Number(value);
+
+    if (Number.isFinite(n) && n > 0) {
+      return n;
+    }
   }
 
+  return null;
+}
+
+// OI DATA ANALYSIS
+
+function analyseOI(candles, quote, instrumentKey) {
   const last = candles[candles.length - 1];
   const previous = candles[candles.length - 2];
 
-  if (last.oi <= 0 || previous.oi <= 0) {
+  const candleLastOI = Number(last?.oi || 0);
+  const candlePreviousOI = Number(previous?.oi || 0);
+
+  let currentOI = null;
+  let previousOI = null;
+  let source = "UNAVAILABLE";
+
+  // First preference: completed candle OI
+  if (
+    candleLastOI > 0 &&
+    candlePreviousOI > 0
+  ) {
+    currentOI = candleLastOI;
+    previousOI = candlePreviousOI;
+    source = "CLOSED_5M_CANDLE";
+  }
+
+  // Fallback: live futures quote OI
+  else {
+    const liveOI = extractQuoteOI(quote);
+
+    if (liveOI !== null) {
+      const previousSnapshot =
+        futuresOISnapshots.get(instrumentKey);
+
+      const currentTime = Date.now();
+
+      if (
+        previousSnapshot &&
+        currentTime - previousSnapshot.time >= 300000
+      ) {
+        currentOI = liveOI;
+        previousOI = previousSnapshot.oi;
+        source = "LIVE_QUOTE_5M_SNAPSHOT";
+      }
+
+      futuresOISnapshots.set(instrumentKey, {
+        oi: liveOI,
+        time: currentTime
+      });
+    }
+  }
+
+  if (
+    currentOI === null ||
+    previousOI === null ||
+    previousOI <= 0
+  ) {
     return {
       valid: false,
+      available: false,
       increase: false,
-      change: 0
+      currentOI: currentOI,
+      previousOI: previousOI,
+      change: null,
+      changePercent: null,
+      source
     };
   }
 
-  const change = last.oi - previous.oi;
+  const change = currentOI - previousOI;
 
   return {
     valid: true,
+    available: true,
     increase: change > 0,
-    currentOI: last.oi,
-    previousOI: previous.oi,
+    currentOI,
+    previousOI,
     change,
-    changePercent: round(change / previous.oi * 100)
+    changePercent: round(
+      (change / previousOI) * 100
+    ),
+    source
   };
 }
 
+// OI SNAPSHOT STATUS
+
+function getOIStatus(oi) {
+  return {
+    futuresOIAvailable: oi.available,
+    futuresOIChange: oi.change,
+    futuresOIChangePercent: oi.changePercent,
+    futuresCurrentOI: oi.currentOI,
+    futuresPreviousOI: oi.previousOI,
+    futuresOISource: oi.source
+  };
+    }
 // ============================================================
+// PART 2B - OPTION CONTRACTS + OTM SELL SELECTOR
+// ============================================================
+
 // OPTION CONTRACTS
-// ============================================================
 
 async function getOptionContracts(underlyingKey) {
   const cached = optionContractsCache.get(underlyingKey);
@@ -601,9 +642,7 @@ async function getOptionContracts(underlyingKey) {
   return contracts;
 }
 
-// ============================================================
 // NEAREST EXPIRY
-// ============================================================
 
 function nearestExpiry(contracts) {
   const today = istDate();
@@ -619,15 +658,16 @@ function nearestExpiry(contracts) {
   return expiries[0] || null;
 }
 
-// ============================================================
 // OPTION CHAIN
-// ============================================================
 
 async function getOptionChain(underlyingKey, expiry) {
   const cacheKey = `${underlyingKey}_${expiry}`;
   const cached = optionChainCache.get(cacheKey);
 
-  if (cached && Date.now() - cached.time < CONFIG.OPTION_CACHE_MS) {
+  if (
+    cached &&
+    Date.now() - cached.time < CONFIG.OPTION_CACHE_MS
+  ) {
     return cached.data;
   }
 
@@ -652,9 +692,7 @@ async function getOptionChain(underlyingKey, expiry) {
   return chain;
 }
 
-// ============================================================
 // OPTION MARKET DATA
-// ============================================================
 
 function optionData(option) {
   const market = option?.market_data || {};
@@ -680,7 +718,9 @@ function optionData(option) {
 // ============================================================
 
 async function selectOTMSellOption(index, direction) {
-  const contracts = await getOptionContracts(index.underlyingKey);
+  const contracts = await getOptionContracts(
+    index.underlyingKey
+  );
 
   if (!contracts.length) {
     return {
@@ -710,7 +750,9 @@ async function selectOTMSellOption(index, direction) {
     };
   }
 
-  const optionType = direction === "BULLISH" ? "PE" : "CE";
+  const optionType =
+    direction === "BULLISH" ? "PE" : "CE";
+
   const candidates = [];
 
   for (const row of chain) {
@@ -719,12 +761,15 @@ async function selectOTMSellOption(index, direction) {
 
     if (strike <= 0 || spot <= 0) continue;
 
+    // OTM FILTER
+
     if (optionType === "PE" && strike >= spot) continue;
     if (optionType === "CE" && strike <= spot) continue;
 
-    const option = optionType === "PE"
-      ? row.put_options
-      : row.call_options;
+    const option =
+      optionType === "PE"
+        ? row.put_options
+        : row.call_options;
 
     if (!option) continue;
 
@@ -736,19 +781,27 @@ async function selectOTMSellOption(index, direction) {
     if (data.bid <= 0 || data.ask <= 0) continue;
     if (data.ask < data.bid) continue;
 
+    // DELTA FILTER
+
     if (
       absDelta < CONFIG.DELTA_MIN ||
       absDelta > CONFIG.DELTA_MAX
     ) continue;
 
+    // BID / ASK SPREAD FILTER
+
     const spreadPercent =
       ((data.ask - data.bid) / data.ltp) * 100;
 
-    if (spreadPercent > CONFIG.MAX_SPREAD_PERCENT) continue;
+    if (
+      spreadPercent > CONFIG.MAX_SPREAD_PERCENT
+    ) continue;
 
     const contract = contracts.find(
       c => c.instrument_key === data.instrumentKey
     );
+
+    // OPTION SELECTION SCORE
 
     const score =
       Math.abs(absDelta - CONFIG.TARGET_DELTA) * 100 +
@@ -790,36 +843,43 @@ async function selectOTMSellOption(index, direction) {
   return {
     success: true,
     ...candidates[0],
-    selectionMethod: "OTM + DELTA + VOLUME + OI + SPREAD",
+    selectionMethod:
+      "OTM + DELTA + VOLUME + OI + SPREAD",
     updatedAt: new Date().toISOString()
   };
 }
 
-
+    
 // ============================================================
-// SMART TRADE INDIA PRO - LIVE 4 INDEX SELL SCANNER
-// PART 2 OF 2 | NODE.JS 20+
-// ANALYSE INDEX + SIX CONDITIONS + LIVE API
-// ============================================================
-
-// ============================================================
-// ANALYSE INDEX
+// PART 3A - LIVE INDEX ANALYSIS
 // ALL SIX CONDITIONS ARE MANDATORY
 // ============================================================
 
 async function analyseIndex(index, quotes) {
+
   const base = {
     symbol: index.symbol,
     indexName: index.symbol,
     futuresSymbol: index.futuresSymbol,
     expiry: index.expiry,
     futuresKey: index.futuresKey,
+
     livePrice: null,
     price: null,
     rsi: null,
     vwap: null,
     volumeRatio: null,
+
     oiChange: null,
+    futuresOIAvailable: false,
+    futuresOIChangePercent: null,
+    futuresCurrentOI: null,
+    futuresPreviousOI: null,
+    futuresOISource: "UNAVAILABLE",
+
+    futuresVolume: null,
+    averageVolume: null,
+
     option: null,
     signal: "WAIT",
     action: "NO SIGNAL",
@@ -830,12 +890,13 @@ async function analyseIndex(index, quotes) {
   };
 
   try {
+
     // 1. LIVE FUTURES PRICE
 
     const quote = findQuote(index, quotes);
     const livePrice = extractLivePrice(quote);
 
-    if (!livePrice) {
+    if (!livePrice || livePrice <= 0) {
       return {
         ...base,
         reason: "LIVE FUTURES PRICE NOT AVAILABLE"
@@ -847,7 +908,9 @@ async function analyseIndex(index, quotes) {
 
     // 2. CLOSED 5-MINUTE CANDLES
 
-    const candles = await getClosedCandles(index.futuresKey);
+    const candles = await getClosedCandles(
+      index.futuresKey
+    );
 
     if (candles.length < CONFIG.MIN_CANDLES) {
       return {
@@ -877,64 +940,115 @@ async function analyseIndex(index, quotes) {
 
     const volume = analyseVolume(candles);
 
-    // 6. OI
+    // 6. FUTURES OI
+    // PART 2A FUNCTION
 
-    const oi = analyseOI(candles);
+    const oi = analyseOI(
+      candles,
+      quote,
+      index.futuresKey
+    );
 
     base.rsi = rsi;
     base.vwap = vwap;
-    base.volumeRatio = volume.ratio;
-    base.oiChange = oi.valid ? oi.change : null;
 
+    base.volumeRatio = volume.ratio;
     base.futuresVolume = volume.latestVolume || null;
     base.averageVolume = volume.averageVolume || null;
-    base.currentOI = oi.currentOI || null;
+
+    base.oiChange = oi.valid ? oi.change : null;
+
+    base.futuresOIAvailable = oi.available;
+    base.futuresOIChangePercent = oi.changePercent;
+    base.futuresCurrentOI = oi.currentOI;
+    base.futuresPreviousOI = oi.previousOI;
+    base.futuresOISource = oi.source;
 
     // ========================================================
-    // SIX MANDATORY CONDITIONS
+    // SIX BULLISH CONDITIONS
     // ========================================================
 
     const bullishConditions = {
+
+      // 1. PRICE INCREASE
+
       priceIncrease:
         last.close > previous.close &&
         last.close > last.open,
 
+      // 2. VOLUME INCREASE
+
       volumeIncrease:
-        volume.valid && volume.pass,
+        volume.valid &&
+        volume.pass,
+
+      // 3. FUTURES OI INCREASE
 
       oiIncrease:
-        oi.valid && oi.increase,
+        oi.valid &&
+        oi.increase,
+
+      // 4. RSI ABOVE 55
 
       rsiConfirmation:
-        rsi !== null && rsi > CONFIG.RSI_BULLISH,
+        rsi !== null &&
+        rsi > CONFIG.RSI_BULLISH,
+
+      // 5. PRICE ABOVE VWAP
 
       vwapConfirmation:
-        vwap !== null && last.close > vwap,
+        vwap !== null &&
+        last.close > vwap,
+
+      // 6. BULLISH CANDLE
 
       candleConfirmation:
         bullishCandle(last)
     };
 
+    // ========================================================
+    // SIX BEARISH CONDITIONS
+    // ========================================================
+
     const bearishConditions = {
+
+      // 1. PRICE DECREASE
+
       priceDecrease:
         last.close < previous.close &&
         last.close < last.open,
 
+      // 2. VOLUME INCREASE
+
       volumeIncrease:
-        volume.valid && volume.pass,
+        volume.valid &&
+        volume.pass,
+
+      // 3. FUTURES OI INCREASE
 
       oiIncrease:
-        oi.valid && oi.increase,
+        oi.valid &&
+        oi.increase,
+
+      // 4. RSI BELOW 45
 
       rsiConfirmation:
-        rsi !== null && rsi < CONFIG.RSI_BEARISH,
+        rsi !== null &&
+        rsi < CONFIG.RSI_BEARISH,
+
+      // 5. PRICE BELOW VWAP
 
       vwapConfirmation:
-        vwap !== null && last.close < vwap,
+        vwap !== null &&
+        last.close < vwap,
+
+      // 6. BEARISH CANDLE
 
       candleConfirmation:
         bearishCandle(last)
     };
+
+    // COUNT CONDITIONS
 
     const bullishCount = Object.values(
       bullishConditions
@@ -955,25 +1069,33 @@ async function analyseIndex(index, quotes) {
     base.candleTime = new Date(last.time).toISOString();
 
     // ========================================================
-    // SIGNAL SELECTION
+    // ONLY ALL SIX CONDITIONS
+    // NO PARTIAL SIGNAL
     // ========================================================
 
     let direction = null;
 
     if (bullishCount === 6) {
+
       direction = "BULLISH";
+
     } else if (bearishCount === 6) {
+
       direction = "BEARISH";
+
     }
 
     if (!direction) {
+
       return {
         ...base,
         signal: "WAIT",
         action: "NO SIGNAL",
         strength: "NONE",
-        reason: `BULLISH ${bullishCount}/6 | BEARISH ${bearishCount}/6`
+        reason:
+          `BULLISH ${bullishCount}/6 | BEARISH ${bearishCount}/6`
       };
+
     }
 
     // ========================================================
@@ -985,34 +1107,42 @@ async function analyseIndex(index, quotes) {
     let option;
 
     try {
+
       option = await selectOTMSellOption(
         index,
         direction
       );
+
     } catch (error) {
+
       return {
         ...base,
         signal: "WAIT",
         action: "NO OPTION",
+        strength: "NONE",
         reason: `OPTION API ERROR: ${error.message}`,
         conditions: {
           ...base.conditions,
           confirmedDirection: direction
         }
       };
+
     }
 
     if (!option.success) {
+
       return {
         ...base,
         signal: "WAIT",
         action: "NO OPTION",
+        strength: "NONE",
         reason: option.reason,
         conditions: {
           ...base.conditions,
           confirmedDirection: direction
         }
       };
+
     }
 
     // ========================================================
@@ -1020,14 +1150,18 @@ async function analyseIndex(index, quotes) {
     // ========================================================
 
     const signal = {
+
       ...base,
 
       signal: direction,
-      action: direction === "BULLISH"
-        ? "OTM PE SELL"
-        : "OTM CE SELL",
+
+      action:
+        direction === "BULLISH"
+          ? "OTM PE SELL"
+          : "OTM CE SELL",
 
       strength: "VERY STRONG",
+
       reason: "ALL SIX CONDITIONS CONFIRMED",
 
       option,
@@ -1038,6 +1172,7 @@ async function analyseIndex(index, quotes) {
         ...base.conditions,
         confirmedDirection: direction
       }
+
     };
 
     const alertKey =
@@ -1048,6 +1183,7 @@ async function analyseIndex(index, quotes) {
     return signal;
 
   } catch (error) {
+
     console.error(
       `[ANALYSE ERROR] ${index.symbol}:`,
       error.message
@@ -1058,14 +1194,23 @@ async function analyseIndex(index, quotes) {
       signal: "ERROR",
       reason: error.message
     };
+
   }
+
 }
+
+
+// ============================================================
+// SMART TRADE INDIA PRO - PART 3B
+// FOUR INDEX LIVE SCAN + API ROUTES + SERVER START
+// ============================================================
 
 // ============================================================
 // RUN COMPLETE FOUR INDEX SCAN
 // ============================================================
 
 async function runScan(force = false) {
+
   if (
     !force &&
     scanCache &&
@@ -1093,22 +1238,22 @@ async function runScan(force = false) {
       throw new Error("No index futures found in master");
     }
 
-    // LIVE QUOTES FOR ALL FOUR INDEXES
-
+    // GET LIVE FUTURES QUOTES
     const quotes = await getLiveQuotes(indexFutures);
 
-    // ANALYSE ALL INDEXES
-
+    // ANALYSE ALL FOUR INDEXES
     const results = await Promise.all(
       indexFutures.map(index =>
         analyseIndex(index, quotes)
       )
     );
 
-    // Ensure missing indexes still appear on dashboard
-
+    // ENSURE ALL FOUR INDEX NAMES APPEAR
     const finalIndexes = INDEX_NAMES.map(name => {
-      const found = results.find(x => x.symbol === name);
+
+      const found = results.find(
+        item => item.symbol === name
+      );
 
       return found || {
         symbol: name,
@@ -1128,13 +1273,15 @@ async function runScan(force = false) {
     });
 
     const bullish = finalIndexes.filter(
-      x => x.signal === "BULLISH" &&
-        x.strength === "VERY STRONG"
+      item =>
+        item.signal === "BULLISH" &&
+        item.strength === "VERY STRONG"
     );
 
     const bearish = finalIndexes.filter(
-      x => x.signal === "BEARISH" &&
-        x.strength === "VERY STRONG"
+      item =>
+        item.signal === "BEARISH" &&
+        item.strength === "VERY STRONG"
     );
 
     const data = {
@@ -1142,21 +1289,20 @@ async function runScan(force = false) {
       version: CONFIG.VERSION,
 
       market: marketOpen() ? "OPEN" : "CLOSED",
-
       marketTime: istTime(),
-
       updatedAt: new Date().toISOString(),
 
       totalIndexes: 4,
 
       scanned: finalIndexes.filter(
-        x => x.signal !== "ERROR"
+        item => item.signal !== "ERROR"
       ).length,
 
       bullishCount: bullish.length,
       bearishCount: bearish.length,
 
-      veryStrongCount: bullish.length + bearish.length,
+      veryStrongCount:
+        bullish.length + bearish.length,
 
       bullish,
       bearish,
@@ -1169,7 +1315,8 @@ async function runScan(force = false) {
         volumeMultiplier: CONFIG.VOLUME_MULTIPLIER,
         mandatoryConditions: 6,
         bullishAction: "OTM PE SELL",
-        bearishAction: "OTM CE SELL"
+        bearishAction: "OTM CE SELL",
+        partialSignals: false
       }
     };
 
@@ -1189,6 +1336,7 @@ async function runScan(force = false) {
     return data;
 
   } catch (error) {
+
     console.error("[SCAN ERROR]", error.message);
 
     const errorData = {
@@ -1196,6 +1344,7 @@ async function runScan(force = false) {
       message: error.message,
       market: marketOpen() ? "OPEN" : "CLOSED",
       updatedAt: new Date().toISOString(),
+
       indexes: INDEX_NAMES.map(name => ({
         symbol: name,
         indexName: name,
@@ -1219,11 +1368,13 @@ async function runScan(force = false) {
   }
 }
 
+
 // ============================================================
-// HTTP JSON RESPONSE
+// JSON RESPONSE
 // ============================================================
 
 function sendJson(res, statusCode, data) {
+
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": "*",
@@ -1235,11 +1386,13 @@ function sendJson(res, statusCode, data) {
   res.end(JSON.stringify(data));
 }
 
+
 // ============================================================
 // HTTP SERVER
 // ============================================================
 
 const server = http.createServer(async (req, res) => {
+
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
@@ -1259,9 +1412,9 @@ const server = http.createServer(async (req, res) => {
 
   try {
 
-    // HEALTH
-
+    // HEALTH CHECK
     if (path === "/health" || path === "/api/health") {
+
       return sendJson(res, 200, {
         status: "OK",
         version: CONFIG.VERSION,
@@ -1275,24 +1428,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     // SERVER STATUS
-
     if (path === "/api/status") {
+
       return sendJson(res, 200, {
         status: "OK",
         lastScan,
         masterLoaded,
-        indexes: indexFutures.map(x => ({
-          symbol: x.symbol,
-          futuresSymbol: x.futuresSymbol,
-          expiry: x.expiry,
-          futuresKey: x.futuresKey
+        indexes: indexFutures.map(item => ({
+          symbol: item.symbol,
+          futuresSymbol: item.futuresSymbol,
+          expiry: item.expiry,
+          futuresKey: item.futuresKey
         }))
       });
     }
 
     // INDEX LIST
-
     if (path === "/api/indexes") {
+
       return sendJson(res, 200, {
         status: "SUCCESS",
         indexes: INDEX_NAMES,
@@ -1300,25 +1453,26 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // MAIN LIVE SCAN
-
+    // MAIN LIVE SCANNER
     if (
       path === "/api/scan" ||
       path === "/api/options/auto-scan"
     ) {
-      const force = url.searchParams.get("refresh") === "true";
+
+      const force =
+        url.searchParams.get("refresh") === "true";
 
       const data = await runScan(force);
 
       return sendJson(res, 200, data);
     }
 
-    // BULLISH PE SELL
-
+    // BULLISH = OTM PE SELL
     if (
       path === "/api/strong-buy" ||
       path === "/api/strong-bullish"
     ) {
+
       const data = await runScan();
 
       return sendJson(res, 200, {
@@ -1328,12 +1482,12 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // BEARISH CE SELL
-
+    // BEARISH = OTM CE SELL
     if (
       path === "/api/strong-sell" ||
       path === "/api/strong-bearish"
     ) {
+
       const data = await runScan();
 
       return sendJson(res, 200, {
@@ -1344,8 +1498,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     // RECENT ALERTS
-
     if (path === "/api/alerts") {
+
       const alerts = Array.from(
         alertHistory.values()
       ).sort((a, b) =>
@@ -1360,13 +1514,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // CONFIGURATION
-
     if (path === "/api/config") {
+
       return sendJson(res, 200, {
         status: "SUCCESS",
         version: CONFIG.VERSION,
         config: CONFIG,
         indexes: INDEX_NAMES,
+
         signalRules: {
           bullish: "ALL 6 CONDITIONS + OTM PE SELL",
           bearish: "ALL 6 CONDITIONS + OTM CE SELL",
@@ -1376,7 +1531,6 @@ const server = http.createServer(async (req, res) => {
     }
 
     // UNKNOWN ROUTE
-
     return sendJson(res, 404, {
       status: "ERROR",
       message: "API route not found",
@@ -1384,6 +1538,7 @@ const server = http.createServer(async (req, res) => {
     });
 
   } catch (error) {
+
     console.error("[SERVER ERROR]", error.message);
 
     return sendJson(res, 500, {
@@ -1393,11 +1548,13 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+
 // ============================================================
 // START SERVER
 // ============================================================
 
 server.listen(PORT, async () => {
+
   console.log("======================================");
   console.log("SMART TRADE INDIA PRO");
   console.log("VERSION:", CONFIG.VERSION);
@@ -1407,6 +1564,7 @@ server.listen(PORT, async () => {
   console.log("BULLISH: OTM PE SELL");
   console.log("BEARISH: OTM CE SELL");
   console.log("CONDITIONS: ALL SIX MANDATORY");
+  console.log("ALERTS ONLY - NO LIVE ORDER PLACEMENT");
   console.log("======================================");
 
   try {
@@ -1416,5 +1574,5 @@ server.listen(PORT, async () => {
     console.error("[MASTER ERROR]", error.message);
   }
 });
-
-  
+          
+      
