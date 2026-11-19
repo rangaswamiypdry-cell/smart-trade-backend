@@ -2,451 +2,526 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMART TRADE INDIA PRO</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMART MONEY PRO V5 Dashboard</title>
 
 <style>
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+:root {
+  color-scheme: dark;
+  --bg:#0b1020;
+  --panel:#121a2d;
+  --line:#25324b;
+  --text:#eef3ff;
+  --muted:#9aa9c2;
+  --green:#24d18a;
+  --red:#ff657a;
+  --yellow:#f5c451;
+  --blue:#71a7ff;
 }
-
-body {
-    background: #07111f;
-    color: #ffffff;
-    font-family: Arial, sans-serif;
-    padding: 12px;
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font:14px Arial,sans-serif;
 }
-
-.header {
-    background: #10243a;
-    padding: 18px;
-    border-radius: 12px;
-    text-align: center;
-    margin-bottom: 15px;
+header{
+  padding:20px 4%;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:12px;
 }
-
-.header h2 {
-    color: #00d9ff;
-    font-size: 21px;
+h1{font-size:20px;margin:0}
+h1 span{color:var(--blue)}
+.sub{color:var(--muted);font-size:12px}
+button{
+  background:#244a86;
+  color:white;
+  border:0;
+  border-radius:8px;
+  padding:11px 15px;
+  font-weight:bold;
+  cursor:pointer;
 }
-
-.header p {
-    color: #aabbd0;
-    margin-top: 7px;
-    font-size: 12px;
+button:disabled{opacity:.5}
+.secondary{background:#26334b}
+main{max-width:1400px;margin:auto;padding:20px 4%}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
 }
-
-.status {
-    background: #142b40;
-    padding: 12px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
+.card,.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:15px;
+  min-width:0;
 }
-
-.green {
-    color: #00e676;
+.label{color:var(--muted);font-size:12px}
+.metric{font-size:24px;font-weight:bold;margin-top:8px}
+.section{margin-top:18px}
+.section h2{font-size:16px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:750px}
+th,td{
+  padding:10px 8px;
+  text-align:left;
+  border-bottom:1px solid var(--line);
+  white-space:nowrap;
+  font-size:12px;
 }
-
-.red {
-    color: #ff5252;
+th{color:var(--muted)}
+.bull{color:var(--green);font-weight:bold}
+.bear{color:var(--red);font-weight:bold}
+.wait{color:var(--yellow);font-weight:bold}
+.news-item{
+  padding:9px 0;
+  border-bottom:1px solid var(--line);
 }
-
-.index-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 18px;
+.news-item a{color:#c8d9ff;text-decoration:none}
+.footer{
+  color:var(--muted);
+  font-size:11px;
+  text-align:center;
+  padding:24px;
 }
-
-.index-card {
-    background: #142b40;
-    border: 1px solid #24445f;
-    border-radius: 10px;
-    padding: 14px;
-}
-
-.index-card h3 {
-    color: #00d9ff;
-    font-size: 16px;
-    margin-bottom: 10px;
-}
-
-.price {
-    font-size: 19px;
-    font-weight: bold;
-}
-
-.signal {
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: bold;
-}
-
-.section {
-    background: #10243a;
-    padding: 14px;
-    border-radius: 10px;
-    margin-bottom: 15px;
-}
-
-.section h3 {
-    color: #00d9ff;
-    margin-bottom: 12px;
-    font-size: 17px;
-}
-
-button {
-    background: #007bff;
-    color: white;
-    border: none;
-    padding: 11px 16px;
-    border-radius: 7px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-input {
-    width: 100%;
-    padding: 11px;
-    border-radius: 7px;
-    border: 1px solid #34536d;
-    background: #07111f;
-    color: white;
-    margin: 8px 0;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    min-width: 500px;
-}
-
-th, td {
-    padding: 10px 7px;
-    border-bottom: 1px solid #29445c;
-    text-align: left;
-}
-
-th {
-    color: #00d9ff;
-}
-
-.table-wrap {
-    overflow-x: auto;
-}
-
-.buy {
-    color: #00e676;
-    font-weight: bold;
-}
-
-.sell {
-    color: #ff5252;
-    font-weight: bold;
-}
-
-.wait {
-    color: #ffc107;
-    font-weight: bold;
-}
-
-@media(max-width: 400px) {
-    .index-card {
-        padding: 10px;
-    }
-
-    .price {
-        font-size: 16px;
-    }
+@media(max-width:700px){
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">
-    <h2>SMART TRADE INDIA PRO</h2>
-    <p>LIVE NSE INDEX FUTURES & OPTIONS SELLING SCANNER</p>
-</div>
-<div class="status">
-    <div>SERVER: <span id="serverStatus" class="wait">CONNECTING</span></div>
-    <div>MARKET: <span id="marketStatus" class="wait">WAIT</span></div>
-</div>
-
-<div class="section">
-    <h3>⚙️ SERVER SETTINGS</h3>
-    <input
-        type="text"
-        id="apiUrl"
-        value="https://smart-trade-backend-ig6l.onrender.com"
-        placeholder="Backend URL"
-    >
-    <button onclick="refreshData()">REFRESH SCANNER</button>
-    <button onclick="toggleSound()" id="soundButton">SOUND: ON</button>
-    <p id="lastUpdate" style="margin-top:10px;color:#aabbd0;font-size:12px">
-        Last update: Waiting...
-    </p>
-</div>
-
-<div class="section">
-    <h3>📊 INDEX LIVE SCANNER</h3>
-    <div class="index-grid">
-        <div class="index-card">
-            <h3>NIFTY</h3>
-            <div class="price" id="NIFTYPrice">--</div>
-            <div class="signal" id="NIFTYSignal">WAIT</div>
-        </div>
-
-        <div class="index-card">
-            <h3>BANKNIFTY</h3>
-            <div class="price" id="BANKNIFTYPrice">--</div>
-            <div class="signal" id="BANKNIFTYSignal">WAIT</div>
-        </div>
-
-        <div class="index-card">
-            <h3>SENSEX</h3>
-            <div class="price" id="SENSEXPrice">--</div>
-            <div class="signal" id="SENSEXSignal">WAIT</div>
-        </div>
-
-        <div class="index-card">
-            <h3>FINNIFTY</h3>
-            <div class="price" id="FINNIFTYPrice">--</div>
-            <div class="signal" id="FINNIFTYSignal">WAIT</div>
-        </div>
+<header>
+  <div>
+    <h1>SMART MONEY PRO <span>V5</span></h1>
+    <div class="sub">
+      FOUR INDEX · 5-MIN CLOSED CANDLE · CE / PE SELL ALERTS
     </div>
+  </div>
+
+  <div>
+    <button id="scanBtn" onclick="runScan()">SCAN NOW</button>
+    <button class="secondary" onclick="refreshAll()">REFRESH</button>
+  </div>
+</header>
+
+<main>
+
+<div class="grid">
+
+  <div class="card">
+    <div class="label">SERVER STATUS</div>
+    <div class="metric" id="serverStatus">CHECKING</div>
+  </div>
+
+  <div class="card">
+    <div class="label">MAPPED INDEXES</div>
+    <div class="metric" id="mapped">— / 4</div>
+  </div>
+
+  <div class="card">
+    <div class="label">ACTIVE SIGNALS</div>
+    <div class="metric" id="activeCount">—</div>
+  </div>
+
+  <div class="card">
+    <div class="label">SIGNAL HISTORY</div>
+    <div class="metric" id="historyCount">—</div>
+  </div>
+
 </div>
 
-<div class="section">
-    <h3>🟢 VERY STRONG BULLISH – OTM PE SELL</h3>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>INDEX</th>
-                    <th>STRIKE</th>
-                    <th>OPTION</th>
-                    <th>SELL PRICE</th>
-                    <th>SIGNAL</th>
-                </tr>
-            </thead>
-            <tbody id="bullishTable">
-                <tr><td colspan="5">Waiting for live data...</td></tr>
-            </tbody>
-        </table>
-    </div>
+<section class="section panel">
+  <h2>FOUR INDEX LIVE SCANNER</h2>
+  <div class="sub" id="scanInfo">Waiting for scanner data...</div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>INDEX</th>
+          <th>DIRECTION</th>
+          <th>SELL SIDE</th>
+          <th>STRENGTH</th>
+          <th>MATCH</th>
+          <th>PRICE</th>
+          <th>RSI</th>
+          <th>VOLUME</th>
+          <th>VWAP</th>
+          <th>FUTURES OI %</th>
+          <th>OPTION</th>
+        </tr>
+      </thead>
+
+      <tbody id="indexRows">
+        <tr>
+          <td colspan="11">No scan data yet</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section panel">
+  <h2>ACTIVE OPTION SELL SIGNALS</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>INDEX</th>
+          <th>SIGNAL</th>
+          <th>STRIKE</th>
+          <th>EXPIRY</th>
+          <th>ENTRY</th>
+          <th>CURRENT PREMIUM</th>
+          <th>STOP LOSS</th>
+          <th>TARGET 1</th>
+          <th>TARGET 2</th>
+          <th>STATUS</th>
+        </tr>
+      </thead>
+
+      <tbody id="activeRows">
+        <tr><td colspan="10">No active signals</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+
+  <div class="panel">
+    <h2>MARKET NEWS</h2>
+    <div class="metric" id="newsSentiment">—</div>
+    <div class="sub" id="newsMeta">Not loaded</div>
+    <div id="newsList"></div>
+  </div>
+
+  <div class="panel">
+    <h2>RECENT SIGNAL HISTORY</h2>
+    <div id="historyList">No history loaded</div>
+  </div>
+
+</section>
+
+<div class="footer">
+  Upstox Live Data · Alerts Only · No Automatic Orders
+  <br>
+  <span id="updatedAt">Last update: —</span>
+  · Auto refresh every 15 seconds
 </div>
 
-<div class="section">
-    <h3>🔴 VERY STRONG BEARISH – OTM CE SELL</h3>
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>INDEX</th>
-                    <th>STRIKE</th>
-                    <th>OPTION</th>
-                    <th>SELL PRICE</th>
-                    <th>SIGNAL</th>
-                </tr>
-            </thead>
-            <tbody id="bearishTable">
-                <tr><td colspan="5">Waiting for live data...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+</main><script>
+const API = window.location.origin;
 
-<div class="section">
-    <h3>🔔 RECENT ALERTS</h3>
-    <div id="alerts">
-        No alerts yet.
-    </div>
-</div><script>
-"use strict";
-
-let soundEnabled = true;
-let previousAlerts = new Set();
-
-function getBaseUrl() {
-    return document.getElementById("apiUrl").value.trim().replace(/\/+$/, "");
-}
+const $ = id => document.getElementById(id);
 
 function safe(value) {
-    return String(value ?? "").replace(/[&<>"']/g, c => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-    })[c]);
+  return String(value ?? "—").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[ch]));
 }
 
-async function getAPI(path) {
-    const response = await fetch(getBaseUrl() + path);
-    if (!response.ok) throw new Error("API error " + response.status);
-    return await response.json();
+function number(value, digits = 2) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(digits) : "—";
 }
 
-function playSound() {
-    if (!soundEnabled) return;
+async function api(path) {
+  const response = await fetch(API + path, {
+    cache: "no-store"
+  });
 
-    try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AudioContext();
-        const oscillator = ctx.createOscillator();
-        const gain = ctx.createGain();
+  const data = await response.json();
 
-        oscillator.connect(gain);
-        gain.connect(ctx.destination);
-        oscillator.frequency.value = 900;
-        gain.gain.value = 0.15;
+  if (!response.ok) {
+    throw new Error(data.error || "API request failed");
+  }
 
-        oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.25);
-        oscillator.onended = () => ctx.close();
-    } catch (e) {
-        console.log("Sound unavailable", e);
+  return data;
+}
+
+// ======================================
+// SERVER STATUS
+// ======================================
+
+async function loadStatus() {
+  try {
+    const data = await api("/api/status");
+
+    $("serverStatus").textContent = "ONLINE";
+    $("serverStatus").className = "metric bull";
+
+    const mapped = data.mappedIndexes || [];
+    $("mapped").textContent = mapped.length + " / 4";
+
+    $("activeCount").textContent =
+      data.activeSignals ?? "—";
+
+    $("historyCount").textContent =
+      data.historyCount ?? "—";
+
+  } catch (error) {
+    $("serverStatus").textContent = "OFFLINE";
+    $("serverStatus").className = "metric bear";
+  }
+}
+
+// ======================================
+// INDEX SCANNER TABLE
+// ======================================
+
+function renderIndexes(data) {
+  const results = data.results || [];
+
+  if (!results.length) {
+    $("indexRows").innerHTML =
+      '<tr><td colspan="11">No scanner data available</td></tr>';
+    return;
+  }
+
+  $("indexRows").innerHTML = results.map(item => {
+    const direction = item.direction || "WAIT";
+
+    const directionClass =
+      direction === "BULLISH" ? "bull" :
+      direction === "BEARISH" ? "bear" : "wait";
+
+    const option = item.option || {};
+
+    const optionText = option.success
+      ? `${safe(option.strikePrice)} ${safe(option.optionType)}`
+      : "WAIT";
+
+    return `
+      <tr>
+        <td><b>${safe(item.symbol)}</b></td>
+        <td class="${directionClass}">
+          ${safe(direction)}
+        </td>
+        <td>${safe(item.optionSide || "—")} SELL</td>
+        <td>${safe(item.strength || "WAIT")}</td>
+        <td>${safe(item.matched ?? 0)}/6</td>
+        <td>${number(item.price)}</td>
+        <td>${number(item.rsi)}</td>
+        <td>${number(item.volumeRatio)}x</td>
+        <td>${number(item.vwap)}</td>
+        <td>${number(item.futuresOIChangePercent)}%</td>
+        <td>${optionText}</td>
+      </tr>
+    `;
+  }).join("");
+
+  $("scanInfo").textContent =
+    "Last scan: " +
+    (data.scanTimeIST || data.scanTime || "Available");
+}
+
+// ======================================
+// ACTIVE SIGNALS
+// ======================================
+
+async function loadActiveSignals() {
+  try {
+    const data = await api("/api/signals/active");
+    const signals = data.data || [];
+
+    $("activeCount").textContent = signals.length;
+
+    if (!signals.length) {
+      $("activeRows").innerHTML =
+        '<tr><td colspan="10">No active signals</td></tr>';
+      return;
     }
-}
 
-function toggleSound() {
-    soundEnabled = !soundEnabled;
-    document.getElementById("soundButton").innerText =
-        "SOUND: " + (soundEnabled ? "ON" : "OFF");
-}
+    $("activeRows").innerHTML = signals.map(signal => {
+      const option = signal.option || {};
 
-function setText(id, value) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value ?? "--";
-}
+      const statusClass =
+        signal.status === "ACTIVE" ? "bull" : "wait";
 
-function renderIndexes(indices) {
-    if (!Array.isArray(indices)) return;
-
-    indices.forEach(item => {
-        const name = String(item.index || item.name || "").toUpperCase()
-            .replace(/[^A-Z]/g, "");
-
-        const price = item.price ?? item.ltp ?? item.lastPrice;
-        const signal = item.signal || item.direction || "WAIT";
-
-        if (["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY"].includes(name)) {
-            setText(name + "Price",
-                price == null ? "--" : Number(price).toFixed(2));
-
-            const signalEl = document.getElementById(name + "Signal");
-            signalEl.textContent = signal;
-            signalEl.className = "signal " +
-                (/BULLISH|BUY|UP/i.test(signal) ? "buy" :
-                 /BEARISH|SELL|DOWN/i.test(signal) ? "sell" : "wait");
-        }
-    });
-}
-
-function renderOptionRows(id, rows, expectedSide) {
-    const tbody = document.getElementById(id);
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-        tbody.innerHTML =
-            '<tr><td colspan="5">No confirmed signal</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = rows.map(item => {
-        const index = item.index || item.name || "--";
-        const strike = item.strike ?? item.strikePrice ?? "--";
-        const option = item.optionType || item.tradingSymbol ||
-            (expectedSide === "PE" ? "PE" : "CE");
-        const price = item.bidPrice ?? item.sellPrice ?? item.ltp ?? "--";
-
-        return `
-            <tr>
-                <td>${safe(index)}</td>
-                <td>${safe(strike)}</td>
-                <td>${safe(option)}</td>
-                <td>${safe(price)}</td>
-                <td class="buy">VERY STRONG</td>
-            </tr>
-        `;
+      return `
+        <tr>
+          <td>${safe(signal.symbol)}</td>
+          <td class="bear">${safe(signal.signal)}</td>
+          <td>${safe(option.strikePrice)}</td>
+          <td>${safe(option.expiry)}</td>
+          <td>${number(option.entry)}</td>
+          <td>${number(signal.currentPremium)}</td>
+          <td>${number(option.stopLoss)}</td>
+          <td>${number(option.target1)}</td>
+          <td>${number(option.target2)}</td>
+          <td class="${statusClass}">
+            ${safe(signal.status)}
+          </td>
+        </tr>
+      `;
     }).join("");
+
+  } catch (error) {
+    $("activeRows").innerHTML =
+      `<tr><td colspan="10">${safe(error.message)}</td></tr>`;
+  }
 }
 
-function renderAlerts(alerts) {
-    const box = document.getElementById("alerts");
+// ======================================
+// LATEST SCAN
+// ======================================
 
-    if (!Array.isArray(alerts) || alerts.length === 0) {
-        box.textContent = "No alerts yet.";
-        return;
+async function loadLatestScan() {
+  try {
+    const data = await api("/api/scan/latest");
+
+    if (data.success && data.results) {
+      renderIndexes(data);
+    }
+  } catch (error) {
+    console.error("Latest scan:", error.message);
+  }
+}
+
+// ======================================
+// NEWS
+// ======================================
+
+async function loadNews() {
+  try {
+    const data = await api("/api/news");
+
+    const sentiment = data.sentiment || "NEUTRAL";
+
+    $("newsSentiment").textContent = sentiment;
+
+    $("newsSentiment").className =
+      "metric " +
+      (sentiment === "GOOD" ? "bull" :
+       sentiment === "BAD" ? "bear" : "wait");
+
+    $("newsMeta").textContent =
+      "Status: " + (data.status || "UNKNOWN") +
+      " | Score: " + (data.score ?? 0);
+
+    const headlines = data.headlines || [];
+
+    $("newsList").innerHTML = headlines.length
+      ? headlines.map(item => `
+          <div class="news-item">
+            <a href="${safe(item.link)}"
+               target="_blank"
+               rel="noopener noreferrer">
+              ${safe(item.title)}
+            </a>
+          </div>
+        `).join("")
+      : '<div class="sub">No fresh headlines available</div>';
+
+  } catch (error) {
+    $("newsMeta").textContent = error.message;
+  }
+}
+
+// ======================================
+// SIGNAL HISTORY
+// ======================================
+
+async function loadHistory() {
+  try {
+    const data = await api("/api/signals/history");
+    const signals = data.data || [];
+
+    $("historyCount").textContent = data.count ?? signals.length;
+
+    $("historyList") = $("historyList");
+
+    $("historyList").innerHTML = signals.length
+      ? signals.slice(0, 10).map(signal => `
+          <div class="news-item">
+            <b>${safe(signal.symbol)}</b>
+            <span class="bear">${safe(signal.signal)}</span>
+            <br>
+            <span class="sub">
+              ${safe(signal.strength)}
+              · ${safe(signal.matchedConditions)}/6
+              · ${safe(signal.option?.strikePrice)}
+            </span>
+          </div>
+        `).join("")
+      : "No signal history";
+
+  } catch (error) {
+    $("historyList").textContent = error.message;
+  }
+}
+
+// ======================================
+// MANUAL SCAN BUTTON
+// ======================================
+
+async function runScan() {
+  const button = $("scanBtn");
+
+  button.disabled = true;
+  button.textContent = "SCANNING...";
+
+  try {
+    const data = await api("/api/scan");
+
+    if (data.success) {
+      renderIndexes(data);
+      await refreshAll();
+      button.textContent = "SCAN COMPLETE";
+    } else {
+      button.textContent = "SCAN FAILED";
     }
 
-    alerts.forEach(alert => {
-        const id = String(alert.id || alert.timestamp ||
-            alert.candleTime || JSON.stringify(alert));
+  } catch (error) {
+    button.textContent = "ERROR";
+    alert("Scanner error: " + error.message);
 
-        if (!previousAlerts.has(id)) {
-            if (previousAlerts.size > 0) playSound();
-            previousAlerts.add(id);
-        }
-    });
+  } finally {
+    button.disabled = false;
 
-    box.innerHTML = alerts.slice(0, 10).map(alert => `
-        <div style="padding:10px;border-bottom:1px solid #29445c">
-            <b>${safe(alert.index || alert.name || "INDEX")}</b>
-            <span class="buy">${safe(alert.signal || alert.action || "")}</span>
-            <div style="color:#aabbd0;font-size:12px;margin-top:5px">
-                ${safe(alert.optionSymbol || alert.tradingSymbol || "")}
-                ${safe(alert.time || alert.timestamp || "")}
-            </div>
-        </div>
-    `).join("");
+    setTimeout(() => {
+      button.textContent = "SCAN NOW";
+    }, 2500);
+  }
 }
 
-async function refreshData() {
-    setText("serverStatus", "CONNECTING");
+// ======================================
+// REFRESH ALL DATA
+// ======================================
 
-    try {
-        const data = await getAPI("/api/scan?force=true");
+async function refreshAll() {
+  await Promise.allSettled([
+    loadStatus(),
+    loadLatestScan(),
+    loadActiveSignals(),
+    loadNews(),
+    loadHistory()
+  ]);
 
-        setText("serverStatus", "CONNECTED");
-        document.getElementById("serverStatus").className = "green";
-
-        renderIndexes(data.indices || data.data?.indices || []);
-
-        renderOptionRows(
-            "bullishTable",
-            data.bullishPeSell || data.bullish || [],
-            "PE"
-        );
-
-        renderOptionRows(
-            "bearishTable",
-            data.bearishCeSell || data.bearish || [],
-            "CE"
-        );
-
-        renderAlerts(data.alerts || []);
-
-        setText("marketStatus", data.marketStatus || data.status || "LIVE");
-        setText("lastUpdate", "Last update: " + new Date().toLocaleTimeString());
-
-    } catch (error) {
-        setText("serverStatus", "ERROR");
-        document.getElementById("serverStatus").className = "red";
-        setText("lastUpdate", "Error: " + error.message);
-        console.error(error);
-    }
+  $("updatedAt").textContent =
+    "Last update: " + new Date().toLocaleTimeString("en-IN");
 }
 
-refreshData();
-setInterval(refreshData, 15000);
+// ======================================
+// AUTO REFRESH
+// ======================================
+
+refreshAll();
+
+setInterval(refreshAll, 15000);
 
 </script>
 
