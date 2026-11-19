@@ -4,358 +4,588 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>SMART TRADE INDIA V12 PRO</title>
 
 <style>
-*{box-sizing:border-box}
-body{
-  margin:0;
-  background:#0b1020;
-  color:#fff;
-  font-family:Arial,sans-serif;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
-header{
-  background:#151e32;
-  padding:18px 14px;
-  border-bottom:2px solid #263957;
+
+body {
+  background: #080f1e;
+  color: #e8f0ff;
+  font-family: Arial, sans-serif;
+  padding: 15px;
 }
-h2{margin:0;color:#42e8b5}
-.sub{color:#aab8ce;font-size:12px;margin-top:7px}
-.container{padding:12px;max-width:1100px;margin:auto}
-.toolbar{
- display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;
+
+.header {
+  background: #172238;
+  padding: 22px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+  border-bottom: 3px solid #36dcb0;
 }
-button{
- border:0;padding:11px 15px;border-radius:8px;
- background:#2378e8;color:white;font-weight:bold;
+
+.header h1 {
+  color: #36dcb0;
+  font-size: 25px;
+  margin-bottom: 12px;
 }
-button.off{background:#536174}
-.status{
- padding:12px;background:#17243b;border-radius:9px;
- margin:10px 0;font-size:13px;
+
+.header p {
+  color: #aab8cc;
+  line-height: 1.8;
 }
-.grid{
- display:grid;
- grid-template-columns:repeat(2,minmax(0,1fr));
- gap:10px;
+
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
 }
-.card{
- background:#17243b;
- border:1px solid #304361;
- border-radius:12px;
- padding:13px;
- min-width:0;
+
+button {
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  background: #247be9;
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
 }
-.card h3{margin:0 0 10px;color:#42e8b5}
-.signal{
- padding:9px;border-radius:7px;
- background:#293750;margin:9px 0;
- font-weight:bold;
+
+#soundBtn {
+  background: #526176;
 }
-.strong{background:#075e42;color:#fff}
-.wait{background:#604b1b;color:#ffe49a}
-.error{background:#722c38;color:#fff}
-.metrics{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:9px;
+
+.status, .info {
+  background: #19263d;
+  padding: 17px;
+  border-radius: 13px;
+  margin-bottom: 14px;
+  line-height: 1.7;
 }
-.metric{
- background:#101a2d;
- padding:9px;border-radius:7px;
+
+.connected {
+  color: #36dcb0;
+  font-weight: bold;
 }
-.metric small{color:#9caec6;display:block;font-size:11px}
-.metric b{display:block;margin-top:5px;font-size:15px;overflow-wrap:anywhere}
-.checks{font-size:12px;line-height:2;color:#c4d3e9}
-.good{color:#42e8b5}
-.bad{color:#ff7777}
-.footer{
- text-align:center;color:#8293ae;
- font-size:11px;padding:20px;
+
+.disconnected {
+  color: #ff6478;
+  font-weight: bold;
 }
-@media(max-width:500px){
- .grid{grid-template-columns:1fr}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card {
+  background: #142137;
+  border: 1px solid #304361;
+  border-radius: 17px;
+  padding: 15px;
+  min-width: 0;
+}
+
+.card h2 {
+  color: #36dcb0;
+  font-size: 21px;
+  margin-bottom: 12px;
+}
+
+.price {
+  font-size: 27px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.signal {
+  display: inline-block;
+  padding: 7px 13px;
+  border-radius: 20px;
+  background: #57451d;
+  color: #ffdc7b;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.bull {
+  background: #075e48;
+  color: #5affc6;
+}
+
+.bear {
+  background: #742e3b;
+  color: #ffb1bd;
+}
+
+.wait {
+  background: #57451d;
+  color: #ffdc7b;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.metric {
+  background: #1c2a40;
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.metric small {
+  color: #9cacc2;
+  font-size: 13px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 17px;
+}
+
+.strength {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.strength div {
+  background: #202e44;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.check {
+  padding: 10px;
+  border-radius: 9px;
+  background: #202e44;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.pass {
+  color: #43e8ac;
+}
+
+.fail {
+  color: #ff8298;
+}
+
+.section {
+  margin: 24px 0 14px;
+  font-size: 21px;
+  color: #36dcb0;
+}
+
+.sellCard {
+  background: #19263d;
+  padding: 16px;
+  border-radius: 13px;
+  margin-bottom: 12px;
+  border: 1px solid #304361;
+}
+
+.noData {
+  background: #702e3a;
+  padding: 17px;
+  border-radius: 10px;
+  font-weight: bold;
+}
+
+@media(max-width: 380px) {
+  body { padding: 9px; }
+  .grid { gap: 8px; }
+  .card { padding: 10px; }
+  .price { font-size: 22px; }
 }
 </style>
 </head>
 
 <body>
 
-<header>
-<h2>SMART TRADE INDIA V12 PRO</h2>
-<div class="sub">LIVE NSE INDEX OPTIONS SCANNER</div>
-<div class="sub">NIFTY | BANKNIFTY | FINNIFTY | SENSEX</div>
-</header>
-
-<div class="container">
-
-<div class="toolbar">
-<button onclick="loadData()">REFRESH NOW</button>
-<button id="soundBtn" class="off" onclick="toggleSound()">SOUND OFF</button>
+<div class="header">
+  <h1>SMART TRADE INDIA V12 PRO</h1>
+  <p>LIVE NSE INDEX OPTIONS SCANNER</p>
+  <p>NIFTY | BANKNIFTY | FINNIFTY | SENSEX</p>
 </div>
 
-<div class="status" id="connection">
-Connecting to server...
+<div class="controls">
+  <button onclick="loadData()">REFRESH NOW</button>
+  <button id="soundBtn" onclick="toggleSound()">
+    SOUND OFF
+  </button>
 </div>
 
 <div class="status">
-Last Scan: <b id="lastScan">Waiting...</b><br>
-Next refresh: <b id="countdown">60</b> seconds
+  <span id="connection" class="disconnected">
+    ● CONNECTING SERVER...
+  </span>
+  <div id="version">WAITING...</div>
 </div>
 
-<div class="grid" id="dashboard">
-<div class="card">Loading market data...</div>
+<div class="info">
+  Last Scan: <strong id="lastScan">--</strong>
+  <br>
+  Next refresh: <strong id="countdown">30</strong> seconds
 </div>
 
-<div class="footer">
-SMART TRADE INDIA V12 PRO<br>
-Upstox API | Completed 5 Minute Candle Scanner
-</div>
+<div class="grid" id="indexGrid">
+
+  <div class="card">
+    <h2>NIFTY</h2>
+    <div class="noData">WAITING FOR DATA</div>
+  </div>
+
+  <div class="card">
+    <h2>BANKNIFTY</h2>
+    <div class="noData">WAITING FOR DATA</div>
+  </div>
+
+  <div class="card">
+    <h2>FINNIFTY</h2>
+    <div class="noData">WAITING FOR DATA</div>
+  </div>
+
+  <div class="card">
+    <h2>SENSEX</h2>
+    <div class="noData">WAITING FOR DATA</div>
+  </div>
 
 </div>
+
+<h2 class="section">STRONG OPTION SELL SIGNALS</h2>
+
+<div id="sellSignals">
+  <div class="noData">WAITING FOR SIGNALS</div>
+</div>
+
+<h2 class="section">SERVER INFORMATION</h2>
+
+<div class="info" id="serverInfo">
+  Server data loading...
+</div>
+
 
 <script>
 "use strict";
 
-// YOUR RENDER SERVER
+// ======================================
+// SMART TRADE INDIA V12 PRO
+// API CONFIGURATION
+// ======================================
+
 const API = "https://smart-trade-backend-ig6l.onrender.com";
 
 const INDEXES = [
- "NIFTY",
- "BANKNIFTY",
- "FINNIFTY",
- "SENSEX"
+  "NIFTY",
+  "BANKNIFTY",
+  "FINNIFTY",
+  "SENSEX"
 ];
 
 let soundEnabled = false;
-let previousSignals = new Set();
-let countdown = 60;
+let refreshCount = 30;
+let lastSignals = new Set();
+let audioContext = null;
 
-function number(v){
- if(v===null || v===undefined || !Number.isFinite(Number(v)))
- return "--";
- return Number(v).toLocaleString("en-IN",{
- maximumFractionDigits:2
- });
+function formatNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-IN", {
+        maximumFractionDigits: 2
+      })
+    : "--";
 }
 
-function checkSignal(checks){
- if(!checks) return {count:0,total:6,ready:false};
-
- const keys=[
-  "trend","vwap","rsi","macd","volume","oiPrice"
- ];
-
- const count=keys.filter(k=>checks[k]===true).length;
-
- return {
-  count,
-  total:6,
-  ready:count===6
- };
+function safe(value) {
+  return String(value ?? "--").replace(
+    /[&<>"']/g,
+    c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[c])
+  );
 }
 
-function makeSignal(name,side,checks){
- const result=checkSignal(checks);
+function showConnection(ok, message) {
+  const el = document.getElementById("connection");
+  el.className = ok ? "connected" : "disconnected";
+  el.textContent = (ok ? "● " : "● ") + message;
+}
 
- if(!result.ready){
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+
+  document.getElementById("soundBtn").textContent =
+    soundEnabled ? "SOUND ON" : "SOUND OFF";
+
+  if (soundEnabled) {
+    try {
+      audioContext = new (
+        window.AudioContext ||
+        window.webkitAudioContext
+      )();
+
+      audioContext.resume();
+    } catch (e) {
+      soundEnabled = false;
+      alert("Sound not supported");
+    }
+  }
+}
+
+function playAlert() {
+  if (!soundEnabled || !audioContext) return;
+
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+
+  oscillator.frequency.value = 880;
+  gain.gain.value = 0.15;
+
+  oscillator.start();
+
+  oscillator.stop(audioContext.currentTime + 0.35);
+}
+
+function renderChecks(checks, type) {
+  if (!checks || typeof checks !== "object") {
+    return "";
+  }
+
+  return Object.entries(checks).map(([key, value]) => {
+    const passed = value === true;
+
+    return `
+      <div class="check ${passed ? "pass" : "fail"}">
+        ${passed ? "✓" : "✕"}
+        ${safe(type)}
+        ${safe(key)}
+      </div>
+    `;
+  }).join("");
+}
+
+function renderIndex(name, data) {
+  if (!data || typeof data !== "object") {
+    return `
+      <div class="card">
+        <h2>${safe(name)}</h2>
+        <div class="noData">NO DATA</div>
+      </div>
+    `;
+  }
+
+  const direction = data.direction;
+  const status = data.status || "WAIT";
+  const statusClass =
+    direction === "PE" ? "bear" :
+    direction === "CE" ? "bull" : "wait";
+
+  const bearCount = Number(data.peScore || 0);
+  const bullCount = Number(data.ceScore || 0);
+
   return `
-  <div class="signal wait">
-   ${side} SELL : WAIT (${result.count}/6)
-  </div>`;
- }
+    <div class="card">
+      <h2>${safe(name)}</h2>
 
- const key=name+"_"+side;
+      <div class="price">
+        ${formatNumber(data.underlyingPrice)}
+      </div>
 
- if(!previousSignals.has(key)){
-  playAlert();
-  previousSignals.add(key);
- }
+      <div class="signal ${statusClass}">
+        ${safe(status)}
+      </div>
 
- return `
- <div class="signal strong">
-  VERY STRONG ${side} SELL<br>
-  ALL 6/6 CONDITIONS TRUE
- </div>`;
+      <div class="metrics">
+        <div class="metric">
+          <small>RSI</small>
+          <strong>${formatNumber(data.rsi)}</strong>
+        </div>
+
+        <div class="metric">
+          <small>VWAP</small>
+          <strong>${formatNumber(data.vwap)}</strong>
+        </div>
+
+        <div class="metric">
+          <small>Volume Ratio</small>
+          <strong>${formatNumber(data.volumeMultiplier)}x</strong>
+        </div>
+
+        <div class="metric">
+          <small>Futures OI Change</small>
+          <strong>${formatNumber(data.oiChangePercent)}%</strong>
+        </div>
+      </div>
+
+      <div class="strength">
+        <div>
+          Bear Strength
+          <strong>${bearCount}/6</strong>
+        </div>
+
+        <div>
+          Bull Strength
+          <strong>${bullCount}/6</strong>
+        </div>
+      </div>
+
+      <div class="checks">
+        ${renderChecks(data.peChecks, "bearish")}
+        ${renderChecks(data.ceChecks, "bullish")}
+      </div>
+    </div>
+  `;
 }
 
-function metric(label,value){
- return `
- <div class="metric">
-  <small>${label}</small>
-  <b>${number(value)}</b>
- </div>`;
-}
+function renderSignals(results) {
+  const container = document.getElementById("sellSignals");
 
-function renderIndex(name,d){
- if(!d){
-  return `<div class="card">
-   <h3>${name}</h3>
-   <div class="signal error">NO DATA</div>
-  </div>`;
- }
+  const signals = Object.entries(results || {}).filter(
+    ([name, data]) =>
+      INDEXES.includes(name) &&
+      data &&
+      data.direction === "PE" &&
+      Number(data.peScore) === 6 &&
+      data.peChecks &&
+      Object.keys(data.peChecks).length === 6 &&
+      Object.values(data.peChecks).every(v => v === true)
+  );
 
- if(d.status==="ERROR"){
-  return `<div class="card">
-   <h3>${name}</h3>
-   <div class="signal error">ERROR</div>
-   ${d.error || "Market data unavailable"}
-  </div>`;
- }
-
- const pe=makeSignal(name,"PE",d.peChecks);
- const ce=makeSignal(name,"CE",d.ceChecks);
-
- return `
- <div class="card">
-  <h3>${name}</h3>
-
-  <div class="signal">
-   STATUS: ${d.status || "WAIT"}
-  </div>
-
-  ${pe}
-  ${ce}
-
-  <div class="metrics">
-   ${metric("Spot Price",d.underlyingPrice)}
-   ${metric("Futures Price",d.futuresPrice)}
-   ${metric("Candle Close",d.candleClose)}
-   ${metric("RSI",d.rsi)}
-   ${metric("VWAP",d.vwap)}
-   ${metric("EMA 9",d.ema9)}
-   ${metric("EMA 21",d.ema21)}
-   ${metric("EMA 50",d.ema50)}
-   ${metric("ADX",d.adx)}
-   ${metric("ADR",d.adr)}
-   ${metric("Volume",d.volume)}
-   ${metric("Average Volume",d.averageVolume)}
-   ${metric("Volume Multiplier",d.volumeMultiplier)}
-   ${metric("Open Interest",d.oi)}
-   ${metric("OI Change",d.oiChange)}
-   ${metric("OI Change %",d.oiChangePercent)}
-  </div>
-
-  <div class="status">
-   OI READY:
-   <b class="${d.oiReady?'good':'bad'}">
-   ${d.oiReady===true?"YES":"NO"}
-   </b>
-  </div>
-
-  <div class="checks">
-   <b>PE SELL CONDITIONS</b><br>
-   ${showChecks(d.peChecks)}
-   <br>
-   <b>CE SELL CONDITIONS</b><br>
-   ${showChecks(d.ceChecks)}
-  </div>
-
-  <div class="sub">
-   Candle: ${d.candleTime || "--"}<br>
-   Updated: ${d.timestamp || "--"}<br>
-   Futures: ${d.futuresSymbol || "--"}<br>
-   Strike: ${d.selectedStrike?.strikePrice || "--"}
-  </div>
- </div>`;
-}
-
-function showChecks(checks){
- if(!checks) return "Checks unavailable";
-
- const keys=["trend","vwap","rsi","macd","volume","oiPrice"];
-
- return keys.map(k=>{
-  const ok=checks[k]===true;
-  return `<span class="${ok?'good':'bad'}">
-   ${ok?'✓':'✗'} ${k}
-  </span>`;
- }).join("<br>");
-}
-
-async function loadData(){
- const connection=document.getElementById("connection");
-
- connection.textContent="Connecting to V12 PRO server...";
-
- try{
-  const response=await fetch(API+"/api/market",{
-   cache:"no-store"
-  });
-
-  if(!response.ok){
-   throw new Error("HTTP "+response.status);
+  if (!signals.length) {
+    container.innerHTML =
+      '<div class="noData">NO VERY STRONG SELL SIGNAL — WAIT</div>';
+    return;
   }
 
-  const data=await response.json();
+  container.innerHTML = signals.map(([name, data]) => `
+    <div class="sellCard">
+      <h2>${safe(name)} — VERY STRONG SELL</h2>
 
-  if(data.status==="ERROR"){
-   throw new Error(data.error || "Scanner error");
+      <div class="signal bear">PE SELL 6/6</div>
+
+      <p>Index Price: ${formatNumber(data.underlyingPrice)}</p>
+      <p>RSI: ${formatNumber(data.rsi)}</p>
+      <p>VWAP: ${formatNumber(data.vwap)}</p>
+      <p>Volume Ratio: ${formatNumber(data.volumeMultiplier)}x</p>
+      <p>OI Change: ${formatNumber(data.oiChangePercent)}%</p>
+    </div>
+  `).join("");
+
+  const key = signals.map(([name]) => name).join(",");
+
+  if (!lastSignals.has(key)) {
+    playAlert();
   }
 
-  const results=data.results || {};
-
-  document.getElementById("dashboard").innerHTML=
-   INDEXES.map(name=>
-    renderIndex(name,results[name])
-   ).join("");
-
-  document.getElementById("lastScan").textContent=
-   data.lastScanTime || new Date().toLocaleTimeString();
-
-  connection.innerHTML=
-   '<span class="good">● SERVER CONNECTED</span> | '+
-   (data.version || "V12 PRO");
-
- }catch(error){
-  connection.innerHTML=
-   '<span class="bad">● CONNECTION ERROR</span><br>'+
-   error.message;
- }
+  lastSignals = new Set([key]);
 }
 
-function toggleSound(){
- soundEnabled=!soundEnabled;
+// ======================================
+// LOAD SERVER DATA
+// ======================================
 
- const btn=document.getElementById("soundBtn");
+async function loadData() {
+  try {
+    showConnection(false, "CONNECTING...");
 
- btn.textContent=soundEnabled?"SOUND ON":"SOUND OFF";
- btn.className=soundEnabled?"":"off";
+    const response = await fetch(
+      API + "/api/options/auto-scan",
+      { cache: "no-store" }
+    );
 
- if(soundEnabled) playAlert();
+    if (!response.ok) {
+      throw new Error("HTTP " + response.status);
+    }
+
+    const json = await response.json();
+
+    if (json.status !== "SUCCESS") {
+      throw new Error(
+        json.message || "Invalid scanner response"
+      );
+    }
+
+    const results = json.results || {};
+
+    showConnection(true, "SERVER CONNECTED");
+
+    document.getElementById("version").textContent =
+      json.version || "SMART TRADE INDIA V12 PRO";
+
+    document.getElementById("lastScan").textContent =
+      new Date().toLocaleTimeString("en-IN");
+
+    document.getElementById("serverInfo").innerHTML = `
+      Server Status: <strong>CONNECTED</strong><br>
+      Scanner: ${safe(json.version)}<br>
+      Indexes: ${INDEXES.join(" | ")}
+    `;
+
+    document.getElementById("indexGrid").innerHTML =
+      INDEXES.map(name =>
+        renderIndex(name, results[name])
+      ).join("");
+
+    renderSignals(results);
+
+  } catch (error) {
+    showConnection(false, "SERVER ERROR");
+
+    document.getElementById("serverInfo").textContent =
+      error.message;
+
+    console.error("Scanner Error:", error);
+  }
 }
 
-function playAlert(){
- if(!soundEnabled) return;
-
- try{
-  const ctx=new (window.AudioContext || window.webkitAudioContext)();
-  const osc=ctx.createOscillator();
-  const gain=ctx.createGain();
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.frequency.value=850;
-  gain.gain.value=0.15;
-
-  osc.start();
-  osc.stop(ctx.currentTime+0.25);
-  osc.onended=()=>ctx.close();
- }catch(e){}
-}
-
-setInterval(()=>{
- countdown--;
- if(countdown<=0){
-  countdown=60;
-  loadData();
- }
- document.getElementById("countdown").textContent=countdown;
-},1000);
+// ======================================
+// AUTO REFRESH
+// ======================================
 
 loadData();
-</script>
 
+setInterval(() => {
+  refreshCount--;
+
+  document.getElementById("countdown").textContent =
+    refreshCount;
+
+  if (refreshCount <= 0) {
+    refreshCount = 30;
+    loadData();
+  }
+}, 1000);
+
+</script>
 </body>
 </html>
+
