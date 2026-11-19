@@ -205,26 +205,94 @@ function findNearestFuture(indexName) {
 // ------------------------------------------------------
 
 async function getMarketQuotes(keys) {
-  const unique = [...new Set(keys.filter(Boolean))];
-
-  if (!unique.length) return {};
+  const unique = [...new Set(
+    (keys || []).filter(
+      key => typeof key === "string" && key.length > 0
+    )
+  )];
 
   const output = {};
 
+  if (unique.length === 0) {
+    return output;
+  }
+
+  // Upstox V3 supports up to 500 keys per request
   for (let i = 0; i < unique.length; i += 100) {
+
     const chunk = unique.slice(i, i + 100);
 
-    const query = encodeURIComponent(chunk.join(","));
+    const query = encodeURIComponent(
+      chunk.join(",")
+    );
 
     const result = await upstoxRequest(
       "/v3/market-quote/quotes?instrument_key=" + query
     );
 
-    Object.assign(output, result.data || {});
+    if (
+      !result ||
+      !result.data ||
+      typeof result.data !== "object"
+    ) {
+      throw new Error(
+        "Invalid Upstox market quote response"
+      );
+    }
+
+    const entries = Object.entries(result.data);
+
+    for (const requestedKey of chunk) {
+
+      const normalizedKey =
+        requestedKey.replace("|", ":");
+
+      let quote = null;
+
+      // Match by instrument token
+      for (const [responseKey, value] of entries) {
+
+        if (
+          value &&
+          (
+            value.instrument_token === requestedKey ||
+            value.instrument_key === requestedKey
+          )
+        ) {
+          quote = value;
+          break;
+        }
+
+        // Match exchange:symbol response key
+        if (responseKey === normalizedKey) {
+          quote = value;
+          break;
+        }
+      }
+
+      if (quote) {
+        output[requestedKey] = quote;
+      } else {
+        console.log(
+          "[QUOTE NOT FOUND]",
+          requestedKey,
+          "Available:",
+          entries.map(item => item[0])
+        );
+      }
+    }
   }
+
+  console.log(
+    "[MARKET QUOTES]",
+    Object.keys(output).length,
+    "/",
+    unique.length
+  );
 
   return output;
 }
+
 
 // ------------------------------------------------------
 // EXTRACT QUOTE
