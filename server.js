@@ -150,19 +150,13 @@ function analyseIndexDirection(name, price) {
   };
 }
 
-// Get current option contracts
-async function getOptionContracts(index) {
 
-  const path =
-    "/v2/option/contract?instrument_key=" +
-    encodeURIComponent(index.key) +
-    "&expiry_date=current_week";
+const contractData = await getOptionContracts(index);
 
-  const result = await upstoxRequest(path);
+const expiry = contractData.expiry;
 
-  return Array.isArray(result.data) ?
-    result.data : [];
-}
+const chain = await getOptionChain(index, expiry);
+
 
 // Get live option chain
 async function getOptionChain(index, expiry) {
