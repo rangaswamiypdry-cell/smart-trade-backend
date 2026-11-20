@@ -992,7 +992,6 @@ function isNewSignal(index, direction, candleTime) {
 // ======================================================
 
 const scanResults = {};
-let scanRunning = false;
 let lastScanTime = null;
 
 // ------------------------------------------------------
