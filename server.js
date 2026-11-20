@@ -991,7 +991,6 @@ function isNewSignal(index, direction, candleTime) {
 // OPTION SELECTOR + SCANNER + DASHBOARD + API ROUTES
 // ======================================================
 
-const signals = [];
 const scanResults = {};
 let scanRunning = false;
 let lastScanTime = null;
