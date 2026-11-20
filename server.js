@@ -3,9 +3,9 @@
 
 // ======================================================
 // SMART TRADE INDIA V13 PRO
-// FOUR INDEX VERY STRONG SELL SCANNER
-// UPSTOX API | NODE.JS 20+
-// PART 1 OF 2
+// PART 1 OF 3
+// LIVE DATA + HISTORICAL CANDLES + FUTURES OI ENGINE
+// NODE.JS 20+
 // ======================================================
 
 const http = require("http");
@@ -17,66 +17,120 @@ const BASE = "https://api.upstox.com";
 
 const CONFIG = {
   VERSION: "SMART_TRADE_INDIA_V13_PRO",
+
   TIMEFRAME: 5,
   SCAN_INTERVAL: 60000,
-  RSI_PERIOD: 14,
-  RSI_BULLISH: 55,
-  RSI_BEARISH: 35,
+
   EMA_FAST: 9,
   EMA_SLOW: 21,
   EMA_TREND: 50,
+
+  RSI_PERIOD: 14,
+  RSI_BUY: 55,
+  RSI_SELL: 35,
+
+  ADX_MIN: 20,
   VOLUME_MULTIPLIER: 1.5,
   OI_INCREASE_MIN: 2,
-  ADX_MIN: 20,
-  VERY_STRONG_SCORE: 6,
-  REQUIRE_ALL_CONDITIONS: true,
+
+  MIN_CANDLES: 50,
   MAX_SIGNALS: 100,
-  PAPER_MODE: true
+
+  REQUIRE_ALL_CONDITIONS: true,
+  PAPER_MODE: true,
+
+  HISTORICAL_DAYS: 7,
+  MAX_CANDLE_AGE_MINUTES: 10
 };
 
-// MIDCPNIFTY REMOVED
+// ======================================================
+// FOUR INDEXES ONLY
+// ======================================================
 
 const INDEXES = {
   NIFTY: {
-    name: "NIFTY",
     spotKey: "NSE_INDEX|Nifty 50",
-    underlyingSymbol: "NIFTY",
+    symbol: "NIFTY",
     segment: "NSE_FO"
   },
+
   BANKNIFTY: {
-    name: "BANKNIFTY",
     spotKey: "NSE_INDEX|Nifty Bank",
-    underlyingSymbol: "BANKNIFTY",
+    symbol: "BANKNIFTY",
     segment: "NSE_FO"
   },
+
   FINNIFTY: {
-    name: "FINNIFTY",
     spotKey: "NSE_INDEX|Nifty Fin Service",
-    underlyingSymbol: "FINNIFTY",
+    symbol: "FINNIFTY",
     segment: "NSE_FO"
   },
+
   SENSEX: {
-    name: "SENSEX",
     spotKey: "BSE_INDEX|SENSEX",
-    underlyingSymbol: "SENSEX",
+    symbol: "SENSEX",
     segment: "BSE_FO"
   }
 };
 
+// ======================================================
+// GLOBAL STORAGE
+// ======================================================
+
 const marketCache = new Map();
 const signals = [];
+
 const previousOI = new Map();
 const oiSnapshots = new Map();
 
+const candleCache = new Map();
+const signalIds = new Set();
+
 let instrumentMaster = [];
 let instrumentMasterTime = 0;
+
 let lastScanTime = null;
 let scanRunning = false;
-let serverStarted = new Date().toISOString();
 
-// ------------------------------------------------------
+const serverStarted = new Date().toISOString();
+
+// ======================================================
+// TIME HELPERS
+// ======================================================
+
+function indiaDate(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function indiaTime() {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(new Date());
+}
+
+function getPreviousDate(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return indiaDate(d);
+}
+
+function isCompletedCandle(time) {
+  const closeTime = time + CONFIG.TIMEFRAME * 60000;
+
+  return closeTime <= Date.now();
+}
+
+// ======================================================
 // JSON RESPONSE
-// ------------------------------------------------------
+// ======================================================
 
 function sendJson(res, status, data) {
   res.writeHead(status, {
@@ -90,9 +144,9 @@ function sendJson(res, status, data) {
   res.end(JSON.stringify(data, null, 2));
 }
 
-// ------------------------------------------------------
+// ======================================================
 // UPSTOX REQUEST
-// ------------------------------------------------------
+// ======================================================
 
 async function upstoxRequest(path) {
   if (!TOKEN) {
@@ -101,10 +155,12 @@ async function upstoxRequest(path) {
 
   const response = await fetch(BASE + path, {
     method: "GET",
+
     headers: {
       Accept: "application/json",
       Authorization: "Bearer " + TOKEN
     },
+
     signal: AbortSignal.timeout(20000)
   });
 
@@ -120,16 +176,18 @@ async function upstoxRequest(path) {
   return data;
 }
 
-// ------------------------------------------------------
+// ======================================================
 // INSTRUMENT MASTER
-// ------------------------------------------------------
+// ======================================================
 
 async function loadInstrumentMaster(force = false) {
   const fresh =
     instrumentMaster.length > 0 &&
     Date.now() - instrumentMasterTime < 6 * 60 * 60 * 1000;
 
-  if (fresh && !force) return instrumentMaster;
+  if (fresh && !force) {
+    return instrumentMaster;
+  }
 
   const url =
     "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
@@ -142,314 +200,207 @@ async function loadInstrumentMaster(force = false) {
     throw new Error("Instrument master download failed");
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const jsonBuffer = zlib.gunzipSync(buffer);
-  const parsed = JSON.parse(jsonBuffer.toString("utf8"));
+  const buffer = Buffer.from(
+    await response.arrayBuffer()
+  );
 
-  instrumentMaster = Array.isArray(parsed) ? parsed : [];
-  instrumentMasterTime = Date.now();
+  const decoded = zlib.gunzipSync(buffer);
 
-  if (!instrumentMaster.length) {
-    throw new Error("Instrument master is empty");
+  const parsed = JSON.parse(
+    decoded.toString("utf8")
+  );
+
+  if (!Array.isArray(parsed) || !parsed.length) {
+    throw new Error("Invalid instrument master");
   }
+
+  instrumentMaster = parsed;
+  instrumentMasterTime = Date.now();
 
   return instrumentMaster;
 }
 
-// ------------------------------------------------------
-// NEAREST INDEX FUTURES
-// ------------------------------------------------------
+// ======================================================
+// FIND NEAREST FUTURES
+// ======================================================
 
 function findNearestFuture(indexName) {
   const config = INDEXES[indexName];
 
   if (!config) {
-    throw new Error("Unknown index: " + indexName);
+    throw new Error("Unknown index " + indexName);
   }
 
-  const today = Date.now();
+  const today = indiaDate();
 
   const candidates = instrumentMaster.filter(item => {
     return (
       item.segment === config.segment &&
       item.instrument_type === "FUT" &&
-      item.underlying_symbol === config.underlyingSymbol &&
-      Number(item.expiry) > today &&
+      item.underlying_symbol === config.symbol &&
+      item.expiry &&
+      String(item.expiry) >= today &&
       item.instrument_key
     );
   });
 
-  candidates.sort(
-    (a, b) => Number(a.expiry) - Number(b.expiry)
+  candidates.sort((a, b) =>
+    String(a.expiry).localeCompare(String(b.expiry))
   );
 
   if (!candidates.length) {
-    throw new Error(
-      config.segment + " FUTURES NOT FOUND"
-    );
+    throw new Error(indexName + " FUTURES NOT FOUND");
   }
 
   return candidates[0];
 }
 
-// ------------------------------------------------------
+// ======================================================
 // MARKET QUOTES
-// ------------------------------------------------------
+// ======================================================
 
 async function getMarketQuotes(keys) {
-  const unique = [...new Set(
-    (keys || []).filter(
-      key => typeof key === "string" && key.length > 0
-    )
-  )];
+  const unique = [...new Set(keys.filter(Boolean))];
 
   const output = {};
-
-  if (unique.length === 0) return output;
 
   for (let i = 0; i < unique.length; i += 100) {
     const chunk = unique.slice(i, i + 100);
 
-    const query = encodeURIComponent(chunk.join(","));
-
     const result = await upstoxRequest(
-      "/v3/market-quote/quotes?instrument_key=" + query
+      "/v3/market-quote/quotes?instrument_key=" +
+      encodeURIComponent(chunk.join(","))
     );
 
-    if (
-      !result ||
-      !result.data ||
-      typeof result.data !== "object"
-    ) {
-      throw new Error("Invalid Upstox market quote response");
-    }
+    const entries = Object.entries(result.data || {});
 
-    const entries = Object.entries(result.data);
+    for (const key of chunk) {
+      const normalized = key.replace("|", ":");
 
-    for (const requestedKey of chunk) {
-      const normalizedKey = requestedKey.replace("|", ":");
-      let quote = null;
+      const match = entries.find(([responseKey, value]) =>
+        responseKey === normalized ||
+        value?.instrument_token === key ||
+        value?.instrument_key === key
+      );
 
-      for (const [responseKey, value] of entries) {
-        if (
-          value &&
-          (
-            value.instrument_token === requestedKey ||
-            value.instrument_key === requestedKey
-          )
-        ) {
-          quote = value;
-          break;
-        }
-
-        if (responseKey === normalizedKey) {
-          quote = value;
-          break;
-        }
-      }
-
-      if (quote) {
-        output[requestedKey] = quote;
-      } else {
-        console.log("[QUOTE NOT FOUND]", requestedKey);
+      if (match) {
+        output[key] = match[1];
       }
     }
   }
 
-  console.log(
-    "[MARKET QUOTES]",
-    Object.keys(output).length,
-    "/",
-    unique.length
-  );
-
   return output;
 }
 
-// ------------------------------------------------------
-// EXTRACT QUOTE
-// ------------------------------------------------------
+// ======================================================
+// NORMALIZE QUOTE
+// ======================================================
 
 function extractQuote(data) {
   const q = data || {};
 
   return {
     ltp: Number(q.last_price || 0),
+
     open: Number(q.ohlc?.open || 0),
     high: Number(q.ohlc?.high || 0),
     low: Number(q.ohlc?.low || 0),
+
     close: Number(
-      q.prev_close_price || q.ohlc?.close || 0
+      q.prev_close_price ||
+      q.ohlc?.close || 0
     ),
-    volume: Number(q.volume || q.ohlc?.volume || 0),
+
+    volume: Number(q.volume || 0),
+
     oi: Number(q.oi || 0),
     previousOI: Number(q.previous_oi || 0),
+
     buyQuantity: Number(q.total_buy_quantity || 0),
     sellQuantity: Number(q.total_sell_quantity || 0),
+
     timestamp: q.last_trade_time || q.timestamp || null
   };
 }
 
-// ------------------------------------------------------
-// IST DATE HELPERS
-// ------------------------------------------------------
+// ======================================================
+// CANDLE NORMALIZER
+// ======================================================
 
-function indiaDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
+function normalizeCandles(rows) {
+  const now = Date.now();
 
-  const get = type =>
-    parts.find(p => p.type === type)?.value;
-
-  return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
-function shiftDate(dateString, days) {
-  const [year, month, day] = dateString.split("-").map(Number);
-
-  const date = new Date(
-    Date.UTC(year, month - 1, day + days)
-  );
-
-  return date.toISOString().slice(0, 10);
-}
-
-function normalizeCandleRows(rows, now) {
-  return (Array.isArray(rows) ? rows : [])
+  return (rows || [])
     .map(c => ({
       time: new Date(c[0]).getTime(),
+
       open: Number(c[1]),
       high: Number(c[2]),
       low: Number(c[3]),
       close: Number(c[4]),
+
       volume: Number(c[5] || 0),
       oi: Number(c[6] || 0)
     }))
     .filter(c =>
       Number.isFinite(c.time) &&
-      Number.isFinite(c.close) &&
       c.close > 0 &&
-      c.time + 5 * 60 * 1000 <= now
+      isCompletedCandle(c.time) &&
+      c.time >= now - 32 * 24 * 60 * 60 * 1000
     );
 }
 
-// ------------------------------------------------------
-// HISTORICAL + CURRENT DAY COMPLETED 5-MINUTE CANDLES
-// ------------------------------------------------------
+// ======================================================
+// HISTORICAL + INTRADAY 5 MINUTE CANDLES
+// ======================================================
 
 async function getCandles(instrumentKey) {
   const key = encodeURIComponent(instrumentKey);
-  const now = Date.now();
 
-  const today = indiaDateString(new Date(now));
-  const fromDate = shiftDate(today, -10);
-  const toDate = shiftDate(today, -1);
+  const toDate = indiaDate();
+  const fromDate = getPreviousDate(CONFIG.HISTORICAL_DAYS);
 
-  const [historicalResult, intradayResult] =
-    await Promise.allSettled([
-      upstoxRequest(
-        `/v3/historical-candle/${key}/minutes/5/${toDate}/${fromDate}`
-      ),
-      upstoxRequest(
-        `/v3/historical-candle/intraday/${key}/minutes/5`
-      )
-    ]);
+  const historicalPath =
+    `/v3/historical-candle/${key}/minutes/5/${toDate}/${fromDate}`;
 
-  const historicalRows =
-    historicalResult.status === "fulfilled"
-      ? historicalResult.value.data?.candles || []
-      : [];
+  const intradayPath =
+    `/v3/historical-candle/intraday/${key}/minutes/5`;
 
-  const intradayRows =
-    intradayResult.status === "fulfilled"
-      ? intradayResult.value.data?.candles || []
-      : [];
+  const [historical, intraday] = await Promise.all([
+    upstoxRequest(historicalPath),
+    upstoxRequest(intradayPath)
+  ]);
 
-  if (historicalResult.status === "rejected") {
-    console.error(
-      "[HISTORICAL CANDLES ERROR]",
-      instrumentKey,
-      historicalResult.reason?.message
-    );
+  const combined = [
+    ...(historical.data?.candles || []),
+    ...(intraday.data?.candles || [])
+  ];
+
+  const normalized = normalizeCandles(combined);
+
+  const unique = new Map();
+
+  for (const candle of normalized) {
+    unique.set(candle.time, candle);
   }
 
-  if (intradayResult.status === "rejected") {
-    console.error(
-      "[INTRADAY CANDLES ERROR]",
-      instrumentKey,
-      intradayResult.reason?.message
-    );
-  }
-
-  const historical = normalizeCandleRows(
-    historicalRows,
-    now
-  );
-
-  const intraday = normalizeCandleRows(
-    intradayRows,
-    now
-  );
-
-  const byTime = new Map();
-
-  for (const candle of historical) {
-    byTime.set(candle.time, candle);
-  }
-
-  for (const candle of intraday) {
-    byTime.set(candle.time, candle);
-  }
-
-  const candles = [...byTime.values()]
+  const candles = [...unique.values()]
     .sort((a, b) => a.time - b.time);
 
-  candles.stats = {
-    historicalCandles: historical.length,
-    intradayCandles: intraday.length,
-    totalCandles: candles.length,
-    fromDate,
-    toDate,
-    today
-  };
-
-  if (!candles.length) {
-    const errors = [];
-
-    if (historicalResult.status === "rejected") {
-      errors.push(historicalResult.reason?.message);
-    }
-
-    if (intradayResult.status === "rejected") {
-      errors.push(intradayResult.reason?.message);
-    }
-
+  if (candles.length < CONFIG.MIN_CANDLES) {
     throw new Error(
-      errors.filter(Boolean).join(" | ") ||
-      "No completed 5-minute candles returned by Upstox"
+      `Need ${CONFIG.MIN_CANDLES} completed candles; received ${candles.length}`
     );
   }
+
+  candleCache.set(instrumentKey, candles);
 
   return candles;
 }
 
-// TODAY SESSION CANDLES FOR VWAP
-
-function getTodaySessionCandles(candles) {
-  const today = indiaDateString();
-
-  return candles.filter(c =>
-    indiaDateString(new Date(c.time)) === today
-  );
-}
-
-// ------------------------------------------------------
+// ======================================================
 // EMA
-// ------------------------------------------------------
+// ======================================================
 
 function calculateEMA(values, period) {
   if (!values || values.length < period) return null;
@@ -467,9 +418,9 @@ function calculateEMA(values, period) {
   return ema;
 }
 
-// ------------------------------------------------------
-// RSI WILDER
-// ------------------------------------------------------
+// ======================================================
+// WILDER RSI
+// ======================================================
 
 function calculateRSI(values, period = 14) {
   if (!values || values.length <= period) return null;
@@ -480,8 +431,8 @@ function calculateRSI(values, period = 14) {
   for (let i = 1; i <= period; i++) {
     const change = values[i] - values[i - 1];
 
-    if (change > 0) gains += change;
-    else losses += Math.abs(change);
+    gains += Math.max(change, 0);
+    losses += Math.max(-change, 0);
   }
 
   let avgGain = gains / period;
@@ -491,12 +442,10 @@ function calculateRSI(values, period = 14) {
     const change = values[i] - values[i - 1];
 
     avgGain =
-      (avgGain * (period - 1) +
-      Math.max(change, 0)) / period;
+      (avgGain * (period - 1) + Math.max(change, 0)) / period;
 
     avgLoss =
-      (avgLoss * (period - 1) +
-      Math.max(-change, 0)) / period;
+      (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
   }
 
   if (avgLoss === 0) return 100;
@@ -506,46 +455,96 @@ function calculateRSI(values, period = 14) {
   return 100 - 100 / (1 + rs);
 }
 
-// ------------------------------------------------------
-// FUTURES VWAP
-// ------------------------------------------------------
+// ======================================================
+// SESSION VWAP
+// ======================================================
 
-function calculateVWAP(candles) {
-  let totalPV = 0;
-  let totalVolume = 0;
+function calculateSessionVWAP(candles) {
+  if (!candles?.length) return null;
 
-  for (const c of candles) {
-    const typical =
-      (c.high + c.low + c.close) / 3;
+  const today = indiaDate();
 
-    totalPV += typical * c.volume;
-    totalVolume += c.volume;
-  }
-
-  if (!totalVolume) return null;
-
-  return totalPV / totalVolume;
-}
-
-// ------------------------------------------------------
-// ADR
-// ------------------------------------------------------
-
-function calculateADR(candles, period = 14) {
-  if (!candles || candles.length < period) return null;
-
-  const recent = candles.slice(-period);
-
-  const total = recent.reduce(
-    (sum, c) => sum + c.high - c.low,
-    0
+  const session = candles.filter(c =>
+    indiaDate(new Date(c.time)) === today
   );
 
-  return total / period;
+  let pv = 0;
+  let volume = 0;
+
+  for (const c of session) {
+    const typical = (c.high + c.low + c.close) / 3;
+
+    pv += typical * c.volume;
+    volume += c.volume;
+  }
+
+  return volume > 0 ? pv / volume : null;
 }
 
+// ======================================================
+// OI TRACKING BY COMPLETED CANDLE
+// ======================================================
+
+function calculateOIChange(key, currentOI, candleTime) {
+  if (!currentOI || currentOI <= 0) {
+    return {
+      ready: false,
+      change: null,
+      percent: null,
+      increasing: false
+    };
+  }
+
+  const previous = previousOI.get(key);
+
+  // Same candle: do not overwrite baseline.
+  if (previous && previous.candleTime === candleTime) {
+    return previous.result;
+  }
+
+  const result = previous
+    ? {
+        ready: true,
+        change: currentOI - previous.oi,
+
+        percent:
+          previous.oi > 0
+            ? ((currentOI - previous.oi) / previous.oi) * 100
+            : 0,
+
+        increasing: currentOI > previous.oi
+      }
+    : {
+        ready: false,
+        change: 0,
+        percent: 0,
+        increasing: false
+      };
+
+  previousOI.set(key, {
+    oi: currentOI,
+    candleTime,
+    result
+  });
+
+  oiSnapshots.set(key, {
+    currentOI,
+    candleTime,
+    updatedAt: new Date().toISOString()
+  });
+
+  return result;
+}
+
+
+// ======================================================
+// SMART TRADE INDIA V13 PRO
+// PART 2 OF 3
+// TREND + SIX CONDITIONS + SELL SIGNAL ENGINE
+// ======================================================
+
 // ------------------------------------------------------
-// ADX
+// ADX CALCULATION
 // ------------------------------------------------------
 
 function calculateADX(candles, period = 14) {
@@ -564,13 +563,8 @@ function calculateADX(candles, period = 14) {
     const up = c.high - p.high;
     const down = p.low - c.low;
 
-    plusDM.push(
-      up > down && up > 0 ? up : 0
-    );
-
-    minusDM.push(
-      down > up && down > 0 ? down : 0
-    );
+    plusDM.push(up > down && up > 0 ? up : 0);
+    minusDM.push(down > up && down > 0 ? down : 0);
 
     tr.push(Math.max(
       c.high - c.low,
@@ -606,9 +600,8 @@ function calculateADX(candles, period = 14) {
 
   if (dx.length < period) return null;
 
-  return dx.slice(-period).reduce(
-    (a, b) => a + b, 0
-  ) / period;
+  return dx.slice(-period)
+    .reduce((a, b) => a + b, 0) / period;
 }
 
 // ------------------------------------------------------
@@ -629,40 +622,18 @@ function calculateMACD(values) {
 }
 
 // ------------------------------------------------------
-// OI SNAPSHOT
+// AVERAGE DAILY RANGE PROXY
 // ------------------------------------------------------
 
-function calculateOIChange(key, currentOI) {
-  if (!Number.isFinite(currentOI) || currentOI <= 0) {
-    return {
-      change: null,
-      percent: null,
-      increasing: false,
-      ready: false
-    };
-  }
+function calculateADR(candles, period = 14) {
+  if (!candles || candles.length < period) return null;
 
-  const previous = previousOI.get(key);
+  const recent = candles.slice(-period);
 
-  previousOI.set(key, currentOI);
-
-  if (!previous || previous <= 0) {
-    return {
-      change: 0,
-      percent: 0,
-      increasing: false,
-      ready: false
-    };
-  }
-
-  const change = currentOI - previous;
-
-  return {
-    change,
-    percent: change / previous * 100,
-    increasing: change > 0,
-    ready: true
-  };
+  return recent.reduce(
+    (sum, c) => sum + (c.high - c.low),
+    0
+  ) / period;
 }
 
 // ------------------------------------------------------
@@ -670,129 +641,162 @@ function calculateOIChange(key, currentOI) {
 // ------------------------------------------------------
 
 function calculateOrderFlow(quote) {
-  const buy = quote.buyQuantity || 0;
-  const sell = quote.sellQuantity || 0;
+  const buy = Number(quote.buyQuantity || 0);
+  const sell = Number(quote.sellQuantity || 0);
+
   const total = buy + sell;
 
   return {
     buyQuantity: buy,
     sellQuantity: sell,
+
     imbalance: buy - sell,
+
     imbalancePercent: total
       ? ((buy - sell) / total) * 100
       : null,
-    sellPressure: sell > buy,
-    buyPressure: buy > sell
+
+    buyPressure: buy > sell,
+    sellPressure: sell > buy
   };
 }
 
-
-// ======================================================
-// SMART TRADE INDIA V13 PRO
-// PART 2 OF 2
-// ======================================================
-
 // ------------------------------------------------------
-// OPTION CHAIN
+// MARKET TREND DETECTION
 // ------------------------------------------------------
 
-async function getOptionChain(spotKey) {
-  const result = await upstoxRequest(
-    "/v2/option/chain?instrument_key=" +
-    encodeURIComponent(spotKey) +
-    "&expiry_date=current_week"
-  );
+function detectMarketTrend(candles, quote) {
+  const closes = candles.map(c => c.close);
 
-  return result.data || [];
+  const ema9 = calculateEMA(closes, CONFIG.EMA_FAST);
+  const ema21 = calculateEMA(closes, CONFIG.EMA_SLOW);
+  const ema50 = calculateEMA(closes, CONFIG.EMA_TREND);
+
+  const rsi = calculateRSI(closes, CONFIG.RSI_PERIOD);
+  const vwap = calculateSessionVWAP(candles);
+  const adx = calculateADX(candles, 14);
+
+  const last = candles[candles.length - 1];
+  const previous = candles[candles.length - 2];
+
+  const bullish =
+    ema9 !== null &&
+    ema21 !== null &&
+    ema50 !== null &&
+    adx !== null &&
+    ema9 > ema21 &&
+    ema21 > ema50 &&
+    last.close > ema50 &&
+    adx >= CONFIG.ADX_MIN;
+
+  const bearish =
+    ema9 !== null &&
+    ema21 !== null &&
+    ema50 !== null &&
+    adx !== null &&
+    ema9 < ema21 &&
+    ema21 < ema50 &&
+    last.close < ema50 &&
+    adx >= CONFIG.ADX_MIN;
+
+  let trend = "SIDEWAYS";
+
+  if (bullish) trend = "UPTREND";
+  if (bearish) trend = "DOWNTREND";
+
+  return {
+    trend,
+
+    bullish,
+    bearish,
+
+    ema9,
+    ema21,
+    ema50,
+
+    rsi,
+    vwap,
+    adx,
+
+    priceIncreasing: last.close > previous.close,
+    priceDecreasing: last.close < previous.close,
+
+    priceAboveVWAP: vwap !== null && last.close > vwap,
+    priceBelowVWAP: vwap !== null && last.close < vwap,
+
+    futuresPrice: quote.ltp
+  };
 }
 
 // ------------------------------------------------------
-// OPTION SELL STRIKE SELECTOR
+// VOLUME CONFIRMATION
 // ------------------------------------------------------
 
-function selectSellStrike(chain, direction) {
-  const candidates = [];
-
-  for (const item of chain || []) {
-    const spot = Number(item.underlying_spot_price || 0);
-    const strike = Number(item.strike_price || 0);
-
-    if (!spot || !strike) continue;
-
-    const option = direction === "PE"
-      ? item.put_options
-      : item.call_options;
-
-    if (!option?.instrument_key) continue;
-
-    const md = option.market_data || {};
-    const greeks = option.option_greeks || {};
-
-    const ltp = Number(md.ltp || 0);
-    const oi = Number(md.oi || 0);
-    const volume = Number(md.volume || 0);
-    const bid = Number(md.bid_price || 0);
-    const ask = Number(md.ask_price || 0);
-    const delta = Math.abs(Number(greeks.delta || 0));
-
-    const isOTM = direction === "PE"
-      ? strike < spot
-      : strike > spot;
-
-    if (!isOTM) continue;
-
-    if (
-      ltp <= 0 ||
-      oi <= 0 ||
-      volume <= 0 ||
-      bid <= 0 ||
-      ask <= 0
-    ) continue;
-
-    const spread = ((ask - bid) / ask) * 100;
-
-    if (spread > 3) continue;
-
-    if (delta > 0 && (delta < 0.10 || delta > 0.40)) {
-      continue;
-    }
-
-    const distance = Math.abs(strike - spot) / spot;
-
-    const score =
-      Math.log10(oi + 1) * 2 +
-      Math.log10(volume + 1) * 2 -
-      spread -
-      distance * 100;
-
-    candidates.push({
-      direction,
-      strike,
-      spot,
-      instrumentKey: option.instrument_key,
-      expiry: item.expiry || null,
-      ltp,
-      oi,
-      volume,
-      bid,
-      ask,
-      spreadPercent: Number(spread.toFixed(2)),
-      delta,
-      theta: Number(greeks.theta || 0),
-      gamma: Number(greeks.gamma || 0),
-      vega: Number(greeks.vega || 0),
-      iv: Number(greeks.iv || 0),
-      score: Number(score.toFixed(2))
-    });
+function checkVolume(candles) {
+  if (candles.length < 21) {
+    return {
+      pass: false,
+      current: 0,
+      average: 0,
+      multiplier: 0
+    };
   }
 
-  candidates.sort((a, b) => b.score - a.score);
+  const last = candles[candles.length - 1];
 
-  return candidates[0] || null;
+  const previous20 = candles.slice(-21, -1);
+
+  const average = previous20.reduce(
+    (sum, c) => sum + c.volume,
+    0
+  ) / 20;
+
+  const multiplier = average > 0
+    ? last.volume / average
+    : 0;
+
+  return {
+    pass:
+      average > 0 &&
+      last.volume >= average * CONFIG.VOLUME_MULTIPLIER,
+
+    current: last.volume,
+    average: Math.round(average),
+    multiplier: Number(multiplier.toFixed(2))
+  };
 }
 
 // ------------------------------------------------------
-// SIX CONDITIONS - VERY STRONG SELL
+// OI + PRICE CONFIRMATION
+// ------------------------------------------------------
+
+function checkOIPattern(oiData, priceUp, priceDown) {
+  const valid =
+    oiData &&
+    oiData.ready &&
+    Number.isFinite(oiData.percent);
+
+  const oiIncreasing =
+    valid &&
+    oiData.percent >= CONFIG.OI_INCREASE_MIN;
+
+  return {
+    valid: !!valid,
+    oiIncreasing: !!oiIncreasing,
+
+    longBuildUp:
+      !!oiIncreasing && priceUp,
+
+    shortBuildUp:
+      !!oiIncreasing && priceDown,
+
+    oiChange: oiData?.change ?? null,
+    oiChangePercent: oiData?.percent ?? null
+  };
+}
+
+// ------------------------------------------------------
+// SIX CONDITION SELL ANALYSIS
 // ------------------------------------------------------
 
 function analyseIndex(
@@ -802,125 +806,113 @@ function analyseIndex(
   futureQuote,
   oiData
 ) {
-  const stats = candles.stats || {};
-
-  if (!candles || candles.length < 55) {
+  if (!candles || candles.length < CONFIG.MIN_CANDLES) {
     return {
       index: indexName,
       status: "WAIT",
-      reason: "Historical candles insufficient",
-      dataStatus: "INSUFFICIENT_CANDLES",
-      candleCount: candles?.length || 0,
-      requiredCandles: 55,
-      historicalCandles: stats.historicalCandles || 0,
-      intradayCandles: stats.intradayCandles || 0,
-      peScore: 0,
-      ceScore: 0
+      reason: "Insufficient completed candles"
     };
   }
-
-  const closes = candles.map(c => c.close);
 
   const last = candles[candles.length - 1];
   const previous = candles[candles.length - 2];
 
-  const ema9 = calculateEMA(closes, 9);
-  const ema21 = calculateEMA(closes, 21);
-  const ema50 = calculateEMA(closes, 50);
+  const trend = detectMarketTrend(candles, futureQuote);
 
-  const rsi = calculateRSI(closes, 14);
-
-  // VWAP uses today's session only.
-  const todayCandles = getTodaySessionCandles(candles);
-  const vwap = calculateVWAP(todayCandles);
-
-  const adx = calculateADX(candles, 14);
-  const adr = calculateADR(candles, 14);
-  const macd = calculateMACD(closes);
-
-  const avgVolumeCandles = candles.slice(-21, -1);
-
-  const avgVolume = avgVolumeCandles.length
-    ? avgVolumeCandles.reduce(
-        (sum, c) => sum + c.volume, 0
-      ) / avgVolumeCandles.length
-    : 0;
-
-  const volumePass =
-    avgVolume > 0 &&
-    last.volume >= avgVolume * CONFIG.VOLUME_MULTIPLIER;
-
-  const oiPass =
-    oiData.ready &&
-    oiData.percent >= CONFIG.OI_INCREASE_MIN;
+  const volume = checkVolume(candles);
 
   const priceUp = last.close > previous.close;
   const priceDown = last.close < previous.close;
 
-  const trendUp =
-    ema9 !== null &&
-    ema21 !== null &&
-    ema50 !== null &&
-    adx !== null &&
-    ema9 > ema21 &&
-    ema21 > ema50 &&
-    adx >= CONFIG.ADX_MIN;
+  const oi = checkOIPattern(
+    oiData,
+    priceUp,
+    priceDown
+  );
 
-  const trendDown =
-    ema9 !== null &&
-    ema21 !== null &&
-    ema50 !== null &&
-    adx !== null &&
-    ema9 < ema21 &&
-    ema21 < ema50 &&
-    adx >= CONFIG.ADX_MIN;
+  const macd = calculateMACD(
+    candles.map(c => c.close)
+  );
 
-  const macdUp = macd && macd.macd > 0;
-  const macdDown = macd && macd.macd < 0;
+  const macdUp = macd !== null && macd.macd > 0;
+  const macdDown = macd !== null && macd.macd < 0;
 
-  // PE SELL: Underlying bullish.
+  // BULLISH MARKET = PE SELL
+
   const peChecks = {
-    trend: trendUp,
-    vwap: vwap !== null && last.close > vwap,
-    rsi: rsi !== null && rsi > CONFIG.RSI_BULLISH,
-    macd: !!macdUp,
-    volume: volumePass,
-    oiPrice: oiPass && priceUp
+    trend: trend.bullish,
+
+    vwap:
+      trend.priceAboveVWAP,
+
+    rsi:
+      trend.rsi !== null &&
+      trend.rsi >= CONFIG.RSI_BUY,
+
+    macd:
+      macdUp,
+
+    volume:
+      volume.pass,
+
+    oiPrice:
+      oi.longBuildUp
   };
 
-  // CE SELL: Underlying bearish.
+  // BEARISH MARKET = CE SELL
+
   const ceChecks = {
-    trend: trendDown,
-    vwap: vwap !== null && last.close < vwap,
-    rsi: rsi !== null && rsi < CONFIG.RSI_BEARISH,
-    macd: !!macdDown,
-    volume: volumePass,
-    oiPrice: oiPass && priceDown
+    trend: trend.bearish,
+
+    vwap:
+      trend.priceBelowVWAP,
+
+    rsi:
+      trend.rsi !== null &&
+      trend.rsi <= CONFIG.RSI_SELL,
+
+    macd:
+      macdDown,
+
+    volume:
+      volume.pass,
+
+    oiPrice:
+      oi.shortBuildUp
   };
 
-  const peScore =
-    Object.values(peChecks).filter(Boolean).length;
+  const peScore = Object.values(peChecks)
+    .filter(Boolean).length;
 
-  const ceScore =
-    Object.values(ceChecks).filter(Boolean).length;
+  const ceScore = Object.values(ceChecks)
+    .filter(Boolean).length;
 
   let direction = null;
 
   if (
     CONFIG.REQUIRE_ALL_CONDITIONS &&
-    peScore === CONFIG.VERY_STRONG_SCORE
+    peScore === 6 &&
+    trend.trend === "UPTREND"
   ) {
     direction = "PE";
   }
 
   if (
     CONFIG.REQUIRE_ALL_CONDITIONS &&
-    ceScore === CONFIG.VERY_STRONG_SCORE
+    ceScore === 6 &&
+    trend.trend === "DOWNTREND"
   ) {
     direction = "CE";
   }
 
-  const orderFlow = calculateOrderFlow(futureQuote);
+  const allValid =
+    trend.rsi !== null &&
+    trend.vwap !== null &&
+    trend.adx !== null &&
+    macd !== null &&
+    oi.valid;
+
+  const adr = calculateADR(candles, 14);
 
   return {
     index: indexName,
@@ -931,7 +923,7 @@ function analyseIndex(
 
     direction,
 
-    dataStatus: "READY",
+    trend: trend.trend,
 
     underlyingPrice: spotQuote.ltp,
     futuresPrice: futureQuote.ltp,
@@ -939,59 +931,26 @@ function analyseIndex(
     candleClose: last.close,
     candleTime: new Date(last.time).toISOString(),
 
-    candleCount: candles.length,
-    requiredCandles: 55,
+    rsi: trend.rsi,
+    vwap: trend.vwap,
 
-    historicalCandles: stats.historicalCandles || 0,
-    intradayCandles: stats.intradayCandles || 0,
+    ema9: trend.ema9,
+    ema21: trend.ema21,
+    ema50: trend.ema50,
 
-    rsi: rsi !== null
-      ? Number(rsi.toFixed(2))
-      : null,
+    adx: trend.adx,
+    adr,
 
-    vwap: vwap !== null
-      ? Number(vwap.toFixed(2))
-      : null,
+    macd: macd?.macd ?? null,
 
-    ema9: ema9 !== null
-      ? Number(ema9.toFixed(2))
-      : null,
-
-    ema21: ema21 !== null
-      ? Number(ema21.toFixed(2))
-      : null,
-
-    ema50: ema50 !== null
-      ? Number(ema50.toFixed(2))
-      : null,
-
-    adx: adx !== null
-      ? Number(adx.toFixed(2))
-      : null,
-
-    adr: adr !== null
-      ? Number(adr.toFixed(2))
-      : null,
-
-    macd: macd
-      ? Number(macd.macd.toFixed(4))
-      : null,
-
-    volume: last.volume,
-    averageVolume: Math.round(avgVolume),
-
-    volumeMultiplier: Number(
-      (avgVolume > 0
-        ? last.volume / avgVolume
-        : 0).toFixed(2)
-    ),
+    volume: volume.current,
+    averageVolume: volume.average,
+    volumeMultiplier: volume.multiplier,
 
     oi: oiData.currentOI,
-    oiChange: oiData.change,
-    oiChangePercent: oiData.percent,
-    oiReady: oiData.ready,
-
-    footprintProxy: orderFlow,
+    oiChange: oi.change,
+    oiChangePercent: oi.oiChangePercent,
+    oiReady: oi.valid,
 
     peScore,
     ceScore,
@@ -999,165 +958,364 @@ function analyseIndex(
     peChecks,
     ceChecks,
 
+    dataValid: allValid,
+
+    orderFlow: calculateOrderFlow(futureQuote),
+
+    reason: direction
+      ? "ALL SIX CONDITIONS CONFIRMED"
+      : "Waiting for all six conditions",
+
     timestamp: new Date().toISOString()
   };
 }
 
 // ------------------------------------------------------
-// SCAN ONE INDEX
+// DUPLICATE CANDLE PROTECTION
 // ------------------------------------------------------
 
-async function scanOneIndex(name) {
-  try {
-    const config = INDEXES[name];
+function isNewSignal(index, direction, candleTime) {
+  const id = `${index}_${direction}_${candleTime}`;
 
-    if (!config) {
-      throw new Error("Index configuration missing");
+  if (signalIds.has(id)) return false;
+
+  signalIds.add(id);
+
+  return true;
+}
+
+
+// ======================================================
+// SMART TRADE INDIA V13 PRO
+// PART 3 OF 3
+// OPTION SELECTOR + SCANNER + DASHBOARD + API ROUTES
+// ======================================================
+
+const signals = [];
+const scanResults = {};
+let scanRunning = false;
+let lastScanTime = null;
+
+// ------------------------------------------------------
+// COMMON HELPERS
+// ------------------------------------------------------
+
+function getNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function getExpiryDate(value) {
+  if (value === undefined || value === null) return "";
+
+  if (typeof value === "number" || /^\d+$/.test(String(value))) {
+    const n = Number(value);
+    const d = new Date(n > 100000000000 ? n : n * 1000);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+
+  const s = String(value);
+  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : "";
+}
+
+function getTodayIndia() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+function getNextExpiry(contracts) {
+  const today = getTodayIndia();
+
+  return contracts
+    .map(x => ({
+      ...x,
+      expiryDate: getExpiryDate(x.expiry)
+    }))
+    .filter(x => x.expiryDate && x.expiryDate >= today)
+    .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))[0];
+}
+
+// ------------------------------------------------------
+// OPTION CONTRACTS
+// ------------------------------------------------------
+
+async function getOptionContracts(indexKey) {
+  const url =
+    `${BASE}/v2/option/contract?instrument_key=${encodeURIComponent(indexKey)}`;
+
+  const response = await upstoxRequest(url);
+  const list = response?.data || [];
+
+  if (!Array.isArray(list)) return [];
+
+  return list;
+}
+
+async function getOptionChain(indexKey, expiryDate) {
+  if (!expiryDate) return [];
+
+  const url =
+    `${BASE}/v2/option/chain?instrument_key=${encodeURIComponent(indexKey)}` +
+    `&expiry_date=${encodeURIComponent(expiryDate)}`;
+
+  const response = await upstoxRequest(url);
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
+// ------------------------------------------------------
+// OPTION SELL CANDIDATE SELECTOR
+// ------------------------------------------------------
+
+function selectOptionToSell(chain, optionType) {
+  if (!Array.isArray(chain) || !chain.length) return null;
+
+  const candidates = [];
+
+  for (const row of chain) {
+    const option =
+      optionType === "PE"
+        ? row.put_options
+        : row.call_options;
+
+    if (!option) continue;
+
+    const market = option.market_data || {};
+    const greeks = option.option_greeks || {};
+
+    const ltp = getNumber(market.ltp);
+    const oi = getNumber(market.oi);
+    const volume = getNumber(market.volume);
+    const delta = Math.abs(getNumber(greeks.delta));
+
+    if (ltp <= 0 || oi <= 0 || volume <= 0) continue;
+
+    // Avoid extremely low-liquidity contracts.
+    if (volume < 1 || oi < 1) continue;
+
+    // Prefer liquid, reasonably priced contracts.
+    candidates.push({
+      instrumentKey: option.instrument_key || "",
+      strike: getNumber(row.strike_price),
+      optionType,
+      ltp,
+      oi,
+      volume,
+      delta
+    });
+  }
+
+  if (!candidates.length) return null;
+
+  // Prefer liquidity first, then a moderate absolute delta.
+  candidates.sort((a, b) => {
+    const scoreA =
+      Math.log10(a.oi + 1) +
+      Math.log10(a.volume + 1) -
+      Math.abs(a.delta - 0.25);
+
+    const scoreB =
+      Math.log10(b.oi + 1) +
+      Math.log10(b.volume + 1) -
+      Math.abs(b.delta - 0.25);
+
+    return scoreB - scoreA;
+  });
+
+  return candidates[0];
+}
+
+// ------------------------------------------------------
+// INDEX SCANNER
+// ------------------------------------------------------
+
+async function scanOneIndex(index) {
+  try {
+    const future = await findNearestFuture(index);
+
+    if (!future || !future.instrument_key) {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: "Nearest future contract not found"
+      };
     }
 
-    const future = findNearestFuture(name);
-
-    const [quotes, candles, chain] = await Promise.all([
-      getMarketQuotes([
-        config.spotKey,
-        future.instrument_key
-      ]),
-      getCandles(future.instrument_key),
-      getOptionChain(config.spotKey)
+    const quoteResponse = await getMarketQuotes([
+      future.instrument_key
     ]);
 
-    const spotRaw = quotes[config.spotKey];
-    const futureRaw = quotes[future.instrument_key];
-
-    if (!spotRaw || !futureRaw) {
-      throw new Error("Spot/Futures quote unavailable");
-    }
-
-    const spotQuote = extractQuote(spotRaw);
-    const futureQuote = extractQuote(futureRaw);
-
-    if (!spotQuote.ltp || !futureQuote.ltp) {
-      throw new Error("Invalid live price");
-    }
-
-    if (!candles.length) {
-      throw new Error("Futures candles unavailable");
-    }
-
-    const lastCandle = candles[candles.length - 1];
-
-    const currentOI =
-      lastCandle.oi > 0
-        ? lastCandle.oi
-        : futureQuote.oi;
-
-    const oiData = calculateOIChange(
-      future.instrument_key,
-      currentOI
+    const quote = extractQuote(
+      quoteResponse,
+      future.instrument_key
     );
 
-    oiData.currentOI = currentOI;
+    if (!quote) {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: "Live futures quote unavailable"
+      };
+    }
 
+    const candles = await getCandles(future.instrument_key);
+
+    if (!Array.isArray(candles) || candles.length < CONFIG.MIN_CANDLES) {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: "Not enough completed 5-minute candles",
+        candleCount: candles?.length || 0
+      };
+    }
+
+    // PART 2 analysis: all six conditions are mandatory.
     const analysis = analyseIndex(
-      name,
+      index.name,
       candles,
-      spotQuote,
-      futureQuote,
-      oiData
+      quote
     );
 
-    analysis.futuresInstrumentKey =
-      future.instrument_key;
-
-    analysis.futuresSymbol =
-      future.trading_symbol;
-
-    analysis.futuresExpiry =
-      future.expiry;
-
-    if (analysis.direction) {
-      analysis.selectedStrike = selectSellStrike(
-        chain,
-        analysis.direction
-      );
-
-      if (!analysis.selectedStrike) {
-        analysis.status = "WAIT";
-        analysis.reason = "No liquid OTM option contract";
-      }
+    if (!analysis || analysis.signal === "WAIT") {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: analysis?.reason || "Six conditions not satisfied",
+        analysis
+      };
     }
 
-    // Only all-six-confirmed signals are saved.
-    if (
-      analysis.status === "VERY_STRONG_SELL" &&
-      analysis.selectedStrike
-    ) {
-      const signalId =
-        name + "_" +
-        analysis.direction + "_" +
-        analysis.candleTime;
+    const optionType =
+      analysis.signal === "PE_SELL" ? "PE" : "CE";
 
-      if (!signals.some(s => s.id === signalId)) {
-        signals.unshift({
-          id: signalId,
-          ...analysis
-        });
+    // Get nearest valid expiry from actual contracts.
+    const contracts = await getOptionContracts(index.instrument_key);
+    const expiry = getNextExpiry(contracts);
 
-        if (signals.length > CONFIG.MAX_SIGNALS) {
-          signals.pop();
-        }
-      }
+    if (!expiry) {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: "Valid option expiry not found",
+        analysis
+      };
     }
 
-    marketCache.set(name, analysis);
+    const chain = await getOptionChain(
+      index.instrument_key,
+      expiry.expiryDate
+    );
 
-    return analysis;
+    const selectedOption = selectOptionToSell(
+      chain,
+      optionType
+    );
 
-  } catch (error) {
-    const result = {
-      index: name,
-      status: "ERROR",
-      error: error.message,
-      timestamp: new Date().toISOString()
+    if (!selectedOption || !selectedOption.instrumentKey) {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: "Liquid option contract not found",
+        analysis
+      };
+    }
+
+    const candleTime =
+      candles[candles.length - 1].time ||
+      candles[candles.length - 1].timestamp ||
+      "";
+
+    const signalId =
+      `${index.name}_${optionType}_${candleTime}`;
+
+    if (!isNewSignal(signalId)) {
+      return {
+        index: index.name,
+        status: "WAIT",
+        reason: "Duplicate completed-candle signal",
+        analysis
+      };
+    }
+
+    const signal = {
+      id: signalId,
+      index: index.name,
+      direction: analysis.signal,
+      action: `SELL ${optionType}`,
+      optionType,
+      expiry: expiry.expiryDate,
+      strike: selectedOption.strike,
+      optionInstrumentKey: selectedOption.instrumentKey,
+      optionLtp: selectedOption.ltp,
+      optionOI: selectedOption.oi,
+      optionVolume: selectedOption.volume,
+      futurePrice: getNumber(quote.last_price),
+      candleTime,
+      timeframe: "5 minute",
+      conditionsPassed: 6,
+      totalConditions: 6,
+      paperMode: CONFIG.PAPER_MODE,
+      status: "VERY_STRONG",
+      createdAt: new Date().toISOString(),
+      analysis
     };
 
-    marketCache.set(name, result);
+    signals.unshift(signal);
 
-    return result;
+    if (signals.length > CONFIG.MAX_SIGNALS) {
+      signals.length = CONFIG.MAX_SIGNALS;
+    }
+
+    return {
+      index: index.name,
+      status: "VERY_STRONG",
+      signal
+    };
+
+  } catch (error) {
+    return {
+      index: index.name,
+      status: "ERROR",
+      reason: error.message
+    };
   }
 }
 
 // ------------------------------------------------------
-// FULL FOUR-INDEX SCAN
+// SCAN ALL FOUR INDEXES
 // ------------------------------------------------------
 
-async function runFullScan() {
+async function scanAllIndexes() {
   if (scanRunning) {
     return {
-      status: "SCAN_ALREADY_RUNNING",
-      results: Object.fromEntries(marketCache)
+      status: "BUSY",
+      message: "Previous scan is still running"
     };
   }
 
   scanRunning = true;
 
   try {
-    await loadInstrumentMaster();
+    const results = [];
 
-    const results = {};
-
-    for (const name of Object.keys(INDEXES)) {
-      results[name] = await scanOneIndex(name);
+    for (const index of INDEXES) {
+      const result = await scanOneIndex(index);
+      results.push(result);
+      scanResults[index.name] = result;
     }
 
     lastScanTime = new Date().toISOString();
 
     return {
-      status: "SUCCESS",
-      version: CONFIG.VERSION,
+      status: "OK",
       lastScanTime,
-      indexes: Object.keys(INDEXES),
-      results
+      results,
+      signals: signals.slice(0, 50)
     };
 
   } finally {
@@ -1166,535 +1324,265 @@ async function runFullScan() {
 }
 
 // ------------------------------------------------------
-// INDIA MARKET TIME
-// ------------------------------------------------------
-
-function getIndiaTime() {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(new Date());
-
-  const get = type =>
-    parts.find(p => p.type === type)?.value;
-
-  const weekday = get("weekday");
-  const hour = Number(get("hour"));
-  const minute = Number(get("minute"));
-
-  return {
-    weekday,
-    hour,
-    minute,
-    minutes: hour * 60 + minute
-  };
-}
-
-function isMarketTime() {
-  const t = getIndiaTime();
-
-  return (
-    t.weekday !== "Sat" &&
-    t.weekday !== "Sun" &&
-    t.minutes >= 555 &&
-    t.minutes <= 930
-  );
-}
-
-// ------------------------------------------------------
 // DASHBOARD HTML
 // ------------------------------------------------------
 
-const DASHBOARD = `<!DOCTYPE html>
+function dashboardHTML() {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SMART TRADE INDIA V13 PRO</title>
-
 <style>
-*{box-sizing:border-box}
-body{
-  margin:0;padding:16px;
-  background:#09111f;color:#eaf0ff;
-  font-family:Arial,sans-serif
+body {
+  margin: 0;
+  padding: 16px;
+  background: #101827;
+  color: #e8eef8;
+  font-family: Arial, sans-serif;
 }
-h1{font-size:22px;color:#56c5ff}
-.sub{color:#a5b4ca;font-size:12px}
-.cards{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-  gap:12px;margin-top:18px
+h2 { color: #35d0a0; }
+button {
+  background: #159b75;
+  color: white;
+  border: 0;
+  padding: 12px 18px;
+  border-radius: 7px;
+  font-size: 15px;
 }
-.card{
-  background:#142238;
-  border:1px solid #2a405e;
-  border-radius:12px;padding:15px
+.card {
+  background: #1b293c;
+  padding: 14px;
+  margin: 12px 0;
+  border-radius: 9px;
+  overflow-wrap: anywhere;
 }
-.name{font-size:18px;font-weight:bold}
-.price{font-size:25px;margin:12px 0}
-.green{color:#30e49a}
-.red{color:#ff697d}
-.yellow{color:#ffcf70}
-button{
-  background:#147bc1;color:white;border:0;
-  border-radius:8px;padding:12px;margin:5px;
-  font-weight:bold
-}
-table{width:100%;border-collapse:collapse;font-size:12px}
-td,th{
-  padding:9px;border-bottom:1px solid #30415a;
-  text-align:left
-}
-.panel{
-  overflow:auto;background:#142238;
-  padding:12px;border-radius:12px;margin-top:15px
-}
-.small{font-size:12px;color:#aabbd1}
+.good { color: #39dfa2; }
+.wait { color: #ffc857; }
+.bad { color: #ff7777; }
+.small { color: #aab8ca; font-size: 12px; }
 </style>
 </head>
-
 <body>
-
-<h1>SMART TRADE INDIA V13 PRO</h1>
-
-<div class="sub">
-FOUR INDEX LIVE FUTURES DATA | HISTORICAL 5M CANDLES | ALL SIX CONDITIONS
-</div>
-
-<button onclick="refresh()">REFRESH SCAN</button>
-<button onclick="soundOn()">ENABLE SOUND</button>
-
-<div id="status" class="sub">Connecting...</div>
-
-<div class="cards" id="cards"></div>
-
-<div class="panel">
-<h3>VERY STRONG SELL ALERTS</h3>
-<table>
-<thead>
-<tr>
-<th>Index</th>
-<th>Signal</th>
-<th>Strike</th>
-<th>LTP</th>
-<th>OI</th>
-<th>Time</th>
-</tr>
-</thead>
-<tbody id="alerts"></tbody>
-</table>
-</div>
-
-<div class="panel">
-<h3>ALL SIX CONDITIONS</h3>
-<div id="details" class="small">Waiting...</div>
-</div>
-
+<h2>SMART TRADE INDIA V13 PRO</h2>
+<p>Live NSE / BSE Index Options Scanner</p>
+<p id="status">Connecting...</p>
+<button onclick="runScan()">SCAN NOW</button>
+<h3>INDEX STATUS</h3>
+<div id="indexes"></div>
+<h3>VERY STRONG SELL SIGNALS</h3>
+<div id="signals"></div>
 <script>
-let soundEnabled=false;
-let seen=new Set();
+async function loadData() {
+  try {
+    const r = await fetch('/api/scan');
+    const d = await r.json();
 
-function soundOn(){
-  soundEnabled=true;
+    document.getElementById('status').innerText =
+      'Last scan: ' + (d.lastScanTime || 'Waiting');
 
-  try{
-    const ctx=new (
-      window.AudioContext||window.webkitAudioContext
-    )();
+    const results = d.results || [];
 
-    const osc=ctx.createOscillator();
-    osc.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime+0.1);
-  }catch(e){}
-}
+    document.getElementById('indexes').innerHTML =
+      results.map(x => {
+        const cls = x.status === 'VERY_STRONG' ? 'good' :
+                    x.status === 'ERROR' ? 'bad' : 'wait';
 
-function beep(){
-  if(!soundEnabled)return;
+        return '<div class="card"><b>' + x.index +
+          '</b><p class="' + cls + '">' + x.status +
+          '</p><p class="small">' +
+          (x.reason || x.signal?.action || '') +
+          '</p></div>';
+      }).join('');
 
-  try{
-    const ctx=new (
-      window.AudioContext||window.webkitAudioContext
-    )();
+    document.getElementById('signals').innerHTML =
+      (d.signals || []).map(s =>
+        '<div class="card">' +
+        '<b class="good">' + s.index + ' — ' + s.action +
+        '</b><p>Strike: ' + s.strike +
+        '</p><p>Expiry: ' + s.expiry +
+        '</p><p>Option LTP: ' + s.optionLtp +
+        '</p><p>Future price: ' + s.futurePrice +
+        '</p><p>Conditions: ' + s.conditionsPassed +
+        '/' + s.totalConditions +
+        '</p><p class="small">Paper mode: ' + s.paperMode +
+        '</p></div>'
+      ).join('') || '<div class="card">No confirmed signals</div>';
 
-    const osc=ctx.createOscillator();
-    const gain=ctx.createGain();
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.frequency.value=880;
-    gain.gain.value=0.15;
-
-    osc.start();
-    osc.stop(ctx.currentTime+0.35);
-  }catch(e){}
-}
-
-function fmt(v){
-  if(v===null||v===undefined||
-     !Number.isFinite(Number(v))){
-    return "N/A";
-  }
-
-  return Number(v).toLocaleString("en-IN");
-}
-
-function checksText(checks){
-  if(!checks)return "DATA UNAVAILABLE";
-
-  return Object.entries(checks).map(([k,v])=>
-    k+": "+(v?"PASS":"FAIL")
-  ).join(" | ");
-}
-
-async function refresh(){
-  try{
-    const [marketResponse,signalResponse]=await Promise.all([
-      fetch("/api/market"),
-      fetch("/api/signals")
-    ]);
-
-    if(!marketResponse.ok||!signalResponse.ok){
-      throw new Error("Dashboard API error");
-    }
-
-    const market=await marketResponse.json();
-    const alerts=await signalResponse.json();
-
-    document.getElementById("status").textContent=
-      "Last scan: "+(market.lastScanTime||"Waiting")+
-      " | Mode: "+market.mode+
-      " | Version: "+market.version;
-
-    const results=market.results||{};
-
-    document.getElementById("cards").innerHTML=
-      Object.values(results).map(x=>{
-        const signal=x.direction||"WAIT";
-
-        const color=signal==="CE"?"red":
-          signal==="PE"?"green":"yellow";
-
-        const strike=x.selectedStrike;
-
-        return \`
-        <div class="card">
-          <div class="name">\${x.index}</div>
-
-          <div class="price">
-            \${fmt(x.underlyingPrice)}
-          </div>
-
-          <div class="\${color}">
-            \${x.status==="VERY_STRONG_SELL"
-              ?"VERY STRONG "+signal+" SELL"
-              :x.status}
-          </div>
-
-          <p class="small">
-            Futures: \${fmt(x.futuresPrice)}<br>
-            Candles: \${fmt(x.candleCount)} / 55<br>
-            Historical: \${fmt(x.historicalCandles)}<br>
-            Intraday: \${fmt(x.intradayCandles)}<br>
-            RSI: \${fmt(x.rsi)} |
-            ADX: \${fmt(x.adx)}<br>
-            VWAP: \${fmt(x.vwap)}<br>
-            EMA 50: \${fmt(x.ema50)}<br>
-            MACD: \${fmt(x.macd)}<br>
-            Volume: \${fmt(x.volume)}<br>
-            OI: \${fmt(x.oi)}<br>
-            OI Change: \${fmt(x.oiChangePercent)}%
-          </p>
-
-          <b>
-            \${strike
-              ?strike.strike+" "+signal+" SELL"
-              :"No confirmed strike"}
-          </b>
-
-          <p class="small">
-            \${x.reason||x.error||""}
-          </p>
-        </div>
-        \`;
-      }).join("");
-
-    const rows=alerts.signals||[];
-
-    for(const s of rows){
-      if(!seen.has(s.id)){
-        seen.add(s.id);
-        beep();
-      }
-    }
-
-    document.getElementById("alerts").innerHTML=
-      rows.map(s=>\`
-        <tr>
-          <td>\${s.index}</td>
-          <td class="red">\${s.direction} SELL</td>
-          <td>\${s.selectedStrike?.strike??"-"}</td>
-          <td>\${s.selectedStrike?.ltp??"-"}</td>
-          <td>\${fmt(s.selectedStrike?.oi)}</td>
-          <td>\${new Date(s.timestamp).toLocaleTimeString()}</td>
-        </tr>
-      \`).join("");
-
-    document.getElementById("details").innerHTML=
-      Object.values(results).map(x=>
-        "<p><b>"+x.index+"</b>"+
-        "<br>PE: "+checksText(x.peChecks)+
-        "<br>CE: "+checksText(x.ceChecks)+
-        "<br>Candles: "+fmt(x.candleCount)+
-        "<br>Status: "+x.status+"</p>"
-      ).join("");
-
-  }catch(e){
-    document.getElementById("status").textContent=
-      "ERROR: "+e.message;
+  } catch(e) {
+    document.getElementById('status').innerText =
+      'Dashboard error: ' + e.message;
   }
 }
 
-refresh();
-setInterval(refresh,5000);
+async function runScan() {
+  document.getElementById('status').innerText = 'Scanning...';
+  try {
+    await fetch('/api/scan?run=1');
+    await loadData();
+  } catch(e) {
+    document.getElementById('status').innerText = e.message;
+  }
+}
+
+loadData();
+setInterval(loadData, 15000);
 </script>
-
 </body>
 </html>`;
+}
 
 // ------------------------------------------------------
-// HTTP SERVER
+// HTTP ROUTES
 // ------------------------------------------------------
 
 const server = http.createServer(async (req, res) => {
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    });
-
-    return res.end();
-  }
-
-  const url = new URL(
-    req.url,
-    "http://localhost:" + PORT
-  );
+  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+  const path = url.pathname;
 
   try {
-
-    if (req.method !== "GET") {
-      return sendJson(res, 405, {
-        error: "GET requests only"
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
       });
+      return res.end();
     }
 
-    // DASHBOARD
-    if (url.pathname === "/") {
+    if (path === "/" && req.method === "GET") {
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8"
       });
-
-      return res.end(DASHBOARD);
+      return res.end(dashboardHTML());
     }
 
-    // HEALTH
-    if (url.pathname === "/health") {
+    if (path === "/health") {
       return sendJson(res, 200, {
         status: "OK",
-        version: CONFIG.VERSION,
+        version: "SMART_TRADE_INDIA_V13_PRO",
+        serverTime: new Date().toISOString(),
         tokenConfigured: Boolean(TOKEN),
-        instrumentMasterLoaded: instrumentMaster.length > 0,
-        started: serverStarted,
-        lastScanTime
+        paperMode: CONFIG.PAPER_MODE
       });
     }
 
-    // STATUS
-    if (url.pathname === "/api/status") {
+    if (path === "/api/status") {
       return sendJson(res, 200, {
-        version: CONFIG.VERSION,
+        status: "OK",
+        version: "V13 PRO",
         tokenConfigured: Boolean(TOKEN),
         scanRunning,
         lastScanTime,
-        paperMode: CONFIG.PAPER_MODE,
-        indexes: Object.keys(INDEXES)
+        indexes: INDEXES.map(x => x.name)
       });
     }
 
-    // MANUAL SCAN
-    if (url.pathname === "/api/scan") {
+    if (path === "/api/indexes") {
+      return sendJson(res, 200, {
+        indexes: INDEXES.map(x => x.name)
+      });
+    }
 
-      if (!TOKEN) {
-        return sendJson(res, 401, {
-          status: "ERROR",
-          error: "UPSTOX_ACCESS_TOKEN missing"
-        });
+    if (path === "/api/scan") {
+      if (url.searchParams.get("run") === "1") {
+        const result = await scanAllIndexes();
+        return sendJson(res, 200, result);
       }
 
-      const result = await runFullScan();
-
-      return sendJson(res, 200, result);
-    }
-
-    // MARKET DATA
-    if (url.pathname === "/api/market") {
       return sendJson(res, 200, {
-        version: CONFIG.VERSION,
-        mode: TOKEN ? "LIVE_API_POLLING" : "NO_TOKEN",
+        status: "OK",
         lastScanTime,
-        scanRunning,
-        indexes: Object.keys(INDEXES),
-        results: Object.fromEntries(marketCache)
+        results: Object.values(scanResults),
+        signals: signals.slice(0, 50)
       });
     }
 
-    // SIGNALS
-    if (url.pathname === "/api/signals") {
+    if (path === "/api/signals") {
       return sendJson(res, 200, {
         count: signals.length,
         signals
       });
     }
 
-    // INDEX LIST
-    if (url.pathname === "/api/indexes") {
+    if (path === "/api/market") {
       return sendJson(res, 200, {
-        indexes: INDEXES
+        indexes: Object.values(scanResults),
+        lastScanTime
       });
     }
 
-    
-    // FUTURES DATA STATUS
-    if (url.pathname === "/api/futures") {
-      return sendJson(res, 200, {
-        indexes: Object.keys(INDEXES).map(name => {
-          try {
-            const future = findNearestFuture(name);
+    if (path === "/api/futures") {
+      const data = [];
 
-            return {
-              index: name,
-              status: "FOUND",
-              tradingSymbol: future.trading_symbol,
-              instrumentKey: future.instrument_key,
-              expiry: future.expiry
-            };
+      for (const index of INDEXES) {
+        const future = await findNearestFuture(index);
+        data.push({
+          index: index.name,
+          future: future || null
+        });
+      }
 
-          } catch (error) {
-            return {
-              index: name,
-              status: "ERROR",
-              error: error.message
-            };
-          }
-        })
-      });
-    }
-
-    // CANDLE DIAGNOSTICS
-    if (url.pathname === "/api/candles") {
-      return sendJson(res, 200, {
-        version: CONFIG.VERSION,
-        indexes: Object.fromEntries(
-          [...marketCache.entries()].map(([name, data]) => [
-            name,
-            {
-              candleCount: data.candleCount || 0,
-              requiredCandles: 55,
-              historicalCandles: data.historicalCandles || 0,
-              intradayCandles: data.intradayCandles || 0,
-              dataStatus: data.dataStatus || "READY",
-              status: data.status
-            }
-          ])
-        )
-      });
+      return sendJson(res, 200, { data });
     }
 
     return sendJson(res, 404, {
-      error: "Route not found",
-      routes: [
-        "/",
-        "/health",
-        "/api/status",
-        "/api/scan",
-        "/api/market",
-        "/api/signals",
-        "/api/indexes",
-        "/api/futures",
-        "/api/candles"
-      ]
+      status: "NOT_FOUND",
+      path
     });
 
   } catch (error) {
     return sendJson(res, 500, {
       status: "ERROR",
-      error: error.message
+      message: error.message
     });
   }
 });
 
 // ------------------------------------------------------
-// AUTOMATIC SCANNER
+// START SERVER + AUTOMATIC SCAN
 // ------------------------------------------------------
 
-setInterval(() => {
-
-  if (
-    TOKEN &&
-    isMarketTime() &&
-    !scanRunning
-  ) {
-    runFullScan().catch(error => {
-      console.error(
-        "[V13 SCAN ERROR]",
-        error.message
-      );
-    });
+async function startServer() {
+  if (!TOKEN) {
+    console.error("[V13] UPSTOX_ACCESS_TOKEN missing");
   }
 
-}, CONFIG.SCAN_INTERVAL);
-
-// ------------------------------------------------------
-// START SERVER
-// ------------------------------------------------------
-
-server.listen(PORT, "0.0.0.0", async () => {
-
-  console.log("====================================");
-  console.log("SMART TRADE INDIA V13 PRO");
-  console.log("PORT:", PORT);
-  console.log("TOKEN:", TOKEN ? "CONFIGURED" : "MISSING");
-  console.log("INDEXES:", Object.keys(INDEXES).join(", "));
-  console.log("HISTORICAL + INTRADAY 5M CANDLES");
-  console.log("MODE: PAPER");
-  console.log("ALL SIX CONDITIONS REQUIRED");
-  console.log("====================================");
-
-  if (TOKEN) {
-    try {
-      await loadInstrumentMaster();
-
-      console.log(
-        "[V13] Instrument Master Loaded:",
-        instrumentMaster.length
-      );
-
-      console.log("[V13] Four Index Scanner Ready");
-
-    } catch (error) {
-      console.error(
-        "[V13 MASTER ERROR]",
-        error.message
-      );
-    }
+  try {
+    await loadInstrumentMaster();
+    console.log("[V13] Instrument master loaded");
+  } catch (error) {
+    console.error("[V13] Instrument master error:", error.message);
   }
-});
-  
+
+  server.listen(PORT, () => {
+    console.log("====================================");
+    console.log("SMART TRADE INDIA V13 PRO RUNNING");
+    console.log("PORT:", PORT);
+    console.log("PAPER MODE:", CONFIG.PAPER_MODE);
+    console.log("INDEXES:", INDEXES.map(x => x.name).join(", "));
+    console.log("DASHBOARD: /");
+    console.log("HEALTH: /health");
+    console.log("SCAN: /api/scan");
+    console.log("====================================");
+  });
+
+  // Scan immediately, then every configured interval.
+  setTimeout(() => {
+    scanAllIndexes().catch(err =>
+      console.error("[V13] Initial scan error:", err.message)
+    );
+  }, 3000);
+
+  setInterval(() => {
+    scanAllIndexes().catch(err =>
+      console.error("[V13] Auto scan error:", err.message)
+    );
+  }, CONFIG.SCAN_INTERVAL);
+}
+
+startServer();
+
+
+                 
