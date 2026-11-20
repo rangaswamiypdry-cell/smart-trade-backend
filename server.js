@@ -2,7 +2,7 @@
 "use strict";
 
 // ======================================================
-// SMART TRADE INDIA V12 PRO
+// SMART TRADE INDIA V13 PRO
 // FOUR INDEX VERY STRONG SELL SCANNER
 // UPSTOX API | NODE.JS 20+
 // PART 1 OF 2
@@ -16,7 +16,7 @@ const TOKEN = process.env.UPSTOX_ACCESS_TOKEN || "";
 const BASE = "https://api.upstox.com";
 
 const CONFIG = {
-  VERSION: "SMART_TRADE_INDIA_V12_PRO",
+  VERSION: "SMART_TRADE_INDIA_V13_PRO",
   TIMEFRAME: 5,
   SCAN_INTERVAL: 60000,
   RSI_PERIOD: 14,
@@ -34,7 +34,7 @@ const CONFIG = {
   PAPER_MODE: true
 };
 
-// MIDCPNIFTY REMOVED COMPLETELY
+// MIDCPNIFTY REMOVED
 
 const INDEXES = {
   NIFTY: {
@@ -43,21 +43,18 @@ const INDEXES = {
     underlyingSymbol: "NIFTY",
     segment: "NSE_FO"
   },
-
   BANKNIFTY: {
     name: "BANKNIFTY",
     spotKey: "NSE_INDEX|Nifty Bank",
     underlyingSymbol: "BANKNIFTY",
     segment: "NSE_FO"
   },
-
   FINNIFTY: {
     name: "FINNIFTY",
     spotKey: "NSE_INDEX|Nifty Fin Service",
     underlyingSymbol: "FINNIFTY",
     segment: "NSE_FO"
   },
-
   SENSEX: {
     name: "SENSEX",
     spotKey: "BSE_INDEX|SENSEX",
@@ -146,15 +143,10 @@ async function loadInstrumentMaster(force = false) {
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-
   const jsonBuffer = zlib.gunzipSync(buffer);
-
   const parsed = JSON.parse(jsonBuffer.toString("utf8"));
 
-  instrumentMaster = Array.isArray(parsed)
-    ? parsed
-    : [];
-
+  instrumentMaster = Array.isArray(parsed) ? parsed : [];
   instrumentMasterTime = Date.now();
 
   if (!instrumentMaster.length) {
@@ -213,18 +205,12 @@ async function getMarketQuotes(keys) {
 
   const output = {};
 
-  if (unique.length === 0) {
-    return output;
-  }
+  if (unique.length === 0) return output;
 
-  // Upstox V3 supports up to 500 keys per request
   for (let i = 0; i < unique.length; i += 100) {
-
     const chunk = unique.slice(i, i + 100);
 
-    const query = encodeURIComponent(
-      chunk.join(",")
-    );
+    const query = encodeURIComponent(chunk.join(","));
 
     const result = await upstoxRequest(
       "/v3/market-quote/quotes?instrument_key=" + query
@@ -235,23 +221,16 @@ async function getMarketQuotes(keys) {
       !result.data ||
       typeof result.data !== "object"
     ) {
-      throw new Error(
-        "Invalid Upstox market quote response"
-      );
+      throw new Error("Invalid Upstox market quote response");
     }
 
     const entries = Object.entries(result.data);
 
     for (const requestedKey of chunk) {
-
-      const normalizedKey =
-        requestedKey.replace("|", ":");
-
+      const normalizedKey = requestedKey.replace("|", ":");
       let quote = null;
 
-      // Match by instrument token
       for (const [responseKey, value] of entries) {
-
         if (
           value &&
           (
@@ -263,7 +242,6 @@ async function getMarketQuotes(keys) {
           break;
         }
 
-        // Match exchange:symbol response key
         if (responseKey === normalizedKey) {
           quote = value;
           break;
@@ -273,12 +251,7 @@ async function getMarketQuotes(keys) {
       if (quote) {
         output[requestedKey] = quote;
       } else {
-        console.log(
-          "[QUOTE NOT FOUND]",
-          requestedKey,
-          "Available:",
-          entries.map(item => item[0])
-        );
+        console.log("[QUOTE NOT FOUND]", requestedKey);
       }
     }
   }
@@ -292,7 +265,6 @@ async function getMarketQuotes(keys) {
 
   return output;
 }
-
 
 // ------------------------------------------------------
 // EXTRACT QUOTE
@@ -319,19 +291,35 @@ function extractQuote(data) {
 }
 
 // ------------------------------------------------------
-// COMPLETED 5-MINUTE FUTURES CANDLES
+// IST DATE HELPERS
 // ------------------------------------------------------
 
-async function getCandles(instrumentKey) {
-  const key = encodeURIComponent(instrumentKey);
+function indiaDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
 
-  const result = await upstoxRequest(
-    `/v3/historical-candle/intraday/${key}/minutes/5`
+  const get = type =>
+    parts.find(p => p.type === type)?.value;
+
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function shiftDate(dateString, days) {
+  const [year, month, day] = dateString.split("-").map(Number);
+
+  const date = new Date(
+    Date.UTC(year, month - 1, day + days)
   );
 
-  const now = Date.now();
+  return date.toISOString().slice(0, 10);
+}
 
-  return (result.data?.candles || [])
+function normalizeCandleRows(rows, now) {
+  return (Array.isArray(rows) ? rows : [])
     .map(c => ({
       time: new Date(c[0]).getTime(),
       open: Number(c[1]),
@@ -343,10 +331,120 @@ async function getCandles(instrumentKey) {
     }))
     .filter(c =>
       Number.isFinite(c.time) &&
-      c.time + 5 * 60 * 1000 <= now &&
-      c.close > 0
-    )
+      Number.isFinite(c.close) &&
+      c.close > 0 &&
+      c.time + 5 * 60 * 1000 <= now
+    );
+}
+
+// ------------------------------------------------------
+// HISTORICAL + CURRENT DAY COMPLETED 5-MINUTE CANDLES
+// ------------------------------------------------------
+
+async function getCandles(instrumentKey) {
+  const key = encodeURIComponent(instrumentKey);
+  const now = Date.now();
+
+  const today = indiaDateString(new Date(now));
+  const fromDate = shiftDate(today, -10);
+  const toDate = shiftDate(today, -1);
+
+  const [historicalResult, intradayResult] =
+    await Promise.allSettled([
+      upstoxRequest(
+        `/v3/historical-candle/${key}/minutes/5/${toDate}/${fromDate}`
+      ),
+      upstoxRequest(
+        `/v3/historical-candle/intraday/${key}/minutes/5`
+      )
+    ]);
+
+  const historicalRows =
+    historicalResult.status === "fulfilled"
+      ? historicalResult.value.data?.candles || []
+      : [];
+
+  const intradayRows =
+    intradayResult.status === "fulfilled"
+      ? intradayResult.value.data?.candles || []
+      : [];
+
+  if (historicalResult.status === "rejected") {
+    console.error(
+      "[HISTORICAL CANDLES ERROR]",
+      instrumentKey,
+      historicalResult.reason?.message
+    );
+  }
+
+  if (intradayResult.status === "rejected") {
+    console.error(
+      "[INTRADAY CANDLES ERROR]",
+      instrumentKey,
+      intradayResult.reason?.message
+    );
+  }
+
+  const historical = normalizeCandleRows(
+    historicalRows,
+    now
+  );
+
+  const intraday = normalizeCandleRows(
+    intradayRows,
+    now
+  );
+
+  const byTime = new Map();
+
+  for (const candle of historical) {
+    byTime.set(candle.time, candle);
+  }
+
+  for (const candle of intraday) {
+    byTime.set(candle.time, candle);
+  }
+
+  const candles = [...byTime.values()]
     .sort((a, b) => a.time - b.time);
+
+  candles.stats = {
+    historicalCandles: historical.length,
+    intradayCandles: intraday.length,
+    totalCandles: candles.length,
+    fromDate,
+    toDate,
+    today
+  };
+
+  if (!candles.length) {
+    const errors = [];
+
+    if (historicalResult.status === "rejected") {
+      errors.push(historicalResult.reason?.message);
+    }
+
+    if (intradayResult.status === "rejected") {
+      errors.push(intradayResult.reason?.message);
+    }
+
+    throw new Error(
+      errors.filter(Boolean).join(" | ") ||
+      "No completed 5-minute candles returned by Upstox"
+    );
+  }
+
+  return candles;
+}
+
+// TODAY SESSION CANDLES FOR VWAP
+
+function getTodaySessionCandles(candles) {
+  const today = indiaDateString();
+
+  return candles.filter(c =>
+    indiaDateString(new Date(c.time)) === today
+  );
 }
 
 // ------------------------------------------------------
@@ -393,10 +491,12 @@ function calculateRSI(values, period = 14) {
     const change = values[i] - values[i - 1];
 
     avgGain =
-      (avgGain * (period - 1) + Math.max(change, 0)) / period;
+      (avgGain * (period - 1) +
+      Math.max(change, 0)) / period;
 
     avgLoss =
-      (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
+      (avgLoss * (period - 1) +
+      Math.max(-change, 0)) / period;
   }
 
   if (avgLoss === 0) return 100;
@@ -415,7 +515,8 @@ function calculateVWAP(candles) {
   let totalVolume = 0;
 
   for (const c of candles) {
-    const typical = (c.high + c.low + c.close) / 3;
+    const typical =
+      (c.high + c.low + c.close) / 3;
 
     totalPV += typical * c.volume;
     totalVolume += c.volume;
@@ -463,8 +564,13 @@ function calculateADX(candles, period = 14) {
     const up = c.high - p.high;
     const down = p.low - c.low;
 
-    plusDM.push(up > down && up > 0 ? up : 0);
-    minusDM.push(down > up && down > 0 ? down : 0);
+    plusDM.push(
+      up > down && up > 0 ? up : 0
+    );
+
+    minusDM.push(
+      down > up && down > 0 ? down : 0
+    );
 
     tr.push(Math.max(
       c.high - c.low,
@@ -582,7 +688,7 @@ function calculateOrderFlow(quote) {
 
 
 // ======================================================
-// SMART TRADE INDIA V12 PRO
+// SMART TRADE INDIA V13 PRO
 // PART 2 OF 2
 // ======================================================
 
@@ -607,7 +713,7 @@ async function getOptionChain(spotKey) {
 function selectSellStrike(chain, direction) {
   const candidates = [];
 
-  for (const item of chain) {
+  for (const item of chain || []) {
     const spot = Number(item.underlying_spot_price || 0);
     const strike = Number(item.strike_price || 0);
 
@@ -689,13 +795,27 @@ function selectSellStrike(chain, direction) {
 // SIX CONDITIONS - VERY STRONG SELL
 // ------------------------------------------------------
 
-function analyseIndex(indexName, candles, spotQuote, futureQuote, oiData) {
+function analyseIndex(
+  indexName,
+  candles,
+  spotQuote,
+  futureQuote,
+  oiData
+) {
+  const stats = candles.stats || {};
+
   if (!candles || candles.length < 55) {
     return {
       index: indexName,
       status: "WAIT",
-      reason: "Need minimum 55 completed 5-minute candles",
-      dataStatus: "INSUFFICIENT_CANDLES"
+      reason: "Historical candles insufficient",
+      dataStatus: "INSUFFICIENT_CANDLES",
+      candleCount: candles?.length || 0,
+      requiredCandles: 55,
+      historicalCandles: stats.historicalCandles || 0,
+      intradayCandles: stats.intradayCandles || 0,
+      peScore: 0,
+      ceScore: 0
     };
   }
 
@@ -709,14 +829,22 @@ function analyseIndex(indexName, candles, spotQuote, futureQuote, oiData) {
   const ema50 = calculateEMA(closes, 50);
 
   const rsi = calculateRSI(closes, 14);
-  const vwap = calculateVWAP(candles);
+
+  // VWAP uses today's session only.
+  const todayCandles = getTodaySessionCandles(candles);
+  const vwap = calculateVWAP(todayCandles);
+
   const adx = calculateADX(candles, 14);
   const adr = calculateADR(candles, 14);
   const macd = calculateMACD(closes);
 
-  const avgVolume = candles
-    .slice(-21, -1)
-    .reduce((sum, c) => sum + c.volume, 0) / 20;
+  const avgVolumeCandles = candles.slice(-21, -1);
+
+  const avgVolume = avgVolumeCandles.length
+    ? avgVolumeCandles.reduce(
+        (sum, c) => sum + c.volume, 0
+      ) / avgVolumeCandles.length
+    : 0;
 
   const volumePass =
     avgVolume > 0 &&
@@ -770,8 +898,11 @@ function analyseIndex(indexName, candles, spotQuote, futureQuote, oiData) {
     oiPrice: oiPass && priceDown
   };
 
-  const peScore = Object.values(peChecks).filter(Boolean).length;
-  const ceScore = Object.values(ceChecks).filter(Boolean).length;
+  const peScore =
+    Object.values(peChecks).filter(Boolean).length;
+
+  const ceScore =
+    Object.values(ceChecks).filter(Boolean).length;
 
   let direction = null;
 
@@ -789,13 +920,18 @@ function analyseIndex(indexName, candles, spotQuote, futureQuote, oiData) {
     direction = "CE";
   }
 
-  const volume = last.volume;
   const orderFlow = calculateOrderFlow(futureQuote);
 
   return {
     index: indexName,
-    status: direction ? "VERY_STRONG_SELL" : "WAIT",
+
+    status: direction
+      ? "VERY_STRONG_SELL"
+      : "WAIT",
+
     direction,
+
+    dataStatus: "READY",
 
     underlyingPrice: spotQuote.ltp,
     futuresPrice: futureQuote.ltp,
@@ -803,20 +939,51 @@ function analyseIndex(indexName, candles, spotQuote, futureQuote, oiData) {
     candleClose: last.close,
     candleTime: new Date(last.time).toISOString(),
 
-    rsi: Number(rsi.toFixed(2)),
-    vwap: Number(vwap.toFixed(2)),
+    candleCount: candles.length,
+    requiredCandles: 55,
 
-    ema9: Number(ema9.toFixed(2)),
-    ema21: Number(ema21.toFixed(2)),
-    ema50: Number(ema50.toFixed(2)),
+    historicalCandles: stats.historicalCandles || 0,
+    intradayCandles: stats.intradayCandles || 0,
 
-    adx: Number(adx.toFixed(2)),
-    adr: Number(adr.toFixed(2)),
+    rsi: rsi !== null
+      ? Number(rsi.toFixed(2))
+      : null,
 
-    volume,
+    vwap: vwap !== null
+      ? Number(vwap.toFixed(2))
+      : null,
+
+    ema9: ema9 !== null
+      ? Number(ema9.toFixed(2))
+      : null,
+
+    ema21: ema21 !== null
+      ? Number(ema21.toFixed(2))
+      : null,
+
+    ema50: ema50 !== null
+      ? Number(ema50.toFixed(2))
+      : null,
+
+    adx: adx !== null
+      ? Number(adx.toFixed(2))
+      : null,
+
+    adr: adr !== null
+      ? Number(adr.toFixed(2))
+      : null,
+
+    macd: macd
+      ? Number(macd.macd.toFixed(4))
+      : null,
+
+    volume: last.volume,
     averageVolume: Math.round(avgVolume),
+
     volumeMultiplier: Number(
-      (avgVolume > 0 ? volume / avgVolume : 0).toFixed(2)
+      (avgVolume > 0
+        ? last.volume / avgVolume
+        : 0).toFixed(2)
     ),
 
     oi: oiData.currentOI,
@@ -828,6 +995,7 @@ function analyseIndex(indexName, candles, spotQuote, futureQuote, oiData) {
 
     peScore,
     ceScore,
+
     peChecks,
     ceChecks,
 
@@ -847,7 +1015,6 @@ async function scanOneIndex(name) {
       throw new Error("Index configuration missing");
     }
 
-    // Find the current valid futures contract.
     const future = findNearestFuture(name);
 
     const [quotes, candles, chain] = await Promise.all([
@@ -877,7 +1044,6 @@ async function scanOneIndex(name) {
       throw new Error("Futures candles unavailable");
     }
 
-    // Use Futures candle OI first, quote OI as fallback.
     const lastCandle = candles[candles.length - 1];
 
     const currentOI =
@@ -900,9 +1066,14 @@ async function scanOneIndex(name) {
       oiData
     );
 
-    analysis.futuresInstrumentKey = future.instrument_key;
-    analysis.futuresSymbol = future.trading_symbol;
-    analysis.futuresExpiry = future.expiry;
+    analysis.futuresInstrumentKey =
+      future.instrument_key;
+
+    analysis.futuresSymbol =
+      future.trading_symbol;
+
+    analysis.futuresExpiry =
+      future.expiry;
 
     if (analysis.direction) {
       analysis.selectedStrike = selectSellStrike(
@@ -1042,7 +1213,7 @@ const DASHBOARD = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SMART TRADE INDIA V12 PRO</title>
+<title>SMART TRADE INDIA V13 PRO</title>
 
 <style>
 *{box-sizing:border-box}
@@ -1088,9 +1259,10 @@ td,th{
 
 <body>
 
-<h1>SMART TRADE INDIA V12 PRO</h1>
+<h1>SMART TRADE INDIA V13 PRO</h1>
+
 <div class="sub">
-FOUR INDEX LIVE FUTURES DATA | ALL SIX CONDITIONS
+FOUR INDEX LIVE FUTURES DATA | HISTORICAL 5M CANDLES | ALL SIX CONDITIONS
 </div>
 
 <button onclick="refresh()">REFRESH SCAN</button>
@@ -1164,9 +1336,11 @@ function beep(){
 }
 
 function fmt(v){
-  if(v===null||v===undefined||!Number.isFinite(Number(v))){
+  if(v===null||v===undefined||
+     !Number.isFinite(Number(v))){
     return "N/A";
   }
+
   return Number(v).toLocaleString("en-IN");
 }
 
@@ -1194,7 +1368,8 @@ async function refresh(){
 
     document.getElementById("status").textContent=
       "Last scan: "+(market.lastScanTime||"Waiting")+
-      " | Mode: "+market.mode;
+      " | Mode: "+market.mode+
+      " | Version: "+market.version;
 
     const results=market.results||{};
 
@@ -1223,9 +1398,14 @@ async function refresh(){
 
           <p class="small">
             Futures: \${fmt(x.futuresPrice)}<br>
+            Candles: \${fmt(x.candleCount)} / 55<br>
+            Historical: \${fmt(x.historicalCandles)}<br>
+            Intraday: \${fmt(x.intradayCandles)}<br>
             RSI: \${fmt(x.rsi)} |
             ADX: \${fmt(x.adx)}<br>
             VWAP: \${fmt(x.vwap)}<br>
+            EMA 50: \${fmt(x.ema50)}<br>
+            MACD: \${fmt(x.macd)}<br>
             Volume: \${fmt(x.volume)}<br>
             OI: \${fmt(x.oi)}<br>
             OI Change: \${fmt(x.oiChangePercent)}%
@@ -1238,7 +1418,7 @@ async function refresh(){
           </b>
 
           <p class="small">
-            \${x.reason||""}
+            \${x.reason||x.error||""}
           </p>
         </div>
         \`;
@@ -1270,6 +1450,7 @@ async function refresh(){
         "<p><b>"+x.index+"</b>"+
         "<br>PE: "+checksText(x.peChecks)+
         "<br>CE: "+checksText(x.ceChecks)+
+        "<br>Candles: "+fmt(x.candleCount)+
         "<br>Status: "+x.status+"</p>"
       ).join("");
 
@@ -1285,7 +1466,7 @@ setInterval(refresh,5000);
 
 </body>
 </html>`;
-  
+
 // ------------------------------------------------------
 // HTTP SERVER
 // ------------------------------------------------------
@@ -1390,6 +1571,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    
     // FUTURES DATA STATUS
     if (url.pathname === "/api/futures") {
       return sendJson(res, 200, {
@@ -1416,6 +1598,26 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // CANDLE DIAGNOSTICS
+    if (url.pathname === "/api/candles") {
+      return sendJson(res, 200, {
+        version: CONFIG.VERSION,
+        indexes: Object.fromEntries(
+          [...marketCache.entries()].map(([name, data]) => [
+            name,
+            {
+              candleCount: data.candleCount || 0,
+              requiredCandles: 55,
+              historicalCandles: data.historicalCandles || 0,
+              intradayCandles: data.intradayCandles || 0,
+              dataStatus: data.dataStatus || "READY",
+              status: data.status
+            }
+          ])
+        )
+      });
+    }
+
     return sendJson(res, 404, {
       error: "Route not found",
       routes: [
@@ -1426,7 +1628,8 @@ const server = http.createServer(async (req, res) => {
         "/api/market",
         "/api/signals",
         "/api/indexes",
-        "/api/futures"
+        "/api/futures",
+        "/api/candles"
       ]
     });
 
@@ -1451,7 +1654,7 @@ setInterval(() => {
   ) {
     runFullScan().catch(error => {
       console.error(
-        "[V12 SCAN ERROR]",
+        "[V13 SCAN ERROR]",
         error.message
       );
     });
@@ -1466,10 +1669,11 @@ setInterval(() => {
 server.listen(PORT, "0.0.0.0", async () => {
 
   console.log("====================================");
-  console.log("SMART TRADE INDIA V12 PRO");
+  console.log("SMART TRADE INDIA V13 PRO");
   console.log("PORT:", PORT);
   console.log("TOKEN:", TOKEN ? "CONFIGURED" : "MISSING");
   console.log("INDEXES:", Object.keys(INDEXES).join(", "));
+  console.log("HISTORICAL + INTRADAY 5M CANDLES");
   console.log("MODE: PAPER");
   console.log("ALL SIX CONDITIONS REQUIRED");
   console.log("====================================");
@@ -1479,18 +1683,18 @@ server.listen(PORT, "0.0.0.0", async () => {
       await loadInstrumentMaster();
 
       console.log(
-        "[V12] Instrument Master Loaded:",
+        "[V13] Instrument Master Loaded:",
         instrumentMaster.length
       );
 
-      console.log("[V12] Four Index Scanner Ready");
+      console.log("[V13] Four Index Scanner Ready");
 
     } catch (error) {
       console.error(
-        "[V12 MASTER ERROR]",
+        "[V13 MASTER ERROR]",
         error.message
       );
     }
   }
 });
-    
+  
