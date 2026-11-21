@@ -4,427 +4,495 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMART TRADE INDIA V12 PRO</title>
+<title>Smart Trade India V13 PRO</title>
 
 <style>
 *{box-sizing:border-box}
 body{
- margin:0;
- padding:16px;
- background:#080f20;
- color:#f1f5f9;
- font-family:Arial,sans-serif;
+  margin:0;background:#080e20;color:#f1f5f9;
+  font-family:Arial,sans-serif;padding:16px
 }
-header,.panel,.card{
- background:#19263d;
- border:1px solid #30435f;
- border-radius:20px;
- padding:18px;
- margin-bottom:16px;
+.container{max-width:1100px;margin:auto}
+.card{
+  background:#19263e;border:1px solid #344765;
+  border-radius:22px;padding:20px;margin-bottom:16px
 }
-h1{color:#42d9b4;font-size:27px}
-h2{color:#42d9b4;font-size:23px}
+h1{color:#42d7b5;font-size:27px}
+h2{color:#42d7b5;font-size:22px}
+.sub{color:#cbd5e1}
 button{
- border:0;border-radius:12px;
- padding:15px 20px;
- font-weight:bold;font-size:15px;
- color:white;background:#2478e8;
- margin:5px 3px;
+  border:0;border-radius:12px;padding:15px 20px;
+  font-size:15px;font-weight:bold;margin:5px;
+  background:#2479ed;color:white
 }
-#sound{background:#53647a}
-#server{font-size:16px;line-height:1.7}
+button:disabled{opacity:.5}
+.secondary{background:#52647c}
+.green{color:#42d7b5}
+.red{color:#fb7185}
+.yellow{color:#facc15}
 .grid{
- display:grid;
- grid-template-columns:repeat(2,minmax(0,1fr));
- gap:12px;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px
 }
-.card{margin:0;padding:14px}
-.price{font-size:27px;font-weight:bold;margin:12px 0}
-.status{
- display:inline-block;
- padding:7px 12px;
- border-radius:20px;
- background:#59451d;
- color:#ffda80;
- font-weight:bold;
- margin-bottom:12px;
-}
-.metrics{
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:8px;
-}
-.metric{
- background:#101c30;
- padding:11px;
- border-radius:12px;
- min-width:0;
- overflow-wrap:anywhere;
-}
-.metric small{color:#9eafc5}
-.metric b{display:block;margin-top:6px;font-size:17px}
-.checks{
- margin-top:12px;
- display:grid;
- grid-template-columns:1fr 1fr;
- gap:7px;
-}
-.check{
- background:#101c30;
- border-radius:9px;
- padding:9px;
- font-size:12px;
- overflow-wrap:anywhere;
-}
-.pass{color:#43d9ad}
-.fail{color:#fa829b}
+.stat{font-size:22px;font-weight:bold;margin-top:8px}
+.small{font-size:13px;color:#aab9ce}
 .signal{
- background:#702e3c;
- padding:17px;
- border-radius:12px;
- margin-top:10px;
- font-weight:bold;
+  border:1px solid #405574;border-radius:16px;
+  padding:16px;margin:12px 0;background:#101b30
 }
-.strong{background:#126b4d}
-.muted{color:#a9b8cc}
-@media(max-width:380px){
- body{padding:9px}
- .card{padding:10px}
- h1{font-size:23px}
- .price{font-size:22px}
+.signal h3{margin-top:0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:11px 7px;border-bottom:1px solid #344765;text-align:left}
+.badge{padding:6px 10px;border-radius:20px;font-weight:bold}
+.ok{background:#145c45;color:#8fffd1}
+.bad{background:#652b3b;color:#ffc1cf}
+.wait{background:#5a4921;color:#ffe29a}
+.error{color:#fb7185}
+#message{white-space:pre-wrap;color:#facc15}
+@media(max-width:550px){
+  body{padding:10px}
+  h1{font-size:23px}
+  .grid{grid-template-columns:1fr}
+  table{font-size:12px}
 }
 </style>
 </head>
 
 <body>
+<div class="container">
 
-<header>
-<h1>SMART TRADE INDIA V12 PRO</h1>
-<p>LIVE NSE INDEX OPTIONS SCANNER</p>
-<p>NIFTY | BANKNIFTY | FINNIFTY | SENSEX</p>
-</header>
-
-<button onclick="loadDashboard()">REFRESH NOW</button>
-<button id="sound" onclick="toggleSound()">SOUND OFF</button>
-
-<div class="panel" id="server">
- <b style="color:#fa829b">● SERVER CONNECTING</b>
- <p>WAITING...</p>
+<div class="card">
+  <h1>SMART TRADE INDIA V13 PRO</h1>
+  <h3>LIVE FUTURES + OPTIONS SELL SCANNER</h3>
+  <p class="sub">NSE / BSE Futures • CE SELL • PE SELL</p>
+  <p class="small">Backend: Upstox API</p>
 </div>
 
-<div class="panel">
- Last Scan: <b id="lastScan">--</b>
- <p>Next refresh: <b id="countdown">5</b> seconds</p>
+<div class="card">
+  <button id="refreshBtn" onclick="manualScan()">SCAN NOW</button>
+  <button class="secondary" id="soundBtn" onclick="toggleSound()">SOUND OFF</button>
+  <button class="secondary" onclick="loadDashboard()">REFRESH DATA</button>
+  <p id="message">Connecting to V13 server...</p>
 </div>
 
-<h2>LIVE INDEX PRICES</h2>
-<div class="grid" id="indexes"></div>
-
-<h2>VERY STRONG SELL SIGNALS</h2>
-<div id="signals">
- <div class="signal">WAITING FOR SIGNALS</div>
+<div class="card">
+  <h2>SERVER STATUS</h2>
+  <div class="grid">
+    <div>
+      <div class="small">SERVER</div>
+      <div class="stat" id="server">Checking...</div>
+    </div>
+    <div>
+      <div class="small">VERSION</div>
+      <div class="stat" id="version">--</div>
+    </div>
+    <div>
+      <div class="small">UPSTOX TOKEN</div>
+      <div class="stat" id="token">--</div>
+    </div>
+    <div>
+      <div class="small">PAPER MODE</div>
+      <div class="stat" id="paper">--</div>
+    </div>
+    <div>
+      <div class="small">FUTURES LOADED</div>
+      <div class="stat" id="futuresCount">0</div>
+    </div>
+    <div>
+      <div class="small">SIGNALS</div>
+      <div class="stat" id="signalCount">0</div>
+    </div>
+  </div>
+  <p class="small">Last Scan: <span id="lastScan">--</span></p>
+  <p class="small">Last Error: <span id="lastError">None</span></p>
 </div>
 
-<h2>SERVER INFORMATION</h2>
-<div class="panel" id="info">Waiting for API...</div>
+<div class="card">
+  <h2>RISK MANAGEMENT</h2>
+  <div class="grid">
+    <div>
+      <div class="small">CAPITAL</div>
+      <div class="stat" id="capital">₹--</div>
+    </div>
+    <div>
+      <div class="small">RISK PER TRADE</div>
+      <div class="stat" id="riskLimit">₹--</div>
+    </div>
+    <div>
+      <div class="small">DAILY REALIZED P&L</div>
+      <div class="stat" id="pnl">₹--</div>
+    </div>
+    <div>
+      <div class="small">DAILY LOSS LIMIT</div>
+      <div class="stat" id="dailyLimit">₹--</div>
+    </div>
+  </div>
+  <p id="riskStatus" class="yellow">Risk status: Checking...</p>
+  <p class="small">
+    Daily P&L is based only on trades manually recorded in the backend.
+    It is not automatically fetched from your broker.
+  </p>
+</div>
+
+<div class="card">
+  <h2>FUTURES WATCHLIST</h2>
+  <p class="small">Futures loaded from the V13 instrument master</p>
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Expiry</th>
+          <th>Lot Size</th>
+        </tr>
+      </thead>
+      <tbody id="futuresTable">
+        <tr><td colspan="3">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>LIVE TRADING SIGNALS</h2>
+  <p class="small">Only signals returned by the backend are displayed.</p>
+  <div id="signals">
+    No signals available.
+  </div>
+</div>
+
+<div class="card">
+  <h2>API CONNECTION</h2>
+  <p class="small">Backend URL</p>
+  <p id="apiUrl" style="word-break:break-all"></p>
+  <p class="small">Dashboard refreshes server data every 15 seconds.</p>
+  <p class="small">Automatic scanning is controlled by the backend.</p>
+</div>
+
+</div>
 
 <script>
 "use strict";
 
-const API_URL =
-"https://smart-trade-backend-ig6l.onrender.com/api/scan";
+// V13 BACKEND
+const API = "https://smart-trade-backend-ig6l.onrender.com";
 
-const INDEXES = [
- "NIFTY",
- "BANKNIFTY",
- "FINNIFTY",
- "SENSEX"
-];
+let soundEnabled = false;
+let previousSignalIds = new Set();
+let loading = false;
 
-const CHECKS = [
- "trend",
- "vwap",
- "rsi",
- "macd",
- "volume",
- "oiPrice"
-];
+document.getElementById("apiUrl").textContent = API;
 
-let soundOn = false;
-let previousSignals = new Set();
-let countdown = 5;
-let busy = false;
+async function apiGet(path, timeoutMs = 30000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-const indexesDiv = document.getElementById("indexes");
+  try {
+    const response = await fetch(API + path, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    });
 
-function formatNumber(value) {
- const n = Number(value);
- if (!Number.isFinite(n)) return "--";
- return n.toLocaleString("en-IN", {
-  maximumFractionDigits: 2
- });
-}
+    const data = await response.json();
 
-function showCheckName(key) {
- const names = {
-  trend:"Trend",
-  vwap:"VWAP",
-  rsi:"RSI",
-  macd:"MACD",
-  volume:"Volume",
-  oiPrice:"OI + Price"
- };
- return names[key] || key;
-}
+    if (!response.ok) {
+      throw new Error(
+        data.message || data.error || "HTTP " + response.status
+      );
+    }
 
-function createCards() {
- indexesDiv.innerHTML = INDEXES.map(name => `
-  <div class="card" id="card-${name}">
-   <h2>${name}</h2>
-   <div class="price" id="price-${name}">--</div>
-   <span class="status" id="status-${name}">WAIT</span>
-
-   <div class="metrics">
-    <div class="metric">
-     <small>RSI</small>
-     <b id="rsi-${name}">--</b>
-    </div>
-    <div class="metric">
-     <small>VWAP</small>
-     <b id="vwap-${name}">--</b>
-    </div>
-    <div class="metric">
-     <small>Volume Ratio</small>
-     <b id="volume-${name}">--</b>
-    </div>
-    <div class="metric">
-     <small>Futures OI Change</small>
-     <b id="oi-${name}">--</b>
-    </div>
-    <div class="metric">
-     <small>Bear Strength</small>
-     <b id="bear-${name}">0/6</b>
-    </div>
-    <div class="metric">
-     <small>Bull Strength</small>
-     <b id="bull-${name}">0/6</b>
-    </div>
-   </div>
-
-   <div class="checks" id="checks-${name}"></div>
-   <div class="signal" id="signal-${name}">
-    WAITING FOR DATA
-   </div>
-  </div>
- `).join("");
-}
-
-function setText(id,value) {
- const el = document.getElementById(id);
- if (el) el.textContent = value;
-}
-
-function countTrue(checks) {
- return CHECKS.filter(k => checks && checks[k] === true).length;
-}
-
-function renderIndex(name,item) {
- if (!item) {
-  setText("price-"+name,"NO DATA");
-  setText("status-"+name,"WAIT");
-  setText("signal-"+name,"WAITING FOR DATA");
-  return;
- }
-
- const price = item.underlyingPrice ??
-               item.spotPrice ??
-               item.price;
-
- setText("price-"+name,formatNumber(price));
- setText("rsi-"+name,formatNumber(item.rsi));
- setText("vwap-"+name,formatNumber(item.vwap));
- setText("volume-"+name,
-  formatNumber(item.volumeMultiplier)+"x");
- setText("oi-"+name,
-  formatNumber(item.oiChangePercent)+"%");
-
- const bear = item.peChecks || {};
- const bull = item.ceChecks || {};
-
- const bearCount = countTrue(bear);
- const bullCount = countTrue(bull);
-
- setText("bear-"+name,bearCount+"/6");
- setText("bull-"+name,bullCount+"/6");
-
- const status = item.status || "WAIT";
- setText("status-"+name,status);
-
- const checksHTML = CHECKS.map(key => {
-  const ok = bear[key] === true;
-  return `
-   <div class="check ${ok ? "pass":"fail"}">
-    ${ok ? "✓":"✕"} Bearish: ${showCheckName(key)}
-   </div>`;
- }).join("");
-
- document.getElementById("checks-"+name).innerHTML =
-  checksHTML;
-
- const strongSell = CHECKS.every(key => bear[key] === true);
-
- const signal = document.getElementById("signal-"+name);
-
- if (strongSell) {
-  signal.className = "signal strong";
-  signal.textContent = "VERY STRONG SELL - ALL 6 CONDITIONS";
- } else {
-  signal.className = "signal";
-  signal.textContent =
-   "WAIT - Bearish conditions: "+bearCount+"/6";
- }
-}
-
-function renderSignals(results) {
- const active = [];
-
- INDEXES.forEach(name => {
-  const item = results[name];
-  if (!item || !item.peChecks) return;
-
-  const checks = item.peChecks;
-  const allTrue = CHECKS.every(k => checks[k] === true);
-
-  if (allTrue) {
-   active.push(name);
+    return data;
+  } finally {
+    clearTimeout(timer);
   }
- });
-
- const container = document.getElementById("signals");
-
- if (active.length === 0) {
-  container.innerHTML =
-   '<div class="signal">NO VERY STRONG SELL SIGNAL</div>';
- } else {
-  container.innerHTML = active.map(name => `
-   <div class="signal strong">
-    VERY STRONG SELL: ${name}
-    <br>ALL SIX CONDITIONS CONFIRMED
-   </div>
-  `).join("");
- }
-
- if (soundOn) {
-  const newSignals = active.filter(
-   name => !previousSignals.has(name)
-  );
-
-  if (newSignals.length > 0) playSound();
- }
-
- previousSignals = new Set(active);
 }
 
-function playSound() {
- try {
-  const audio = new AudioContext();
-  const oscillator = audio.createOscillator();
-  const gain = audio.createGain();
+function money(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "--";
 
-  oscillator.connect(gain);
-  gain.connect(audio.destination);
-  oscillator.frequency.value = 850;
-  gain.gain.value = 0.15;
-  oscillator.start();
+  return "₹" + n.toLocaleString("en-IN", {
+    maximumFractionDigits: 2
+  });
+}
 
-  setTimeout(() => {
-   oscillator.stop();
-   audio.close();
-  },400);
- } catch(e) {
-  console.log("Sound unavailable",e);
- }
+function safe(value) {
+  return String(value ?? "--").replace(
+    /[&<>"']/g,
+    ch => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    })[ch]
+  );
+}
+
+function setMessage(message, isError = false) {
+  const el = document.getElementById("message");
+  el.textContent = message;
+  el.className = isError ? "error" : "";
 }
 
 function toggleSound() {
- soundOn = !soundOn;
- document.getElementById("sound").textContent =
-  soundOn ? "SOUND ON" : "SOUND OFF";
+  soundEnabled = !soundEnabled;
 
- if (soundOn) playSound();
+  document.getElementById("soundBtn").textContent =
+    soundEnabled ? "SOUND ON" : "SOUND OFF";
+
+  if (soundEnabled) playSound();
+}
+
+function playSound() {
+  if (!soundEnabled) return;
+
+  try {
+    const AudioContext =
+      window.AudioContext || window.webkitAudioContext;
+
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+
+    oscillator.frequency.value = 850;
+    gain.gain.value = 0.12;
+
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.25);
+
+    oscillator.onended = () => ctx.close();
+  } catch (e) {
+    console.log("Sound unavailable:", e.message);
+  }
+}
+
+function renderStatus(data) {
+  document.getElementById("server").innerHTML =
+    '<span class="badge ok">RUNNING</span>';
+
+  document.getElementById("version").textContent =
+    data.version || "--";
+
+  document.getElementById("token").textContent =
+    data.connected ? "YES" : "NO";
+
+  document.getElementById("paper").textContent =
+    data.paperMode ? "ON" : "OFF";
+
+  document.getElementById("futuresCount").textContent =
+    data.futuresLoaded ?? 0;
+
+  document.getElementById("signalsCount").textContent =
+    data.signalsCount ?? 0;
+
+  document.getElementById("lastScan").textContent =
+    data.lastScanTime || "--";
+
+  document.getElementById("lastError").textContent =
+    data.lastError || "None";
+
+  const config = data.config || {};
+  const risk = data.risk || {};
+
+  document.getElementById("capital").textContent =
+    money(config.capital);
+
+  document.getElementById("riskLimit").textContent =
+    money(
+      Number(config.capital || 0) *
+      Number(config.riskPercent || 0) / 100
+    );
+
+  document.getElementById("pnl").textContent =
+    money(risk.realizedPnl);
+
+  document.getElementById("dailyLimit").textContent =
+    money(risk.dailyStopLoss);
+
+  const riskStatus = document.getElementById("riskStatus");
+
+  riskStatus.textContent = risk.locked
+    ? "DAILY LOSS LIMIT REACHED — SCAN LOCKED"
+    : "Risk status: ACTIVE";
+
+  riskStatus.className = risk.locked ? "red" : "green";
+}
+
+function renderFutures(data) {
+  const list = data.futures || [];
+  const table = document.getElementById("futuresTable");
+
+  if (!list.length) {
+    table.innerHTML =
+      '<tr><td colspan="3" class="error">' +
+      'No futures loaded. Check Render logs and instrument master.' +
+      '</td></tr>';
+    return;
+  }
+
+  table.innerHTML = list.slice(0, 100).map(item => `
+    <tr>
+      <td>${safe(item.symbol)}</td>
+      <td>${safe(item.expiry)}</td>
+      <td>${safe(item.lotSize)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderSignals(data) {
+  const list = data.signals || [];
+  const container = document.getElementById("signals");
+
+  document.getElementById("signalCount").textContent =
+    data.count ?? list.length;
+
+  if (!list.length) {
+    container.innerHTML =
+      '<p class="yellow">NO CONFIRMED SIGNALS</p>' +
+      '<p class="small">Wait for all required conditions to pass.</p>';
+    return;
+  }
+
+  for (const signal of list) {
+    if (signal.id && !previousSignalIds.has(signal.id)) {
+      playSound();
+    }
+  }
+
+  previousSignalIds = new Set(
+    list.map(s => s.id).filter(Boolean)
+  );
+
+  container.innerHTML = list.map(s => {
+    const isPE = s.signal === "PE_SELL";
+    const color = isPE ? "green" : "red";
+
+    const r = s.risk || {};
+
+    return `
+      <div class="signal">
+        <h3 class="${color}">
+          ${safe(s.signal)}
+          — ${safe(s.underlying)}
+        </h3>
+
+        <p><b>Underlying Price:</b>
+          ${money(s.underlyingPrice)}</p>
+
+        <p><b>RSI:</b> ${safe(s.rsi)}</p>
+        <p><b>VWAP:</b> ${money(s.vwap)}</p>
+        <p><b>EMA 20:</b> ${money(s.ema20)}</p>
+
+        <hr>
+
+        <p><b>Short Strike:</b>
+          ${safe(s.shortStrike)}</p>
+        <p><b>Short Premium:</b>
+          ${money(s.shortPremium)}</p>
+
+        <p><b>Hedge Strike:</b>
+          ${safe(s.hedgeStrike)}</p>
+        <p><b>Hedge Premium:</b>
+          ${money(s.hedgePremium)}</p>
+
+        <hr>
+
+        <p><b>Net Credit:</b>
+          ${money(r.netCredit)}</p>
+        <p><b>Target Debit:</b>
+          ${money(r.targetDebit)}</p>
+        <p><b>Stop Debit:</b>
+          ${money(r.stopDebit)}</p>
+        <p><b>Max Profit (theoretical):</b>
+          ${money(r.maxProfit)}</p>
+        <p><b>Max Loss (theoretical):</b>
+          ${money(r.maxLoss)}</p>
+        <p><b>Lots:</b> ${safe(r.lots)}</p>
+
+        <p class="small">OI change:
+          ${safe(s.optionOIChangePct)}%</p>
+        <p class="small">Volume change:
+          ${safe(s.optionVolumeChangePct)}%</p>
+        <p class="small">Premium change:
+          ${safe(s.premiumChangePct)}%</p>
+
+        <p class="yellow">
+          PAPER SIGNAL — VERIFY BEFORE MANUAL TRADE
+        </p>
+        <p class="small">${safe(s.timestamp)}</p>
+      </div>
+    `;
+  }).join("");
 }
 
 async function loadDashboard() {
- if (busy) return;
- busy = true;
+  if (loading) return;
 
- try {
-  const response = await fetch(API_URL,{
-   method:"GET",
-   cache:"no-store",
-   headers:{"Accept":"application/json"}
-  });
+  loading = true;
 
-  if (!response.ok) {
-   throw new Error("HTTP "+response.status);
+  try {
+    const [status, futures, signals] = await Promise.all([
+      apiGet("/api/status"),
+      apiGet("/api/futures"),
+      apiGet("/api/signals")
+    ]);
+
+    renderStatus(status);
+    renderFutures(futures);
+    renderSignals(signals);
+
+    setMessage("V13 backend connected. Data refreshed.");
+
+  } catch (error) {
+    setMessage("SERVER ERROR: " + error.message, true);
+    document.getElementById("server").textContent = "ERROR";
+  } finally {
+    loading = false;
   }
-
-  const data = await response.json();
-
-  if (data.status !== "SUCCESS" || !data.results) {
-   throw new Error("Invalid scan response");
-  }
-
-  INDEXES.forEach(name => {
-   renderIndex(name,data.results[name]);
-  });
-
-  renderSignals(data.results);
-
-  document.getElementById("server").innerHTML =
-   '<b class="pass">● SERVER CONNECTED</b><br>'+
-   (data.version || "SMART TRADE INDIA");
-
-  setText("lastScan",
-   data.lastScanTime
-    ? new Date(data.lastScanTime).toLocaleTimeString("en-IN")
-    : "--"
-  );
-
-  setText("info",
-   "HTTP 200 | API SUCCESS | Four Index Scan Active"
-  );
-
- } catch(error) {
-  document.getElementById("server").innerHTML =
-   '<b style="color:#fa829b">● SERVER ERROR</b><br>'+
-   error.message;
-
-  setText("info",error.message);
-  console.error("Dashboard Error:",error);
-
- } finally {
-  busy = false;
- }
 }
 
-function startRefresh() {
- countdown = 5;
+async function manualScan() {
+  const button = document.getElementById("refreshBtn");
 
- setInterval(() => {
-  countdown--;
-  setText("countdown",Math.max(0,countdown));
+  if (loading) return;
 
-  if (countdown <= 0) {
-   countdown = 5;
-   loadDashboard();
+  button.disabled = true;
+  button.textContent = "SCANNING...";
+  setMessage("Scan started. Please wait...");
+
+  try {
+    const result = await apiGet("/api/scan", 180000);
+
+    if (result.status === "DAILY_LOSS_LIMIT_REACHED") {
+      setMessage("Daily loss limit reached. Scanning locked.", true);
+    } else {
+      setMessage(
+        "Scan complete. Signals found: " +
+        (result.signalCount ?? 0)
+      );
+    }
+
+    await loadDashboard();
+
+  } catch (error) {
+    setMessage("SCAN ERROR: " + error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "SCAN NOW";
   }
- },1000);
 }
 
-createCards();
+// Initial load
 loadDashboard();
-startRefresh();
+
+// Refresh dashboard data every 15 seconds.
+// This does not start a new market scan.
+setInterval(loadDashboard, 15000);
 
 </script>
 </body>
