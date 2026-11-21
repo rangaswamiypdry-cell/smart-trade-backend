@@ -1,12 +1,10 @@
 
 "use strict";
 
-// ======================================================
 // SMART TRADE INDIA V13 PRO
+// ALL FUTURES + HEDGED OPTION SELLING
 // PART 1 OF 3
-// LIVE DATA + HISTORICAL CANDLES + FUTURES OI ENGINE
 // NODE.JS 20+
-// ======================================================
 
 const http = require("http");
 const zlib = require("zlib");
@@ -17,150 +15,42 @@ const BASE = "https://api.upstox.com";
 
 const CONFIG = {
   VERSION: "SMART_TRADE_INDIA_V13_PRO",
-
   TIMEFRAME: 5,
   SCAN_INTERVAL: 60000,
 
-  EMA_FAST: 9,
-  EMA_SLOW: 21,
-  EMA_TREND: 50,
+  CAPITAL: 120000,
+  RISK_PERCENT: 1,
+  DAILY_STOP_LOSS: 2400,
 
-  RSI_PERIOD: 14,
-  RSI_BUY: 55,
+  VOLUME_MULTIPLIER: 1.5,
+  RSI_BUY: 65,
   RSI_SELL: 35,
 
-  ADX_MIN: 20,
-  VOLUME_MULTIPLIER: 1.5,
-  OI_INCREASE_MIN: 2,
+  TARGET_PERCENT: 0.50,
+  MAX_TARGET_PERCENT: 0.60,
+  SL_MULTIPLE: 1.5,
 
-  MIN_CANDLES: 50,
-  MAX_SIGNALS: 100,
-
-  REQUIRE_ALL_CONDITIONS: true,
-  PAPER_MODE: true,
-
-  HISTORICAL_DAYS: 7,
-  MAX_CANDLE_AGE_MINUTES: 10
+  MAX_FUTURES: 250,
+  PAPER_MODE: true
 };
 
-// ======================================================
-// FOUR INDEXES ONLY
-// ======================================================
-
-const INDEXES = {
-  NIFTY: {
-    spotKey: "NSE_INDEX|Nifty 50",
-    symbol: "NIFTY",
-    segment: "NSE_FO"
-  },
-
-  BANKNIFTY: {
-    spotKey: "NSE_INDEX|Nifty Bank",
-    symbol: "BANKNIFTY",
-    segment: "NSE_FO"
-  },
-
-  FINNIFTY: {
-    spotKey: "NSE_INDEX|Nifty Fin Service",
-    symbol: "FINNIFTY",
-    segment: "NSE_FO"
-  },
-
-  SENSEX: {
-    spotKey: "BSE_INDEX|SENSEX",
-    symbol: "SENSEX",
-    segment: "BSE_FO"
-  }
-};
-
-// ======================================================
-// GLOBAL STORAGE
-// ======================================================
-
-const marketCache = new Map();
-const signals = [];
-
-const previousOI = new Map();
-const oiSnapshots = new Map();
-
-const candleCache = new Map();
-const signalIds = new Set();
-
-let instrumentMaster = [];
-let instrumentMasterTime = 0;
-
-let lastScanTime = null;
+let instruments = [];
+let futures = [];
+let signals = [];
+let marketCache = {};
+let previousOI = new Map();
+let optionSnapshots = new Map();
 let scanRunning = false;
+let lastScanTime = null;
 
-const serverStarted = new Date().toISOString();
-
-// ======================================================
-// TIME HELPERS
-// ======================================================
-
-function indiaDate(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
-}
-
-function indiaTime() {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23"
-  }).format(new Date());
-}
-
-function getPreviousDate(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return indiaDate(d);
-}
-
-function isCompletedCandle(time) {
-  const closeTime = time + CONFIG.TIMEFRAME * 60000;
-
-  return closeTime <= Date.now();
-}
-
-// ======================================================
-// JSON RESPONSE
-// ======================================================
-
-function sendJson(res, status, data) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "no-store"
-  });
-
-  res.end(JSON.stringify(data, null, 2));
-}
-
-// ======================================================
-// UPSTOX REQUEST
-// ======================================================
-
-async function upstoxRequest(path) {
-  if (!TOKEN) {
-    throw new Error("UPSTOX_ACCESS_TOKEN missing in Render");
-  }
+async function api(path) {
+  if (!TOKEN) throw new Error("UPSTOX_ACCESS_TOKEN missing");
 
   const response = await fetch(BASE + path, {
-    method: "GET",
-
     headers: {
       Accept: "application/json",
       Authorization: "Bearer " + TOKEN
     },
-
     signal: AbortSignal.timeout(20000)
   });
 
@@ -168,7 +58,7 @@ async function upstoxRequest(path) {
 
   if (!response.ok) {
     throw new Error(
-      "UPSTOX " + response.status + ": " +
+      "Upstox " + response.status + ": " +
       JSON.stringify(data)
     );
   }
@@ -176,849 +66,703 @@ async function upstoxRequest(path) {
   return data;
 }
 
-// ======================================================
-// INSTRUMENT MASTER
-// ======================================================
+// LOAD ALL FUTURES
 
-async function loadInstrumentMaster(force = false) {
-  const fresh =
-    instrumentMaster.length > 0 &&
-    Date.now() - instrumentMasterTime < 6 * 60 * 60 * 1000;
-
-  if (fresh && !force) {
-    return instrumentMaster;
-  }
-
+async function loadAllFutures() {
   const url =
     "https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz";
 
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(30000)
-  });
+  const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error("Instrument master download failed");
   }
 
-  const buffer = Buffer.from(
-    await response.arrayBuffer()
-  );
-
-  const decoded = zlib.gunzipSync(buffer);
-
+  const buffer = Buffer.from(await response.arrayBuffer());
   const parsed = JSON.parse(
-    decoded.toString("utf8")
+    zlib.gunzipSync(buffer).toString("utf8")
   );
 
-  if (!Array.isArray(parsed) || !parsed.length) {
-    throw new Error("Invalid instrument master");
-  }
+  instruments = Array.isArray(parsed) ? parsed : [];
 
-  instrumentMaster = parsed;
-  instrumentMasterTime = Date.now();
+  const today = new Date().toISOString().slice(0, 10);
 
-  return instrumentMaster;
-}
-
-// ======================================================
-// FIND NEAREST FUTURES
-// ======================================================
-
-function findNearestFuture(indexName) {
-  const config = INDEXES[indexName];
-
-  if (!config) {
-    throw new Error("Unknown index " + indexName);
-  }
-
-  const today = indiaDate();
-
-  const candidates = instrumentMaster.filter(item => {
-    return (
-      item.segment === config.segment &&
-      item.instrument_type === "FUT" &&
-      item.underlying_symbol === config.symbol &&
-      item.expiry &&
-      String(item.expiry) >= today &&
-      item.instrument_key
-    );
-  });
-
-  candidates.sort((a, b) =>
-    String(a.expiry).localeCompare(String(b.expiry))
+  const valid = instruments.filter(x =>
+    ["NSE_FO", "BSE_FO"].includes(x.segment) &&
+    x.instrument_type === "FUT" &&
+    x.instrument_key &&
+    x.underlying_symbol &&
+    x.expiry >= today
   );
 
-  if (!candidates.length) {
-    throw new Error(indexName + " FUTURES NOT FOUND");
+  // Nearest expiry for each underlying
+  const nearest = new Map();
+
+  for (const item of valid) {
+    const old = nearest.get(item.underlying_symbol);
+
+    if (!old || item.expiry < old.expiry) {
+      nearest.set(item.underlying_symbol, item);
+    }
   }
 
-  return candidates[0];
+  futures = [...nearest.values()]
+    .sort((a, b) =>
+      a.underlying_symbol.localeCompare(b.underlying_symbol)
+    )
+    .slice(0, CONFIG.MAX_FUTURES);
+
+  console.log("[V13] Futures loaded:", futures.length);
+
+  return futures;
 }
 
-// ======================================================
-// MARKET QUOTES
-// ======================================================
+// BATCH LIVE QUOTES
 
-async function getMarketQuotes(keys) {
-  const unique = [...new Set(keys.filter(Boolean))];
-
+async function getQuotes(keys) {
   const output = {};
 
-  for (let i = 0; i < unique.length; i += 100) {
-    const chunk = unique.slice(i, i + 100);
+  for (let i = 0; i < keys.length; i += 100) {
+    const chunk = keys.slice(i, i + 100);
 
-    const result = await upstoxRequest(
-      "/v3/market-quote/quotes?instrument_key=" +
-      encodeURIComponent(chunk.join(","))
+    const query = encodeURIComponent(chunk.join(","));
+
+    const result = await api(
+      "/v3/market-quote/quotes?instrument_key=" + query
     );
 
-    const entries = Object.entries(result.data || {});
-
-    for (const key of chunk) {
-      const normalized = key.replace("|", ":");
-
-      const match = entries.find(([responseKey, value]) =>
-        responseKey === normalized ||
-        value?.instrument_token === key ||
-        value?.instrument_key === key
-      );
-
-      if (match) {
-        output[key] = match[1];
-      }
-    }
+    Object.assign(output, result.data || {});
   }
 
   return output;
 }
 
-// ======================================================
-// NORMALIZE QUOTE
-// ======================================================
+// MATCH QUOTE
 
-function extractQuote(data) {
-  const q = data || {};
+function findQuote(quotes, key) {
+  if (quotes[key]) return quotes[key];
 
-  return {
-    ltp: Number(q.last_price || 0),
+  const normalized = key.replace("|", ":");
 
-    open: Number(q.ohlc?.open || 0),
-    high: Number(q.ohlc?.high || 0),
-    low: Number(q.ohlc?.low || 0),
+  for (const [name, value] of Object.entries(quotes)) {
+    if (
+      name === normalized ||
+      value.instrument_token === key ||
+      value.instrument_key === key
+    ) return value;
+  }
 
-    close: Number(
-      q.prev_close_price ||
-      q.ohlc?.close || 0
-    ),
-
-    volume: Number(q.volume || 0),
-
-    oi: Number(q.oi || 0),
-    previousOI: Number(q.previous_oi || 0),
-
-    buyQuantity: Number(q.total_buy_quantity || 0),
-    sellQuantity: Number(q.total_sell_quantity || 0),
-
-    timestamp: q.last_trade_time || q.timestamp || null
-  };
+  return null;
 }
 
-// ======================================================
-// CANDLE NORMALIZER
-// ======================================================
+// LIVE FUTURES CANDLES
 
-function normalizeCandles(rows) {
+async function getFiveMinuteCandles(key) {
+  const result = await api(
+    "/v3/historical-candle/intraday/" +
+    encodeURIComponent(key) +
+    "/minutes/5"
+  );
+
   const now = Date.now();
 
-  return (rows || [])
+  return (result.data?.candles || [])
     .map(c => ({
       time: new Date(c[0]).getTime(),
-
       open: Number(c[1]),
       high: Number(c[2]),
       low: Number(c[3]),
       close: Number(c[4]),
-
       volume: Number(c[5] || 0),
       oi: Number(c[6] || 0)
     }))
     .filter(c =>
       Number.isFinite(c.time) &&
-      c.close > 0 &&
-      isCompletedCandle(c.time) &&
-      c.time >= now - 32 * 24 * 60 * 60 * 1000
-    );
-}
-
-// ======================================================
-// HISTORICAL + INTRADAY 5 MINUTE CANDLES
-// ======================================================
-
-async function getCandles(instrumentKey) {
-  const key = encodeURIComponent(instrumentKey);
-
-  const toDate = indiaDate();
-  const fromDate = getPreviousDate(CONFIG.HISTORICAL_DAYS);
-
-  const historicalPath =
-    `/v3/historical-candle/${key}/minutes/5/${toDate}/${fromDate}`;
-
-  const intradayPath =
-    `/v3/historical-candle/intraday/${key}/minutes/5`;
-
-  const [historical, intraday] = await Promise.all([
-    upstoxRequest(historicalPath),
-    upstoxRequest(intradayPath)
-  ]);
-
-  const combined = [
-    ...(historical.data?.candles || []),
-    ...(intraday.data?.candles || [])
-  ];
-
-  const normalized = normalizeCandles(combined);
-
-  const unique = new Map();
-
-  for (const candle of normalized) {
-    unique.set(candle.time, candle);
-  }
-
-  const candles = [...unique.values()]
+      c.time + 300000 <= now &&
+      c.close > 0
+    )
     .sort((a, b) => a.time - b.time);
-
-  if (candles.length < CONFIG.MIN_CANDLES) {
-    throw new Error(
-      `Need ${CONFIG.MIN_CANDLES} completed candles; received ${candles.length}`
-    );
-  }
-
-  candleCache.set(instrumentKey, candles);
-
-  return candles;
 }
 
-// ======================================================
 // EMA
-// ======================================================
 
-function calculateEMA(values, period) {
-  if (!values || values.length < period) return null;
+function EMA(values, period) {
+  if (values.length < period) return null;
+
+  let value =
+    values.slice(0, period).reduce((a,b) => a+b, 0) / period;
 
   const multiplier = 2 / (period + 1);
 
-  let ema = values
-    .slice(0, period)
-    .reduce((a, b) => a + b, 0) / period;
-
   for (let i = period; i < values.length; i++) {
-    ema = (values[i] - ema) * multiplier + ema;
+    value =
+      (values[i] - value) * multiplier + value;
   }
 
-  return ema;
+  return value;
 }
 
-// ======================================================
-// WILDER RSI
-// ======================================================
+// RSI
 
-function calculateRSI(values, period = 14) {
-  if (!values || values.length <= period) return null;
+function RSI(values, period = 14) {
+  if (values.length <= period) return null;
 
-  let gains = 0;
-  let losses = 0;
+  let gain = 0;
+  let loss = 0;
 
   for (let i = 1; i <= period; i++) {
-    const change = values[i] - values[i - 1];
+    const change = values[i] - values[i-1];
 
-    gains += Math.max(change, 0);
-    losses += Math.max(-change, 0);
+    if (change > 0) gain += change;
+    else loss += Math.abs(change);
   }
 
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
+  let avgGain = gain / period;
+  let avgLoss = loss / period;
 
   for (let i = period + 1; i < values.length; i++) {
-    const change = values[i] - values[i - 1];
+    const change = values[i] - values[i-1];
 
     avgGain =
-      (avgGain * (period - 1) + Math.max(change, 0)) / period;
+      (avgGain * (period-1) + Math.max(change,0)) / period;
 
     avgLoss =
-      (avgLoss * (period - 1) + Math.max(-change, 0)) / period;
+      (avgLoss * (period-1) + Math.max(-change,0)) / period;
   }
 
   if (avgLoss === 0) return 100;
 
-  const rs = avgGain / avgLoss;
-
-  return 100 - 100 / (1 + rs);
+  return 100 - 100 / (1 + avgGain / avgLoss);
 }
 
-// ======================================================
-// SESSION VWAP
-// ======================================================
+// DAILY VWAP
 
-function calculateSessionVWAP(candles) {
-  if (!candles?.length) return null;
-
-  const today = indiaDate();
-
-  const session = candles.filter(c =>
-    indiaDate(new Date(c.time)) === today
-  );
-
+function VWAP(candles) {
   let pv = 0;
   let volume = 0;
 
-  for (const c of session) {
-    const typical = (c.high + c.low + c.close) / 3;
-
-    pv += typical * c.volume;
+  for (const c of candles) {
+    const price = (c.high + c.low + c.close) / 3;
+    pv += price * c.volume;
     volume += c.volume;
   }
 
   return volume > 0 ? pv / volume : null;
 }
 
-// ======================================================
-// OI TRACKING BY COMPLETED CANDLE
-// ======================================================
+// OI SNAPSHOT
 
-function calculateOIChange(key, currentOI, candleTime) {
-  if (!currentOI || currentOI <= 0) {
-    return {
-      ready: false,
-      change: null,
-      percent: null,
-      increasing: false
-    };
-  }
-
+function getOIChange(key, current) {
   const previous = previousOI.get(key);
 
-  // Same candle: do not overwrite baseline.
-  if (previous && previous.candleTime === candleTime) {
-    return previous.result;
-  }
+  previousOI.set(key, current);
 
-  const result = previous
-    ? {
-        ready: true,
-        change: currentOI - previous.oi,
-
-        percent:
-          previous.oi > 0
-            ? ((currentOI - previous.oi) / previous.oi) * 100
-            : 0,
-
-        increasing: currentOI > previous.oi
-      }
-    : {
-        ready: false,
-        change: 0,
-        percent: 0,
-        increasing: false
-      };
-
-  previousOI.set(key, {
-    oi: currentOI,
-    candleTime,
-    result
-  });
-
-  oiSnapshots.set(key, {
-    currentOI,
-    candleTime,
-    updatedAt: new Date().toISOString()
-  });
-
-  return result;
-}
-
-
-// ======================================================
-// SMART TRADE INDIA V13 PRO
-// PART 2 OF 3
-// TREND + SIX CONDITIONS + SELL SIGNAL ENGINE
-// ======================================================
-
-// ------------------------------------------------------
-// ADX CALCULATION
-// ------------------------------------------------------
-
-function calculateADX(candles, period = 14) {
-  if (!candles || candles.length < period * 2 + 1) {
-    return null;
-  }
-
-  const tr = [];
-  const plusDM = [];
-  const minusDM = [];
-
-  for (let i = 1; i < candles.length; i++) {
-    const c = candles[i];
-    const p = candles[i - 1];
-
-    const up = c.high - p.high;
-    const down = p.low - c.low;
-
-    plusDM.push(up > down && up > 0 ? up : 0);
-    minusDM.push(down > up && down > 0 ? down : 0);
-
-    tr.push(Math.max(
-      c.high - c.low,
-      Math.abs(c.high - p.close),
-      Math.abs(c.low - p.close)
-    ));
-  }
-
-  const dx = [];
-
-  for (let i = period - 1; i < tr.length; i++) {
-    const start = i - period + 1;
-
-    const t = tr.slice(start, i + 1)
-      .reduce((a, b) => a + b, 0);
-
-    const p = plusDM.slice(start, i + 1)
-      .reduce((a, b) => a + b, 0);
-
-    const m = minusDM.slice(start, i + 1)
-      .reduce((a, b) => a + b, 0);
-
-    if (!t) continue;
-
-    const pdi = 100 * p / t;
-    const mdi = 100 * m / t;
-
-    dx.push(
-      100 * Math.abs(pdi - mdi) /
-      Math.max(pdi + mdi, 0.000001)
-    );
-  }
-
-  if (dx.length < period) return null;
-
-  return dx.slice(-period)
-    .reduce((a, b) => a + b, 0) / period;
-}
-
-// ------------------------------------------------------
-// MACD
-// ------------------------------------------------------
-
-function calculateMACD(values) {
-  if (!values || values.length < 35) return null;
-
-  const fast = calculateEMA(values, 12);
-  const slow = calculateEMA(values, 26);
-
-  if (fast === null || slow === null) return null;
-
-  return {
-    macd: fast - slow
-  };
-}
-
-// ------------------------------------------------------
-// AVERAGE DAILY RANGE PROXY
-// ------------------------------------------------------
-
-function calculateADR(candles, period = 14) {
-  if (!candles || candles.length < period) return null;
-
-  const recent = candles.slice(-period);
-
-  return recent.reduce(
-    (sum, c) => sum + (c.high - c.low),
-    0
-  ) / period;
-}
-
-// ------------------------------------------------------
-// ORDER FLOW PROXY
-// ------------------------------------------------------
-
-function calculateOrderFlow(quote) {
-  const buy = Number(quote.buyQuantity || 0);
-  const sell = Number(quote.sellQuantity || 0);
-
-  const total = buy + sell;
-
-  return {
-    buyQuantity: buy,
-    sellQuantity: sell,
-
-    imbalance: buy - sell,
-
-    imbalancePercent: total
-      ? ((buy - sell) / total) * 100
-      : null,
-
-    buyPressure: buy > sell,
-    sellPressure: sell > buy
-  };
-}
-
-// ------------------------------------------------------
-// MARKET TREND DETECTION
-// ------------------------------------------------------
-
-function detectMarketTrend(candles, quote) {
-  const closes = candles.map(c => c.close);
-
-  const ema9 = calculateEMA(closes, CONFIG.EMA_FAST);
-  const ema21 = calculateEMA(closes, CONFIG.EMA_SLOW);
-  const ema50 = calculateEMA(closes, CONFIG.EMA_TREND);
-
-  const rsi = calculateRSI(closes, CONFIG.RSI_PERIOD);
-  const vwap = calculateSessionVWAP(candles);
-  const adx = calculateADX(candles, 14);
-
-  const last = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
-
-  const bullish =
-    ema9 !== null &&
-    ema21 !== null &&
-    ema50 !== null &&
-    adx !== null &&
-    ema9 > ema21 &&
-    ema21 > ema50 &&
-    last.close > ema50 &&
-    adx >= CONFIG.ADX_MIN;
-
-  const bearish =
-    ema9 !== null &&
-    ema21 !== null &&
-    ema50 !== null &&
-    adx !== null &&
-    ema9 < ema21 &&
-    ema21 < ema50 &&
-    last.close < ema50 &&
-    adx >= CONFIG.ADX_MIN;
-
-  let trend = "SIDEWAYS";
-
-  if (bullish) trend = "UPTREND";
-  if (bearish) trend = "DOWNTREND";
-
-  return {
-    trend,
-
-    bullish,
-    bearish,
-
-    ema9,
-    ema21,
-    ema50,
-
-    rsi,
-    vwap,
-    adx,
-
-    priceIncreasing: last.close > previous.close,
-    priceDecreasing: last.close < previous.close,
-
-    priceAboveVWAP: vwap !== null && last.close > vwap,
-    priceBelowVWAP: vwap !== null && last.close < vwap,
-
-    futuresPrice: quote.ltp
-  };
-}
-
-// ------------------------------------------------------
-// VOLUME CONFIRMATION
-// ------------------------------------------------------
-
-function checkVolume(candles) {
-  if (candles.length < 21) {
+  if (!previous || previous <= 0 || current <= 0) {
     return {
-      pass: false,
-      current: 0,
-      average: 0,
-      multiplier: 0
+      change: null,
+      percent: null,
+      ready: false
     };
   }
 
-  const last = candles[candles.length - 1];
-
-  const previous20 = candles.slice(-21, -1);
-
-  const average = previous20.reduce(
-    (sum, c) => sum + c.volume,
-    0
-  ) / 20;
-
-  const multiplier = average > 0
-    ? last.volume / average
-    : 0;
+  const change = current - previous;
 
   return {
-    pass:
-      average > 0 &&
-      last.volume >= average * CONFIG.VOLUME_MULTIPLIER,
-
-    current: last.volume,
-    average: Math.round(average),
-    multiplier: Number(multiplier.toFixed(2))
+    change,
+    percent: change / previous * 100,
+    ready: true
   };
 }
 
-// ------------------------------------------------------
-// OI + PRICE CONFIRMATION
-// ------------------------------------------------------
 
-function checkOIPattern(oiData, priceUp, priceDown) {
-  const valid =
-    oiData &&
-    oiData.ready &&
-    Number.isFinite(oiData.percent);
+// ============================================================
+// PART 2/3 — OPTION CHAIN, OI SNAPSHOTS, SELL SIGNALS & RISK
+// Requires PART 1 functions: api, getQuotes, findQuote,
+// getFiveMinuteCandles, EMA, RSI, VWAP, CONFIG
+// ============================================================
 
-  const oiIncreasing =
-    valid &&
-    oiData.percent >= CONFIG.OI_INCREASE_MIN;
+const optionHistory = new Map();
+const futureHistory = new Map();
 
-  return {
-    valid: !!valid,
-    oiIncreasing: !!oiIncreasing,
-
-    longBuildUp:
-      !!oiIncreasing && priceUp,
-
-    shortBuildUp:
-      !!oiIncreasing && priceDown,
-
-    oiChange: oiData?.change ?? null,
-    oiChangePercent: oiData?.percent ?? null
-  };
-}
-
-// ------------------------------------------------------
-// SIX CONDITION SELL ANALYSIS
-// ------------------------------------------------------
-
-function analyseIndex(
-  indexName,
-  candles,
-  spotQuote,
-  futureQuote,
-  oiData
-) {
-  if (!candles || candles.length < CONFIG.MIN_CANDLES) {
-    return {
-      index: indexName,
-      status: "WAIT",
-      reason: "Insufficient completed candles"
-    };
-  }
-
-  const last = candles[candles.length - 1];
-  const previous = candles[candles.length - 2];
-
-  const trend = detectMarketTrend(candles, futureQuote);
-
-  const volume = checkVolume(candles);
-
-  const priceUp = last.close > previous.close;
-  const priceDown = last.close < previous.close;
-
-  const oi = checkOIPattern(
-    oiData,
-    priceUp,
-    priceDown
-  );
-
-  const macd = calculateMACD(
-    candles.map(c => c.close)
-  );
-
-  const macdUp = macd !== null && macd.macd > 0;
-  const macdDown = macd !== null && macd.macd < 0;
-
-  // BULLISH MARKET = PE SELL
-
-  const peChecks = {
-    trend: trend.bullish,
-
-    vwap:
-      trend.priceAboveVWAP,
-
-    rsi:
-      trend.rsi !== null &&
-      trend.rsi >= CONFIG.RSI_BUY,
-
-    macd:
-      macdUp,
-
-    volume:
-      volume.pass,
-
-    oiPrice:
-      oi.longBuildUp
-  };
-
-  // BEARISH MARKET = CE SELL
-
-  const ceChecks = {
-    trend: trend.bearish,
-
-    vwap:
-      trend.priceBelowVWAP,
-
-    rsi:
-      trend.rsi !== null &&
-      trend.rsi <= CONFIG.RSI_SELL,
-
-    macd:
-      macdDown,
-
-    volume:
-      volume.pass,
-
-    oiPrice:
-      oi.shortBuildUp
-  };
-
-  const peScore = Object.values(peChecks)
-    .filter(Boolean).length;
-
-  const ceScore = Object.values(ceChecks)
-    .filter(Boolean).length;
-
-  let direction = null;
-
-  if (
-    CONFIG.REQUIRE_ALL_CONDITIONS &&
-    peScore === 6 &&
-    trend.trend === "UPTREND"
-  ) {
-    direction = "PE";
-  }
-
-  if (
-    CONFIG.REQUIRE_ALL_CONDITIONS &&
-    ceScore === 6 &&
-    trend.trend === "DOWNTREND"
-  ) {
-    direction = "CE";
-  }
-
-  const allValid =
-    trend.rsi !== null &&
-    trend.vwap !== null &&
-    trend.adx !== null &&
-    macd !== null &&
-    oi.valid;
-
-  const adr = calculateADR(candles, 14);
-
-  return {
-    index: indexName,
-
-    status: direction
-      ? "VERY_STRONG_SELL"
-      : "WAIT",
-
-    direction,
-
-    trend: trend.trend,
-
-    underlyingPrice: spotQuote.ltp,
-    futuresPrice: futureQuote.ltp,
-
-    candleClose: last.close,
-    candleTime: new Date(last.time).toISOString(),
-
-    rsi: trend.rsi,
-    vwap: trend.vwap,
-
-    ema9: trend.ema9,
-    ema21: trend.ema21,
-    ema50: trend.ema50,
-
-    adx: trend.adx,
-    adr,
-
-    macd: macd?.macd ?? null,
-
-    volume: volume.current,
-    averageVolume: volume.average,
-    volumeMultiplier: volume.multiplier,
-
-    oi: oiData.currentOI,
-    oiChange: oi.change,
-    oiChangePercent: oi.oiChangePercent,
-    oiReady: oi.valid,
-
-    peScore,
-    ceScore,
-
-    peChecks,
-    ceChecks,
-
-    dataValid: allValid,
-
-    orderFlow: calculateOrderFlow(futureQuote),
-
-    reason: direction
-      ? "ALL SIX CONDITIONS CONFIRMED"
-      : "Waiting for all six conditions",
-
-    timestamp: new Date().toISOString()
-  };
-}
-
-// ------------------------------------------------------
-// DUPLICATE CANDLE PROTECTION
-// ------------------------------------------------------
-
-function isNewSignal(index, direction, candleTime) {
-  const id = `${index}_${direction}_${candleTime}`;
-
-  if (signalIds.has(id)) return false;
-
-  signalIds.add(id);
-
-  return true;
-}
-
-
-// ======================================================
-// SMART TRADE INDIA V13 PRO
-// PART 3 OF 3
-// OPTION SELECTOR + SCANNER + DASHBOARD + API ROUTES
-// ======================================================
-
-const scanResults = {};
-let lastScanTime = null;
-
-// ------------------------------------------------------
-// COMMON HELPERS
-// ------------------------------------------------------
-
-function getNumber(value) {
+function number(value, fallback = null) {
   const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n : fallback;
 }
 
-function getExpiryDate(value) {
-  if (value === undefined || value === null) return "";
+function pctChange(current, previous) {
+  if (!Number.isFinite(current) ||
+      !Number.isFinite(previous) || previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
+}
 
-  if (typeof value === "number" || /^\d+$/.test(String(value))) {
+function getExpiryDate(future) {
+  let value = future.expiry;
+
+  // Upstox instrument expiry may be Unix milliseconds.
+  if (typeof value === "number" ||
+      (typeof value === "string" && /^\d+$/.test(value))) {
     const n = Number(value);
-    const d = new Date(n > 100000000000 ? n : n * 1000);
+    const d = new Date(n < 1e12 ? n * 1000 : n);
     if (!Number.isNaN(d.getTime())) {
       return d.toISOString().slice(0, 10);
     }
   }
 
-  const s = String(value);
-  return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : "";
+  if (typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+
+  return null;
 }
 
-function getTodayIndia() {
+function getUnderlyingKey(future) {
+  return future.underlying_key ||
+         future.underlyingKey ||
+         future.instrument_key;
+}
+
+async function getOptionChain(future) {
+  const underlyingKey = getUnderlyingKey(future);
+  const expiryDate = getExpiryDate(future);
+
+  if (!underlyingKey || !expiryDate) {
+    throw new Error("Missing underlying_key or valid expiry_date");
+  }
+
+  const path =
+    "/v2/option/chain?instrument_key=" +
+    encodeURIComponent(underlyingKey) +
+    "&expiry_date=" +
+    encodeURIComponent(expiryDate);
+
+  const response = await api(path);
+  return response?.data || [];
+}
+
+function getOptionMarket(option) {
+  const market = option?.market_data || {};
+  return {
+    ltp: number(market.ltp),
+    oi: number(market.oi),
+    volume: number(market.volume),
+    bid: number(market.bid_price),
+    ask: number(market.ask_price)
+  };
+}
+
+function getOptionKey(option) {
+  return option?.instrument_key ||
+         option?.instrumentKey ||
+         option?.instrument_token ||
+         null;
+}
+
+function saveOptionSnapshot(option) {
+  const key = getOptionKey(option);
+  if (!key) return null;
+
+  const market = getOptionMarket(option);
+  if (market.ltp === null ||
+      market.oi === null ||
+      market.volume === null) return null;
+
+  const now = Date.now();
+  const old = optionHistory.get(key);
+
+  optionHistory.set(key, {
+    ...market,
+    time: now
+  });
+
+  if (!old) return null;
+
+  const age = now - old.time;
+  if (age < 30000 || age > 10 * 60 * 1000) return null;
+
+  return {
+    old,
+    current: market,
+    ageMs: age,
+    oiChange: pctChange(market.oi, old.oi),
+    volumeChange: pctChange(market.volume, old.volume),
+    premiumChangePct: pctChange(market.ltp, old.ltp)
+  };
+}
+
+function saveFutureSnapshot(future, price, oi) {
+  const key = future.instrument_key;
+  if (!key || price === null || oi === null) return null;
+
+  const now = Date.now();
+  const old = futureHistory.get(key);
+
+  futureHistory.set(key, { price, oi, time: now });
+
+  if (!old) return null;
+
+  const age = now - old.time;
+  if (age < 30000 || age > 10 * 60 * 1000) return null;
+
+  return {
+    priceChangePct: pctChange(price, old.price),
+    oiChangePct: pctChange(oi, old.oi),
+    ageMs: age
+  };
+}
+
+function analyseFutureCandles(candles) {
+  if (!Array.isArray(candles) || candles.length < 21) {
+    return { valid: false, reason: "NOT_ENOUGH_CLOSED_CANDLES" };
+  }
+
+  const closes = candles.map(c => number(c.close)).filter(v => v !== null);
+  const highs = candles.map(c => number(c.high)).filter(v => v !== null);
+  const lows = candles.map(c => number(c.low)).filter(v => v !== null);
+  const volumes = candles.map(c => number(c.volume, 0));
+
+  if (closes.length < 21 || highs.length < 21 ||
+      lows.length < 21) {
+    return { valid: false, reason: "INVALID_CANDLE_DATA" };
+  }
+
+  const lastClose = closes[closes.length - 1];
+  const lastVolume = volumes[volumes.length - 1] || 0;
+  const avgVolume =
+    volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+
+  const rsi = RSI(closes, 14);
+  const ema20 = EMA(closes, 20);
+  const vwap = VWAP(candles);
+
+  if (![lastClose, rsi, ema20, vwap].every(Number.isFinite)) {
+    return { valid: false, reason: "INDICATOR_NOT_READY" };
+  }
+
+  return {
+    valid: true,
+    close: lastClose,
+    rsi,
+    ema20,
+    vwap,
+    volume: lastVolume,
+    averageVolume: avgVolume,
+    volumePass: avgVolume > 0 &&
+      lastVolume >= avgVolume * CONFIG.VOLUME_MULTIPLIER,
+    bullish: lastClose > ema20 && lastClose > vwap,
+    bearish: lastClose < ema20 && lastClose < vwap
+  };
+}
+
+function getStrike(option) {
+  return number(option?.strike_price);
+}
+
+function selectOptionPair(chain, side, spotPrice) {
+  const rows = [];
+
+  for (const item of chain) {
+    const strike = getStrike(item);
+    if (strike === null) continue;
+
+    const option = side === "PE"
+      ? item.put_options
+      : item.call_options;
+
+    if (!option) continue;
+
+    const market = getOptionMarket(option);
+    const key = getOptionKey(option);
+
+    if (!key || market.ltp === null ||
+        market.oi === null || market.volume === null) continue;
+
+    rows.push({
+      strike,
+      option,
+      key,
+      market
+    });
+  }
+
+  if (rows.length < 2) return null;
+
+  // PE: short near ATM/below ATM; hedge lower strike.
+  // CE: short near ATM/above ATM; hedge higher strike.
+  rows.sort((a, b) =>
+    Math.abs(a.strike - spotPrice) -
+    Math.abs(b.strike - spotPrice)
+  );
+
+  const shortOption = rows[0];
+
+  const hedgeCandidates = rows
+    .filter(x => side === "PE"
+      ? x.strike < shortOption.strike
+      : x.strike > shortOption.strike)
+    .sort((a, b) =>
+      Math.abs(a.strike - shortOption.strike) -
+      Math.abs(b.strike - shortOption.strike)
+    );
+
+  if (!hedgeCandidates.length) return null;
+
+  return {
+    short: shortOption,
+    hedge: hedgeCandidates[0]
+  };
+}
+
+function calculateCreditSpread(
+  shortPremium,
+  hedgePremium,
+  strikeWidth,
+  lotSize
+) {
+  const netCredit = shortPremium - hedgePremium;
+
+  if (netCredit <= 0 || strikeWidth <= netCredit ||
+      lotSize <= 0) return null;
+
+  const maxProfit = netCredit * lotSize;
+  const maxLoss = (strikeWidth - netCredit) * lotSize;
+
+  const riskLimit =
+    CONFIG.CAPITAL * CONFIG.RISK_PERCENT / 100;
+
+  const lots = Math.floor(riskLimit / maxLoss);
+
+  if (lots < 1) return null;
+
+  const targetDebit =
+    netCredit * (1 - CONFIG.TARGET_PERCENT);
+
+  const stopDebit = Math.min(
+    strikeWidth,
+    netCredit * CONFIG.SL_MULTIPLE
+  );
+
+  return {
+    netCredit: Number(netCredit.toFixed(2)),
+    maxProfit: Number(maxProfit.toFixed(2)),
+    maxLoss: Number(maxLoss.toFixed(2)),
+    riskLimit: Number(riskLimit.toFixed(2)),
+    lots,
+    targetDebit: Number(targetDebit.toFixed(2)),
+    stopDebit: Number(stopDebit.toFixed(2)),
+    targetCreditPercent: CONFIG.TARGET_PERCENT * 100
+  };
+}
+
+function checkOptionConditions(option, side) {
+  const snapshot = saveOptionSnapshot(option);
+  if (!snapshot) {
+    return {
+      valid: false,
+      reason: "WAITING_FOR_SECOND_OI_VOLUME_PREMIUM_SNAPSHOT"
+    };
+  }
+
+  const oiPass = snapshot.oiChange > 0;
+  const volumePass = snapshot.volumeChange > 0;
+  const premiumDown = snapshot.premiumChangePct < 0;
+
+  return {
+    valid: true,
+    oiPass,
+    volumePass,
+    premiumDown,
+    oiChange: snapshot.oiChange,
+    volumeChange: snapshot.volumeChange,
+    premiumChangePct: snapshot.premiumChangePct,
+    allPass: oiPass && volumePass && premiumDown
+  };
+}
+
+async function scanOneFuture(future) {
+  try {
+    const candles = await getFiveMinuteCandles(
+      future.instrument_key
+    );
+
+    const trend = analyseFutureCandles(candles);
+    if (!trend.valid || !trend.volumePass) return null;
+
+    const quoteResponse = await getQuotes([
+      future.instrument_key
+    ]);
+
+    const quote = findQuote(
+      quoteResponse,
+      future.instrument_key
+    );
+
+    const price = number(
+      quote?.last_price ?? quote?.ltp
+    );
+
+    const oi = number(
+      quote?.oi ?? quote?.open_interest
+    );
+
+    if (price === null || oi === null) return null;
+
+    const futureChange = saveFutureSnapshot(
+      future, price, oi
+    );
+
+    if (!futureChange) return null;
+
+    // Both trend and futures OI/price must confirm.
+    const bullish =
+      trend.bullish &&
+      trend.rsi >= CONFIG.RSI_BUY &&
+      futureChange.priceChangePct > 0 &&
+      futureChange.oiChangePct > 0;
+
+    const bearish =
+      trend.bearish &&
+      trend.rsi <= CONFIG.RSI_SELL &&
+      futureChange.priceChangePct < 0 &&
+      futureChange.oiChangePct > 0;
+
+    if (!bullish && !bearish) return null;
+
+    const chain = await getOptionChain(future);
+    if (!Array.isArray(chain) || !chain.length) return null;
+
+    const side = bullish ? "PE" : "CE";
+    const pair = selectOptionPair(chain, side, price);
+    if (!pair) return null;
+
+    const optionConditions = checkOptionConditions(
+      pair.short.option,
+      side
+    );
+
+    if (!optionConditions.valid ||
+        !optionConditions.allPass) return null;
+
+    const lotSize = number(
+      future.lot_size ?? future.lotSize
+    );
+
+    if (!lotSize) return null;
+
+    const width = Math.abs(
+      pair.short.strike - pair.hedge.strike
+    );
+
+    const risk = calculateCreditSpread(
+      pair.short.market.ltp,
+      pair.hedge.market.ltp,
+      width,
+      lotSize
+    );
+
+    if (!risk) return null;
+
+    const now = new Date().toISOString();
+
+    return {
+      id: `${future.instrument_key}-${side}-${Date.now()}`,
+      timestamp: now,
+      status: "PAPER_SIGNAL",
+      signal: side === "PE" ? "PE_SELL" : "CE_SELL",
+      underlying: future.underlying_symbol ||
+                  future.trading_symbol,
+      futureInstrumentKey: future.instrument_key,
+      expiry: getExpiryDate(future),
+
+      underlyingPrice: price,
+      rsi: Number(trend.rsi.toFixed(2)),
+      vwap: Number(trend.vwap.toFixed(2)),
+      ema20: Number(trend.ema20.toFixed(2)),
+
+      futurePriceChangePct:
+        Number(futureChange.priceChangePct.toFixed(2)),
+      futureOIChangePct:
+        Number(futureChange.oiChangePct.toFixed(2)),
+
+      optionSide: side,
+      shortStrike: pair.short.strike,
+      shortInstrumentKey: pair.short.key,
+      shortPremium: pair.short.market.ltp,
+      hedgeStrike: pair.hedge.strike,
+      hedgeInstrumentKey: pair.hedge.key,
+      hedgePremium: pair.hedge.market.ltp,
+
+      optionOIChangePct:
+        Number(optionConditions.oiChange.toFixed(2)),
+      optionVolumeChangePct:
+        Number(optionConditions.volumeChange.toFixed(2)),
+      premiumChangePct:
+        Number(optionConditions.premiumChangePct.toFixed(2)),
+
+      lotSize,
+      risk,
+      entryRule: "SELL SHORT OPTION + BUY HEDGE",
+      exitRule: "BUY BACK WHEN TARGET OR STOP IS HIT",
+      paperMode: CONFIG.PAPER_MODE
+    };
+
+  } catch (error) {
+    return {
+      error: true,
+      underlying: future.underlying_symbol ||
+                  future.trading_symbol,
+      message: error.message
+    };
+  }
+}
+
+async function scanFuturesForSignals() {
+  if (scanRunning) {
+    return { status: "SCAN_ALREADY_RUNNING" };
+  }
+
+  scanRunning = true;
+
+  try {
+    const batch = futures.slice(0, CONFIG.MAX_FUTURES);
+    const found = [];
+
+    // Sequential scanning helps reduce API bursts.
+    for (const future of batch) {
+      const result = await scanOneFuture(future);
+
+      if (result && !result.error) {
+        found.push(result);
+      }
+    }
+
+    signals = found;
+    lastScanTime = new Date().toISOString();
+
+    return {
+      status: "SCAN_COMPLETE",
+      scanned: batch.length,
+      signalCount: found.length,
+      signals: found,
+      lastScanTime
+    };
+
+  } finally {
+    scanRunning = false;
+  }
+      }
+    
+// ============================================================
+// PART 3/3 — DASHBOARD ROUTES, DAILY RISK LOCK & SERVER START
+// Add this after PART 2.
+// ============================================================
+
+let dailyRealizedPnl = 0;
+let dailyTradeCount = 0;
+let tradingDay = "";
+let lastError = null;
+
+function indiaTradingDate() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
     year: "numeric",
@@ -1027,560 +771,289 @@ function getTodayIndia() {
   }).format(new Date());
 }
 
-function getNextExpiry(contracts) {
-  const today = getTodayIndia();
+function refreshDailyRisk() {
+  const today = indiaTradingDate();
 
-  return contracts
-    .map(x => ({
-      ...x,
-      expiryDate: getExpiryDate(x.expiry)
-    }))
-    .filter(x => x.expiryDate && x.expiryDate >= today)
-    .sort((a, b) => a.expiryDate.localeCompare(b.expiryDate))[0];
-}
-
-// ------------------------------------------------------
-// OPTION CONTRACTS
-// ------------------------------------------------------
-
-async function getOptionContracts(indexKey) {
-  const url =
-    `${BASE}/v2/option/contract?instrument_key=${encodeURIComponent(indexKey)}`;
-
-  const response = await upstoxRequest(url);
-  const list = response?.data || [];
-
-  if (!Array.isArray(list)) return [];
-
-  return list;
-}
-
-async function getOptionChain(indexKey, expiryDate) {
-  if (!expiryDate) return [];
-
-  const url =
-    `${BASE}/v2/option/chain?instrument_key=${encodeURIComponent(indexKey)}` +
-    `&expiry_date=${encodeURIComponent(expiryDate)}`;
-
-  const response = await upstoxRequest(url);
-  return Array.isArray(response?.data) ? response.data : [];
-}
-
-// ------------------------------------------------------
-// OPTION SELL CANDIDATE SELECTOR
-// ------------------------------------------------------
-
-function selectOptionToSell(chain, optionType) {
-  if (!Array.isArray(chain) || !chain.length) return null;
-
-  const candidates = [];
-
-  for (const row of chain) {
-    const option =
-      optionType === "PE"
-        ? row.put_options
-        : row.call_options;
-
-    if (!option) continue;
-
-    const market = option.market_data || {};
-    const greeks = option.option_greeks || {};
-
-    const ltp = getNumber(market.ltp);
-    const oi = getNumber(market.oi);
-    const volume = getNumber(market.volume);
-    const delta = Math.abs(getNumber(greeks.delta));
-
-    if (ltp <= 0 || oi <= 0 || volume <= 0) continue;
-
-    // Avoid extremely low-liquidity contracts.
-    if (volume < 1 || oi < 1) continue;
-
-    // Prefer liquid, reasonably priced contracts.
-    candidates.push({
-      instrumentKey: option.instrument_key || "",
-      strike: getNumber(row.strike_price),
-      optionType,
-      ltp,
-      oi,
-      volume,
-      delta
-    });
+  if (tradingDay !== today) {
+    tradingDay = today;
+    dailyRealizedPnl = 0;
+    dailyTradeCount = 0;
+    lastError = null;
   }
 
-  if (!candidates.length) return null;
+  return {
+    date: tradingDay,
+    realizedPnl: Number(dailyRealizedPnl.toFixed(2)),
+    dailyStopLoss: CONFIG.DAILY_STOP_LOSS,
+    locked: dailyRealizedPnl <= -CONFIG.DAILY_STOP_LOSS,
+    remainingLossLimit: Math.max(
+      0,
+      CONFIG.DAILY_STOP_LOSS + dailyRealizedPnl
+    )
+  };
+}
 
-  // Prefer liquidity first, then a moderate absolute delta.
-  candidates.sort((a, b) => {
-    const scoreA =
-      Math.log10(a.oi + 1) +
-      Math.log10(a.volume + 1) -
-      Math.abs(a.delta - 0.25);
+function sendJsonV13(res, statusCode, data) {
+  const body = JSON.stringify(data);
 
-    const scoreB =
-      Math.log10(b.oi + 1) +
-      Math.log10(b.volume + 1) -
-      Math.abs(b.delta - 0.25);
-
-    return scoreB - scoreA;
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
   });
 
-  return candidates[0];
+  res.end(body);
 }
 
-// ------------------------------------------------------
-// INDEX SCANNER
-// ------------------------------------------------------
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    let size = 0;
 
-async function scanOneIndex(index) {
-  try {
-    const future = await findNearestFuture(index);
+    req.on("data", chunk => {
+      size += chunk.length;
 
-    if (!future || !future.instrument_key) {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: "Nearest future contract not found"
-      };
-    }
-
-    const quoteResponse = await getMarketQuotes([
-      future.instrument_key
-    ]);
-
-    const quote = extractQuote(
-      quoteResponse,
-      future.instrument_key
-    );
-
-    if (!quote) {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: "Live futures quote unavailable"
-      };
-    }
-
-    const candles = await getCandles(future.instrument_key);
-
-    if (!Array.isArray(candles) || candles.length < CONFIG.MIN_CANDLES) {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: "Not enough completed 5-minute candles",
-        candleCount: candles?.length || 0
-      };
-    }
-
-    // PART 2 analysis: all six conditions are mandatory.
-    const analysis = analyseIndex(
-      index.name,
-      candles,
-      quote
-    );
-
-    if (!analysis || analysis.signal === "WAIT") {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: analysis?.reason || "Six conditions not satisfied",
-        analysis
-      };
-    }
-
-    const optionType =
-      analysis.signal === "PE_SELL" ? "PE" : "CE";
-
-    // Get nearest valid expiry from actual contracts.
-    const contracts = await getOptionContracts(index.instrument_key);
-    const expiry = getNextExpiry(contracts);
-
-    if (!expiry) {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: "Valid option expiry not found",
-        analysis
-      };
-    }
-
-    const chain = await getOptionChain(
-      index.instrument_key,
-      expiry.expiryDate
-    );
-
-    const selectedOption = selectOptionToSell(
-      chain,
-      optionType
-    );
-
-    if (!selectedOption || !selectedOption.instrumentKey) {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: "Liquid option contract not found",
-        analysis
-      };
-    }
-
-    const candleTime =
-      candles[candles.length - 1].time ||
-      candles[candles.length - 1].timestamp ||
-      "";
-
-    const signalId =
-      `${index.name}_${optionType}_${candleTime}`;
-
-    if (!isNewSignal(signalId)) {
-      return {
-        index: index.name,
-        status: "WAIT",
-        reason: "Duplicate completed-candle signal",
-        analysis
-      };
-    }
-
-    const signal = {
-      id: signalId,
-      index: index.name,
-      direction: analysis.signal,
-      action: `SELL ${optionType}`,
-      optionType,
-      expiry: expiry.expiryDate,
-      strike: selectedOption.strike,
-      optionInstrumentKey: selectedOption.instrumentKey,
-      optionLtp: selectedOption.ltp,
-      optionOI: selectedOption.oi,
-      optionVolume: selectedOption.volume,
-      futurePrice: getNumber(quote.last_price),
-      candleTime,
-      timeframe: "5 minute",
-      conditionsPassed: 6,
-      totalConditions: 6,
-      paperMode: CONFIG.PAPER_MODE,
-      status: "VERY_STRONG",
-      createdAt: new Date().toISOString(),
-      analysis
-    };
-
-    signals.unshift(signal);
-
-    if (signals.length > CONFIG.MAX_SIGNALS) {
-      signals.length = CONFIG.MAX_SIGNALS;
-    }
-
-    return {
-      index: index.name,
-      status: "VERY_STRONG",
-      signal
-    };
-
-  } catch (error) {
-    return {
-      index: index.name,
-      status: "ERROR",
-      reason: error.message
-    };
-  }
-}
-
-// ------------------------------------------------------
-// SCAN ALL FOUR INDEXES
-// ------------------------------------------------------
-
-async function scanAllIndexes() {
-  if (scanRunning) {
-    return {
-      status: "BUSY",
-      message: "Previous scan is still running"
-    };
-  }
-
-  scanRunning = true;
-
-  try {
-    const results = [];
-
-    for (const index of INDEXES) {
-      const result = await scanOneIndex(index);
-      results.push(result);
-      scanResults[index.name] = result;
-    }
-
-    lastScanTime = new Date().toISOString();
-
-    return {
-      status: "OK",
-      lastScanTime,
-      results,
-      signals: signals.slice(0, 50)
-    };
-
-  } finally {
-    scanRunning = false;
-  }
-}
-
-// ------------------------------------------------------
-// DASHBOARD HTML
-// ------------------------------------------------------
-
-function dashboardHTML() {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SMART TRADE INDIA V13 PRO</title>
-<style>
-body {
-  margin: 0;
-  padding: 16px;
-  background: #101827;
-  color: #e8eef8;
-  font-family: Arial, sans-serif;
-}
-h2 { color: #35d0a0; }
-button {
-  background: #159b75;
-  color: white;
-  border: 0;
-  padding: 12px 18px;
-  border-radius: 7px;
-  font-size: 15px;
-}
-.card {
-  background: #1b293c;
-  padding: 14px;
-  margin: 12px 0;
-  border-radius: 9px;
-  overflow-wrap: anywhere;
-}
-.good { color: #39dfa2; }
-.wait { color: #ffc857; }
-.bad { color: #ff7777; }
-.small { color: #aab8ca; font-size: 12px; }
-</style>
-</head>
-<body>
-<h2>SMART TRADE INDIA V13 PRO</h2>
-<p>Live NSE / BSE Index Options Scanner</p>
-<p id="status">Connecting...</p>
-<button onclick="runScan()">SCAN NOW</button>
-<h3>INDEX STATUS</h3>
-<div id="indexes"></div>
-<h3>VERY STRONG SELL SIGNALS</h3>
-<div id="signals"></div>
-<script>
-async function loadData() {
-  try {
-    const r = await fetch('/api/scan');
-    const d = await r.json();
-
-    document.getElementById('status').innerText =
-      'Last scan: ' + (d.lastScanTime || 'Waiting');
-
-    const results = d.results || [];
-
-    document.getElementById('indexes').innerHTML =
-      results.map(x => {
-        const cls = x.status === 'VERY_STRONG' ? 'good' :
-                    x.status === 'ERROR' ? 'bad' : 'wait';
-
-        return '<div class="card"><b>' + x.index +
-          '</b><p class="' + cls + '">' + x.status +
-          '</p><p class="small">' +
-          (x.reason || x.signal?.action || '') +
-          '</p></div>';
-      }).join('');
-
-    document.getElementById('signals').innerHTML =
-      (d.signals || []).map(s =>
-        '<div class="card">' +
-        '<b class="good">' + s.index + ' — ' + s.action +
-        '</b><p>Strike: ' + s.strike +
-        '</p><p>Expiry: ' + s.expiry +
-        '</p><p>Option LTP: ' + s.optionLtp +
-        '</p><p>Future price: ' + s.futurePrice +
-        '</p><p>Conditions: ' + s.conditionsPassed +
-        '/' + s.totalConditions +
-        '</p><p class="small">Paper mode: ' + s.paperMode +
-        '</p></div>'
-      ).join('') || '<div class="card">No confirmed signals</div>';
-
-  } catch(e) {
-    document.getElementById('status').innerText =
-      'Dashboard error: ' + e.message;
-  }
-}
-
-async function runScan() {
-  document.getElementById('status').innerText = 'Scanning...';
-  try {
-    await fetch('/api/scan?run=1');
-    await loadData();
-  } catch(e) {
-    document.getElementById('status').innerText = e.message;
-  }
-}
-
-loadData();
-setInterval(loadData, 15000);
-</script>
-</body>
-</html>`;
-}
-
-// ------------------------------------------------------
-// HTTP ROUTES
-// ------------------------------------------------------
-
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  const path = url.pathname;
-
-  try {
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
-      });
-      return res.end();
-    }
-
-    if (path === "/" && req.method === "GET") {
-      res.writeHead(200, {
-        "Content-Type": "text/html; charset=utf-8"
-      });
-      return res.end(dashboardHTML());
-    }
-
-    if (path === "/health") {
-      return sendJson(res, 200, {
-        status: "OK",
-        version: "SMART_TRADE_INDIA_V13_PRO",
-        serverTime: new Date().toISOString(),
-        tokenConfigured: Boolean(TOKEN),
-        paperMode: CONFIG.PAPER_MODE
-      });
-    }
-
-    if (path === "/api/status") {
-      return sendJson(res, 200, {
-        status: "OK",
-        version: "V13 PRO",
-        tokenConfigured: Boolean(TOKEN),
-        scanRunning,
-        lastScanTime,
-        indexes: INDEXES.map(x => x.name)
-      });
-    }
-
-    if (path === "/api/indexes") {
-      return sendJson(res, 200, {
-        indexes: INDEXES.map(x => x.name)
-      });
-    }
-
-    if (path === "/api/scan") {
-      if (url.searchParams.get("run") === "1") {
-        const result = await scanAllIndexes();
-        return sendJson(res, 200, result);
+      if (size > 100000) {
+        reject(new Error("Request body too large"));
+        req.destroy();
+        return;
       }
 
-      return sendJson(res, 200, {
-        status: "OK",
-        lastScanTime,
-        results: Object.values(scanResults),
-        signals: signals.slice(0, 50)
+      body += chunk.toString();
+    });
+
+    req.on("end", () => {
+      if (!body.trim()) return resolve({});
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+
+    req.on("error", reject);
+  });
+}
+
+function getDashboardStatus() {
+  const risk = refreshDailyRisk();
+
+  return {
+    version: CONFIG.VERSION,
+    serverTime: new Date().toISOString(),
+    indiaDate: risk.date,
+    connected: Boolean(TOKEN),
+    paperMode: CONFIG.PAPER_MODE,
+    scanRunning,
+    lastScanTime,
+    lastError,
+    futuresLoaded: futures.length,
+    signalsCount: signals.length,
+    risk,
+    config: {
+      capital: CONFIG.CAPITAL,
+      riskPercent: CONFIG.RISK_PERCENT,
+      dailyStopLoss: CONFIG.DAILY_STOP_LOSS,
+      timeframeMinutes: CONFIG.TIMEFRAME,
+      volumeMultiplier: CONFIG.VOLUME_MULTIPLIER,
+      rsiBuy: CONFIG.RSI_BUY,
+      rsiSell: CONFIG.RSI_SELL
+    }
+  };
+}
+
+async function recordClosedTrade(pnl) {
+  refreshDailyRisk();
+
+  if (!Number.isFinite(pnl)) {
+    throw new Error("P&L must be a valid number");
+  }
+
+  dailyRealizedPnl += pnl;
+  dailyTradeCount += 1;
+
+  return {
+    recorded: true,
+    tradePnl: pnl,
+    tradeCount: dailyTradeCount,
+    risk: refreshDailyRisk()
+  };
+}
+
+async function handleRequest(req, res) {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
+    return res.end();
+  }
+
+  const url = new URL(
+    req.url,
+    `http://${req.headers.host || "localhost"}`
+  );
+
+  try {
+    // Health check
+    if (req.method === "GET" && url.pathname === "/health") {
+      return sendJsonV13(res, 200, {
+        ok: true,
+        ...getDashboardStatus()
       });
     }
 
-    if (path === "/api/signals") {
-      return sendJson(res, 200, {
+    // Dashboard status
+    if (req.method === "GET" &&
+        url.pathname === "/api/status") {
+      return sendJsonV13(res, 200, getDashboardStatus());
+    }
+
+    // Loaded futures list
+    if (req.method === "GET" &&
+        url.pathname === "/api/futures") {
+      return sendJsonV13(res, 200, {
+        count: futures.length,
+        futures: futures.map(f => ({
+          symbol: f.underlying_symbol || f.trading_symbol,
+          instrumentKey: f.instrument_key,
+          expiry: getExpiryDate(f),
+          lotSize: f.lot_size
+        }))
+      });
+    }
+
+    // Dashboard signals
+    if (req.method === "GET" &&
+        url.pathname === "/api/signals") {
+      return sendJsonV13(res, 200, {
         count: signals.length,
-        signals
+        signals,
+        lastScanTime,
+        risk: refreshDailyRisk()
       });
     }
 
-    if (path === "/api/market") {
-      return sendJson(res, 200, {
-        indexes: Object.values(scanResults),
-        lastScanTime
-      });
-    }
+    // Manually start a scan
+    if (req.method === "GET" &&
+        url.pathname === "/api/scan") {
+      const risk = refreshDailyRisk();
 
-    if (path === "/api/futures") {
-      const data = [];
-
-      for (const index of INDEXES) {
-        const future = await findNearestFuture(index);
-        data.push({
-          index: index.name,
-          future: future || null
+      if (!TOKEN) {
+        return sendJsonV13(res, 503, {
+          error: "UPSTOX_ACCESS_TOKEN_MISSING"
         });
       }
 
-      return sendJson(res, 200, { data });
+      if (risk.locked) {
+        return sendJsonV13(res, 423, {
+          status: "DAILY_LOSS_LIMIT_REACHED",
+          risk
+        });
+      }
+
+      if (scanRunning) {
+        return sendJsonV13(res, 202, {
+          status: "SCAN_ALREADY_RUNNING",
+          lastScanTime
+        });
+      }
+
+      const result = await scanFuturesForSignals();
+      return sendJsonV13(res, 200, {
+        ...result,
+        risk: refreshDailyRisk()
+      });
     }
 
-    return sendJson(res, 404, {
-      status: "NOT_FOUND",
-      path
+    // Record a closed paper trade's P&L.
+    // Example body: {"pnl":-500}
+    if (req.method === "POST" &&
+        url.pathname === "/api/risk/close-trade") {
+      const body = await readRequestBody(req);
+      const pnl = number(body.pnl);
+
+      if (pnl === null) {
+        return sendJsonV13(res, 400, {
+          error: "VALID_PNL_REQUIRED"
+        });
+      }
+
+      const result = await recordClosedTrade(pnl);
+      return sendJsonV13(res, 200, result);
+    }
+
+    // Unknown endpoint
+    return sendJsonV13(res, 404, {
+      error: "ENDPOINT_NOT_FOUND",
+      path: url.pathname
     });
 
   } catch (error) {
-    return sendJson(res, 500, {
-      status: "ERROR",
+    lastError = error.message;
+
+    return sendJsonV13(res, 500, {
+      error: "SERVER_ERROR",
       message: error.message
     });
   }
-});
+}
 
-// ------------------------------------------------------
-// START SERVER + AUTOMATIC SCAN
-// ------------------------------------------------------
+const server = http.createServer(handleRequest);
 
-async function startServer() {
+async function startV13Server() {
   if (!TOKEN) {
-    console.error("[V13] UPSTOX_ACCESS_TOKEN missing");
+    console.error(
+      "[V13] UPSTOX_ACCESS_TOKEN is missing in Render Environment"
+    );
   }
 
   try {
-    await loadInstrumentMaster();
-    console.log("[V13] Instrument master loaded");
+    console.log("[V13] Loading futures instrument master...");
+    await loadAllFutures();
+    console.log("[V13] Futures loaded:", futures.length);
   } catch (error) {
-    console.error("[V13] Instrument master error:", error.message);
+    lastError = error.message;
+    console.error("[V13] Futures load failed:", error.message);
   }
 
-  server.listen(PORT, () => {
-    console.log("====================================");
-    console.log("SMART TRADE INDIA V13 PRO RUNNING");
-    console.log("PORT:", PORT);
-    console.log("PAPER MODE:", CONFIG.PAPER_MODE);
-    console.log("INDEXES:", INDEXES.map(x => x.name).join(", "));
-    console.log("DASHBOARD: /");
-    console.log("HEALTH: /health");
-    console.log("SCAN: /api/scan");
-    console.log("====================================");
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`[V13] Server running on port ${PORT}`);
+    console.log(`[V13] Paper mode: ${CONFIG.PAPER_MODE}`);
   });
 
-  // Scan immediately, then every configured interval.
-  setTimeout(() => {
-    scanAllIndexes().catch(err =>
-      console.error("[V13] Initial scan error:", err.message)
-    );
-  }, 3000);
+  // Periodically refresh the instrument master.
+  setInterval(async () => {
+    try {
+      await loadAllFutures();
+      console.log("[V13] Futures master refreshed:", futures.length);
+    } catch (error) {
+      lastError = error.message;
+      console.error("[V13] Master refresh error:", error.message);
+    }
+  }, 6 * 60 * 60 * 1000);
 
-  setInterval(() => {
-    scanAllIndexes().catch(err =>
-      console.error("[V13] Auto scan error:", err.message)
-    );
+  // Automatic scan. The API route also checks the daily risk lock.
+  setInterval(async () => {
+    const risk = refreshDailyRisk();
+
+    if (!TOKEN || risk.locked || scanRunning || !futures.length) {
+      return;
+    }
+
+    try {
+      await scanFuturesForSignals();
+    } catch (error) {
+      lastError = error.message;
+      console.error("[V13] Scheduled scan error:", error.message);
+    }
   }, CONFIG.SCAN_INTERVAL);
 }
 
-startServer();
-
-
-                 
+startV13Server().catch(error => {
+  console.error("[V13] Startup error:", error);
+  process.exitCode = 1;
+});
+    
