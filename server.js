@@ -106,7 +106,22 @@ async function loadInstruments() {
   );
 
   state.instruments = records;
-
+console.log(
+  '[NIFTY INSTRUMENT DEBUG]',
+  records.filter(x =>
+    /NIFTY/i.test(
+      String(x.trading_symbol || '') + ' ' +
+      String(x.name || '') + ' ' +
+      String(x.underlying_symbol || '')
+    ) &&
+    String(x.segment || '').endsWith('_INDEX')
+  ).map(x => ({
+    name: x.trading_symbol,
+    segment: x.segment,
+    type: x.instrument_type,
+    key: x.instrument_key
+  }))
+);
 console.log(
   '[DEBUG] INDEX ONLY:',
   records
