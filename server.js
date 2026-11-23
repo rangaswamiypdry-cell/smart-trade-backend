@@ -179,6 +179,7 @@ const normalizeIndexName = value =>
     .replace(/[^A-Z0-9]/g, '');
 
 const wantedIndexes = new Set([
+  'NIFTY',
   'NIFTY50',
   'NIFTYBANK',
   'BANKNIFTY',
@@ -189,8 +190,9 @@ const wantedIndexes = new Set([
 ]);
 
 state.indexes = records.filter(x => {
-  const segment = String(x.segment || '').toUpperCase();
-  const name = normalizeIndexName(x.trading_symbol);
+  const name = normalizeIndexName(
+  x.trading_symbol || x.name || x.underlying_symbol
+);
 
   return (
     segment.endsWith('_INDEX') &&
