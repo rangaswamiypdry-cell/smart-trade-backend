@@ -4,496 +4,372 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Smart Trade India V13 PRO</title>
+<title>SMART TRADE INDIA V11 PRO</title>
 
 <style>
 *{box-sizing:border-box}
 body{
-  margin:0;background:#080e20;color:#f1f5f9;
-  font-family:Arial,sans-serif;padding:16px
+  margin:0;
+  background:#0b1220;
+  color:#fff;
+  font-family:Arial,sans-serif;
 }
-.container{max-width:1100px;margin:auto}
-.card{
-  background:#19263e;border:1px solid #344765;
-  border-radius:22px;padding:20px;margin-bottom:16px
+header{
+  background:#151f32;
+  padding:18px;
+  text-align:center;
+  border-bottom:2px solid #263751;
 }
-h1{color:#42d7b5;font-size:27px}
-h2{color:#42d7b5;font-size:22px}
-.sub{color:#cbd5e1}
-button{
-  border:0;border-radius:12px;padding:15px 20px;
-  font-size:15px;font-weight:bold;margin:5px;
-  background:#2479ed;color:white
-}
-button:disabled{opacity:.5}
-.secondary{background:#52647c}
-.green{color:#42d7b5}
-.red{color:#fb7185}
-.yellow{color:#facc15}
+header h2{margin:0;color:#00e5a0}
+header p{color:#9aabc3;font-size:12px}
+.container{padding:14px;max-width:1100px;margin:auto}
 .grid{
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
 }
-.stat{font-size:22px;font-weight:bold;margin-top:8px}
-.small{font-size:13px;color:#aab9ce}
+.card{
+  background:#172338;
+  padding:16px;
+  border-radius:12px;
+  border:1px solid #293a55;
+}
+.card h3{margin:0 0 10px;color:#a9bad3;font-size:14px}
+.number{font-size:25px;font-weight:bold}
+.green{color:#00e5a0}
+.red{color:#ff5268}
+.yellow{color:#ffc857}
+.index-list{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+  margin-top:15px;
+}
+.index{
+  background:#172338;
+  padding:13px;
+  border-radius:10px;
+  border:1px solid #293a55;
+}
+.index small{color:#9aabc3}
+.status{font-size:12px;margin-top:7px}
+button{
+  border:0;
+  padding:13px 18px;
+  border-radius:8px;
+  font-weight:bold;
+  cursor:pointer;
+  margin:5px 3px;
+}
+.scan{background:#00d99a;color:#001b14}
+.refresh{background:#344965;color:white}
+h3.section{margin-top:25px;color:#00e5a0}
 .signal{
-  border:1px solid #405574;border-radius:16px;
-  padding:16px;margin:12px 0;background:#101b30
+  background:#172338;
+  border-radius:12px;
+  padding:15px;
+  margin:12px 0;
+  border-left:4px solid #00e5a0;
 }
-.signal h3{margin-top:0}
-table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{padding:11px 7px;border-bottom:1px solid #344765;text-align:left}
-.badge{padding:6px 10px;border-radius:20px;font-weight:bold}
-.ok{background:#145c45;color:#8fffd1}
-.bad{background:#652b3b;color:#ffc1cf}
-.wait{background:#5a4921;color:#ffe29a}
-.error{color:#fb7185}
-#message{white-space:pre-wrap;color:#facc15}
-@media(max-width:550px){
-  body{padding:10px}
-  h1{font-size:23px}
-  .grid{grid-template-columns:1fr}
-  table{font-size:12px}
+.signal.sell{border-left-color:#ff5268}
+.signal p{font-size:13px;color:#c5d1e2}
+.signal strong{font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td,th{padding:10px;border-bottom:1px solid #293a55;text-align:left}
+.error{color:#ff5268}
+footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
+@media(max-width:380px){
+ .number{font-size:20px}
+ .index-list{grid-template-columns:1fr}
 }
 </style>
 </head>
 
 <body>
+
+<header>
+<h2>SMART TRADE INDIA V11 PRO</h2>
+<p>LIVE NSE F&O + INDEX OPTIONS SCANNER</p>
+<div id="connection" class="yellow">Connecting Backend...</div>
+</header>
+
 <div class="container">
 
+<div class="grid">
+
 <div class="card">
-  <h1>SMART TRADE INDIA V13 PRO</h1>
-  <h3>LIVE FUTURES + OPTIONS SELL SCANNER</h3>
-  <p class="sub">NSE / BSE Futures • CE SELL • PE SELL</p>
-  <p class="small">Backend: Upstox API</p>
+<h3>NSE F&O STOCKS</h3>
+<div class="number green" id="stocks">0</div>
 </div>
 
 <div class="card">
-  <button id="refreshBtn" onclick="manualScan()">SCAN NOW</button>
-  <button class="secondary" id="soundBtn" onclick="toggleSound()">SOUND OFF</button>
-  <button class="secondary" onclick="loadDashboard()">REFRESH DATA</button>
-  <p id="message">Connecting to V13 server...</p>
+<h3>INDEXES</h3>
+<div class="number yellow" id="indexes">0</div>
 </div>
 
 <div class="card">
-  <h2>SERVER STATUS</h2>
-  <div class="grid">
-    <div>
-      <div class="small">SERVER</div>
-      <div class="stat" id="server">Checking...</div>
-    </div>
-    <div>
-      <div class="small">VERSION</div>
-      <div class="stat" id="version">--</div>
-    </div>
-    <div>
-      <div class="small">UPSTOX TOKEN</div>
-      <div class="stat" id="token">--</div>
-    </div>
-    <div>
-      <div class="small">PAPER MODE</div>
-      <div class="stat" id="paper">--</div>
-    </div>
-    <div>
-      <div class="small">FUTURES LOADED</div>
-      <div class="stat" id="futuresCount">0</div>
-    </div>
-    <div>
-      <div class="small">SIGNALS</div>
-      <div class="stat" id="signalCount">0</div>
-    </div>
-  </div>
-  <p class="small">Last Scan: <span id="lastScan">--</span></p>
-  <p class="small">Last Error: <span id="lastError">None</span></p>
+<h3>OPTIONS CONTRACTS</h3>
+<div class="number" id="options">0</div>
 </div>
 
 <div class="card">
-  <h2>RISK MANAGEMENT</h2>
-  <div class="grid">
-    <div>
-      <div class="small">CAPITAL</div>
-      <div class="stat" id="capital">₹--</div>
-    </div>
-    <div>
-      <div class="small">RISK PER TRADE</div>
-      <div class="stat" id="riskLimit">₹--</div>
-    </div>
-    <div>
-      <div class="small">DAILY REALIZED P&L</div>
-      <div class="stat" id="pnl">₹--</div>
-    </div>
-    <div>
-      <div class="small">DAILY LOSS LIMIT</div>
-      <div class="stat" id="dailyLimit">₹--</div>
-    </div>
-  </div>
-  <p id="riskStatus" class="yellow">Risk status: Checking...</p>
-  <p class="small">
-    Daily P&L is based only on trades manually recorded in the backend.
-    It is not automatically fetched from your broker.
-  </p>
+<h3>TOTAL SIGNALS</h3>
+<div class="number" id="totalSignals">0</div>
 </div>
+
+</div>
+
+<h3 class="section">INDEX MARKET</h3>
+
+<div class="index-list" id="indexList">
+
+<div class="index">
+<strong>NIFTY 50</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+<div class="index">
+<strong>BANKNIFTY</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+<div class="index">
+<strong>FINNIFTY</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+<div class="index">
+<strong>SENSEX</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+</div>
+
+<h3 class="section">SCANNER CONTROL</h3>
 
 <div class="card">
-  <h2>FUTURES WATCHLIST</h2>
-  <p class="small">Futures loaded from the V13 instrument master</p>
-  <div style="overflow-x:auto">
-    <table>
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Expiry</th>
-          <th>Lot Size</th>
-        </tr>
-      </thead>
-      <tbody id="futuresTable">
-        <tr><td colspan="3">Loading...</td></tr>
-      </tbody>
-    </table>
-  </div>
+<div id="scanStatus" class="yellow">Scanner Ready</div>
+<br>
+<button class="scan" onclick="runScan()">START SCAN</button>
+<button class="refresh" onclick="loadDashboard()">REFRESH</button>
+<p style="font-size:12px;color:#9aabc3">
+Timeframe: 5 Minutes | EMA 9 / 15 Cross<br>
+RSI BUY: 65 | RSI SELL: 35<br>
+Volume: 1.5x | All 7 Conditions Required
+</p>
 </div>
 
-<div class="card">
-  <h2>LIVE TRADING SIGNALS</h2>
-  <p class="small">Only signals returned by the backend are displayed.</p>
-  <div id="signals">
-    No signals available.
-  </div>
+<h3 class="section">VERY STRONG BUY</h3>
+<div id="buySignals">
+No BUY signals
 </div>
 
-<div class="card">
-  <h2>API CONNECTION</h2>
-  <p class="small">Backend URL</p>
-  <p id="apiUrl" style="word-break:break-all"></p>
-  <p class="small">Dashboard refreshes server data every 15 seconds.</p>
-  <p class="small">Automatic scanning is controlled by the backend.</p>
+<h3 class="section">VERY STRONG SELL</h3>
+<div id="sellSignals">
+No SELL signals
 </div>
 
+<h3 class="section">BACKEND ERRORS</h3>
+<div class="card" id="errors">No errors</div>
+
 </div>
+
+<footer>
+SMART TRADE INDIA V11 PRO<br>
+5 MIN CLOSED CANDLE SIGNALS
+</footer>
 
 <script>
-"use strict";
 
-// V13 BACKEND
+// YOUR EXISTING RENDER BACKEND
 const API = "https://smart-trade-backend-ig6l.onrender.com";
 
-let soundEnabled = false;
-let previousSignalIds = new Set();
-let loading = false;
+async function getAPI(path){
+  const response = await fetch(API + path);
+  if(!response.ok){
+    throw new Error("HTTP " + response.status);
+  }
+  return response.json();
+}
 
-document.getElementById("apiUrl").textContent = API;
+function escapeHTML(value){
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",
+    '"':"&quot;","'":"&#39;"
+  })[c]);
+}
 
-async function apiGet(path, timeoutMs = 30000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+const indexNames = [
+  {label:"NIFTY 50", aliases:["NIFTY 50"]},
+  {label:"BANKNIFTY", aliases:["NIFTY BANK"]},
+  {label:"FINNIFTY", aliases:["NIFTY FIN SERVICE"]},
+  {label:"SENSEX", aliases:["SENSEX"]}
+];
 
-  try {
-    const response = await fetch(API + path, {
-      method: "GET",
-      cache: "no-store",
-      signal: controller.signal
-    });
+function renderIndexes(data){
+  const indexes = data.indexes || [];
 
-    const data = await response.json();
+  document.getElementById("indexes").textContent =
+    indexes.length;
 
-    if (!response.ok) {
-      throw new Error(
-        data.message || data.error || "HTTP " + response.status
+  document.getElementById("indexList").innerHTML =
+    indexNames.map(item => {
+      const found = indexes.find(x =>
+        item.aliases.includes(x.symbol)
       );
-    }
 
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
+      return `
+      <div class="index">
+        <strong>${item.label}</strong>
+        <div class="status ${found ? "green":"red"}">
+          ${found ? "INDEX LOADED" : "NOT LOADED"}
+        </div>
+        <small>${found
+          ? escapeHTML(found.key)
+          : "Instrument key unavailable"}
+        </small>
+      </div>`;
+    }).join("");
 }
 
-function money(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "--";
-
-  return "₹" + n.toLocaleString("en-IN", {
-    maximumFractionDigits: 2
-  });
-}
-
-function safe(value) {
-  return String(value ?? "--").replace(
-    /[&<>"']/g,
-    ch => ({
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-    })[ch]
-  );
-}
-
-function setMessage(message, isError = false) {
-  const el = document.getElementById("message");
-  el.textContent = message;
-  el.className = isError ? "error" : "";
-}
-
-function toggleSound() {
-  soundEnabled = !soundEnabled;
-
-  document.getElementById("soundBtn").textContent =
-    soundEnabled ? "SOUND ON" : "SOUND OFF";
-
-  if (soundEnabled) playSound();
-}
-
-function playSound() {
-  if (!soundEnabled) return;
-
-  try {
-    const AudioContext =
-      window.AudioContext || window.webkitAudioContext;
-
-    const ctx = new AudioContext();
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-
-    oscillator.frequency.value = 850;
-    gain.gain.value = 0.12;
-
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.25);
-
-    oscillator.onended = () => ctx.close();
-  } catch (e) {
-    console.log("Sound unavailable:", e.message);
-  }
-}
-
-function renderStatus(data) {
-  document.getElementById("server").innerHTML =
-    '<span class="badge ok">RUNNING</span>';
-
-  document.getElementById("version").textContent =
-    data.version || "--";
-
-  document.getElementById("token").textContent =
-    data.connected ? "YES" : "NO";
-
-  document.getElementById("paper").textContent =
-    data.paperMode ? "ON" : "OFF";
-
-  document.getElementById("futuresCount").textContent =
-    data.futuresLoaded ?? 0;
-
-  document.getElementById("signalsCount").textContent =
-    data.signalsCount ?? 0;
-
-  document.getElementById("lastScan").textContent =
-    data.lastScanTime || "--";
-
-  document.getElementById("lastError").textContent =
-    data.lastError || "None";
-
-  const config = data.config || {};
-  const risk = data.risk || {};
-
-  document.getElementById("capital").textContent =
-    money(config.capital);
-
-  document.getElementById("riskLimit").textContent =
-    money(
-      Number(config.capital || 0) *
-      Number(config.riskPercent || 0) / 100
-    );
-
-  document.getElementById("pnl").textContent =
-    money(risk.realizedPnl);
-
-  document.getElementById("dailyLimit").textContent =
-    money(risk.dailyStopLoss);
-
-  const riskStatus = document.getElementById("riskStatus");
-
-  riskStatus.textContent = risk.locked
-    ? "DAILY LOSS LIMIT REACHED — SCAN LOCKED"
-    : "Risk status: ACTIVE";
-
-  riskStatus.className = risk.locked ? "red" : "green";
-}
-
-function renderFutures(data) {
-  const list = data.futures || [];
-  const table = document.getElementById("futuresTable");
-
-  if (!list.length) {
-    table.innerHTML =
-      '<tr><td colspan="3" class="error">' +
-      'No futures loaded. Check Render logs and instrument master.' +
-      '</td></tr>';
-    return;
-  }
-
-  table.innerHTML = list.slice(0, 100).map(item => `
-    <tr>
-      <td>${safe(item.symbol)}</td>
-      <td>${safe(item.expiry)}</td>
-      <td>${safe(item.lotSize)}</td>
-    </tr>
-  `).join("");
-}
-
-function renderSignals(data) {
-  const list = data.signals || [];
-  const container = document.getElementById("signals");
-
-  document.getElementById("signalCount").textContent =
-    data.count ?? list.length;
-
-  if (!list.length) {
-    container.innerHTML =
-      '<p class="yellow">NO CONFIRMED SIGNALS</p>' +
-      '<p class="small">Wait for all required conditions to pass.</p>';
-    return;
-  }
-
-  for (const signal of list) {
-    if (signal.id && !previousSignalIds.has(signal.id)) {
-      playSound();
-    }
-  }
-
-  previousSignalIds = new Set(
-    list.map(s => s.id).filter(Boolean)
+function renderSignals(signals){
+  const buys = signals.filter(
+    x => x.signal === "VERY_STRONG_BUY"
   );
 
-  container.innerHTML = list.map(s => {
-    const isPE = s.signal === "PE_SELL";
-    const color = isPE ? "green" : "red";
+  const sells = signals.filter(
+    x => x.signal === "VERY_STRONG_SELL"
+  );
 
-    const r = s.risk || {};
+  document.getElementById("totalSignals").textContent =
+    signals.length;
 
-    return `
-      <div class="signal">
-        <h3 class="${color}">
-          ${safe(s.signal)}
-          — ${safe(s.underlying)}
-        </h3>
+  document.getElementById("buySignals").innerHTML =
+    buys.length ? buys.map(x => signalCard(x,false)).join("")
+    : "No VERY STRONG BUY signals";
 
-        <p><b>Underlying Price:</b>
-          ${money(s.underlyingPrice)}</p>
-
-        <p><b>RSI:</b> ${safe(s.rsi)}</p>
-        <p><b>VWAP:</b> ${money(s.vwap)}</p>
-        <p><b>EMA 20:</b> ${money(s.ema20)}</p>
-
-        <hr>
-
-        <p><b>Short Strike:</b>
-          ${safe(s.shortStrike)}</p>
-        <p><b>Short Premium:</b>
-          ${money(s.shortPremium)}</p>
-
-        <p><b>Hedge Strike:</b>
-          ${safe(s.hedgeStrike)}</p>
-        <p><b>Hedge Premium:</b>
-          ${money(s.hedgePremium)}</p>
-
-        <hr>
-
-        <p><b>Net Credit:</b>
-          ${money(r.netCredit)}</p>
-        <p><b>Target Debit:</b>
-          ${money(r.targetDebit)}</p>
-        <p><b>Stop Debit:</b>
-          ${money(r.stopDebit)}</p>
-        <p><b>Max Profit (theoretical):</b>
-          ${money(r.maxProfit)}</p>
-        <p><b>Max Loss (theoretical):</b>
-          ${money(r.maxLoss)}</p>
-        <p><b>Lots:</b> ${safe(r.lots)}</p>
-
-        <p class="small">OI change:
-          ${safe(s.optionOIChangePct)}%</p>
-        <p class="small">Volume change:
-          ${safe(s.optionVolumeChangePct)}%</p>
-        <p class="small">Premium change:
-          ${safe(s.premiumChangePct)}%</p>
-
-        <p class="yellow">
-          PAPER SIGNAL — VERIFY BEFORE MANUAL TRADE
-        </p>
-        <p class="small">${safe(s.timestamp)}</p>
-      </div>
-    `;
-  }).join("");
+  document.getElementById("sellSignals").innerHTML =
+    sells.length ? sells.map(x => signalCard(x,true)).join("")
+    : "No VERY STRONG SELL signals";
 }
 
-async function loadDashboard() {
-  if (loading) return;
+function signalCard(x,isSell){
+  const option = x.option || {};
+  const risk = x.optionRisk || {};
 
-  loading = true;
+  return `
+  <div class="signal ${isSell ? "sell":""}">
+    <strong>${escapeHTML(x.symbol)}</strong>
+    <span class="${isSell ? "red":"green"}">
+      ${escapeHTML(x.signal)}
+    </span>
 
-  try {
-    const [status, futures, signals] = await Promise.all([
-      apiGet("/api/status"),
-      apiGet("/api/futures"),
-      apiGet("/api/signals")
-    ]);
+    <p>Market: ${escapeHTML(x.marketType)}</p>
+    <p>EMA Cross: ${escapeHTML(x.cross)}</p>
+    <p>Confirmation: ${escapeHTML(x.confirmation)}</p>
+    <p>Entry: ${Number(x.entry).toFixed(2)}</p>
+    <p>Stop Loss: ${Number(x.stopLoss).toFixed(2)}</p>
+    <p>Target 1: ${Number(x.target1).toFixed(2)}</p>
+    <p>Target 2: ${Number(x.target2).toFixed(2)}</p>
 
-    renderStatus(status);
-    renderFutures(futures);
-    renderSignals(signals);
+    <hr>
+    <p>Option: ${escapeHTML(option.symbol || "N/A")}</p>
+    <p>Option Entry: ${risk.optionEntry ?? "N/A"}</p>
+    <p>Option SL: ${risk.optionSL ?? "N/A"}</p>
+    <p>Option Target 1: ${risk.optionTarget1 ?? "N/A"}</p>
+    <p>Option Target 2: ${risk.optionTarget2 ?? "N/A"}</p>
+    <p>RSI: ${Number(x.rsi).toFixed(2)}</p>
+    <p>VWAP: ${Number(x.vwap).toFixed(2)}</p>
+    <p>Volume Ratio: ${Number(x.volumeRatio).toFixed(2)}x</p>
+    <p>OI Change: ${x.oiChange == null
+      ? "N/A" : Number(x.oiChange).toFixed(2)+"%"}</p>
+    <p>Signal Time: ${escapeHTML(x.candleTime)}</p>
+  </div>`;
+}
 
-    setMessage("V13 backend connected. Data refreshed.");
+async function loadDashboard(){
+  try{
+    const [status,instruments,signalData] =
+      await Promise.all([
+        getAPI("/api/market/status"),
+        getAPI("/api/market/instruments"),
+        getAPI("/api/market/signals")
+      ]);
 
-  } catch (error) {
-    setMessage("SERVER ERROR: " + error.message, true);
-    document.getElementById("server").textContent = "ERROR";
-  } finally {
-    loading = false;
+    document.getElementById("connection").textContent =
+      "BACKEND CONNECTED";
+
+    document.getElementById("connection").className =
+      "green";
+
+    document.getElementById("stocks").textContent =
+      instruments.stocks;
+
+    document.getElementById("options").textContent =
+      instruments.options;
+
+    renderIndexes(instruments);
+    renderSignals(signalData.signals || []);
+
+    document.getElementById("scanStatus").textContent =
+      status.running ? "SCANNER RUNNING" :
+      "SCANNER READY | " + (status.lastScan || "Not scanned");
+
+    document.getElementById("errors").innerHTML =
+      (status.errors || []).length
+      ? status.errors.map(e =>
+        `<p class="error">${escapeHTML(e.symbol)}:
+        ${escapeHTML(e.message)}</p>`
+      ).join("")
+      : "No errors";
+
+  }catch(error){
+    document.getElementById("connection").textContent =
+      "BACKEND CONNECTION ERROR";
+
+    document.getElementById("connection").className =
+      "error";
+
+    document.getElementById("errors").textContent =
+      error.message;
   }
 }
 
-async function manualScan() {
-  const button = document.getElementById("refreshBtn");
-
-  if (loading) return;
-
+async function runScan(){
+  const button = document.querySelector(".scan");
   button.disabled = true;
-  button.textContent = "SCANNING...";
-  setMessage("Scan started. Please wait...");
 
-  try {
-    const result = await apiGet("/api/scan", 180000);
+  document.getElementById("scanStatus").textContent =
+    "SCANNING... PLEASE WAIT";
 
-    if (result.status === "DAILY_LOSS_LIMIT_REACHED") {
-      setMessage("Daily loss limit reached. Scanning locked.", true);
-    } else {
-      setMessage(
-        "Scan complete. Signals found: " +
-        (result.signalCount ?? 0)
-      );
+  try{
+    const result = await getAPI("/api/market/scan");
+
+    if(result.status === "SUCCESS"){
+      document.getElementById("scanStatus").textContent =
+        "SCAN COMPLETED";
+
+      await loadDashboard();
+    }else{
+      document.getElementById("scanStatus").textContent =
+        result.status || "SCAN FAILED";
     }
 
-    await loadDashboard();
-
-  } catch (error) {
-    setMessage("SCAN ERROR: " + error.message, true);
-  } finally {
+  }catch(error){
+    document.getElementById("scanStatus").textContent =
+      "SCAN ERROR: " + error.message;
+  }finally{
     button.disabled = false;
-    button.textContent = "SCAN NOW";
   }
 }
 
-// Initial load
-loadDashboard();
-
-// Refresh dashboard data every 15 seconds.
+// Refresh dashboard every 10 seconds.
 // This does not start a new market scan.
-setInterval(loadDashboard, 15000);
+loadDashboard();
+setInterval(loadDashboard,10000);
 
 </script>
+
 </body>
-</html>
+  </html>
+  
