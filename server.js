@@ -106,21 +106,28 @@ async function loadInstruments() {
   );
 
   state.instruments = records;
+
 console.log(
-  '[DEBUG] ALL INDEX RECORDS:',
+  '[DEBUG] INDEX ONLY:',
   records
     .filter(x =>
-      String(x.segment || '').includes('INDEX') ||
-      x.instrument_type === 'FUT'
+      String(x.segment || '').includes('INDEX')
     )
     .map(x => ({
       name: x.trading_symbol,
       segment: x.segment,
       type: x.instrument_type,
-      underlying: x.underlying_symbol,
       key: x.instrument_key
     }))
 );
+
+console.log(
+  '[DEBUG] INDEX COUNT:',
+  records.filter(x =>
+    String(x.segment || '').includes('INDEX')
+  ).length
+);
+  
   // NSE F&O equity futures only
   const futures = records.filter(x =>
     x.segment === 'NSE_FO' &&
