@@ -189,17 +189,24 @@ const wantedIndexes = new Set([
   'SENSEX'
 ]);
 
+
 state.indexes = records.filter(x => {
+  const segment = String(x.segment || '');
+
   const name = normalizeIndexName(
-  x.trading_symbol || x.name || x.underlying_symbol
-);
+    x.trading_symbol ||
+    x.name ||
+    x.underlying_symbol ||
+    ''
+  );
 
   return (
     segment.endsWith('_INDEX') &&
     wantedIndexes.has(name) &&
-    x.instrument_key
+    Boolean(x.instrument_key)
   );
 });
+
 
 console.log(
   '[V11] SELECTED INDEXES:',
