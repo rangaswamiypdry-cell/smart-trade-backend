@@ -157,18 +157,42 @@ console.log(
 
   // Index spot instrument keys: verify against
   // current Upstox instrument master.
-  const indexNames = [
-    'NIFTY 50',
-    'NIFTY BANK',
-    'NIFTY FIN SERVICE',
-    'SENSEX'
-  ];
+  
+const normalizeIndexName = value =>
+  String(value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 
-  state.indexes = records.filter(x =>
-    x.segment === 'NSE_INDEX' &&
-    indexNames.includes(x.trading_symbol) &&
+const wantedIndexes = new Set([
+  'NIFTY50',
+  'NIFTYBANK',
+  'BANKNIFTY',
+  'NIFTYFINSERVICE',
+  'FINNIFTY',
+  'NIFTYFINANCIALSERVICES',
+  'SENSEX'
+]);
+
+state.indexes = records.filter(x => {
+  const segment = String(x.segment || '').toUpperCase();
+  const name = normalizeIndexName(x.trading_symbol);
+
+  return (
+    segment.endsWith('_INDEX') &&
+    wantedIndexes.has(name) &&
     x.instrument_key
   );
+});
+
+console.log(
+  '[V11] SELECTED INDEXES:',
+  state.indexes.map(x => ({
+    name: x.trading_symbol,
+    segment: x.segment,
+    key: x.instrument_key
+  }))
+);
+
 
   // Options contracts
   state.options = records.filter(x =>
