@@ -9,29 +9,21 @@
 <style>
 *{box-sizing:border-box}
 body{
-  margin:0;
-  background:#0b1220;
-  color:#fff;
+  margin:0;background:#0b1220;color:#fff;
   font-family:Arial,sans-serif;
 }
 header{
-  background:#151f32;
-  padding:18px;
-  text-align:center;
+  background:#151f32;padding:18px;text-align:center;
   border-bottom:2px solid #263751;
 }
 header h2{margin:0;color:#00e5a0}
 header p{color:#9aabc3;font-size:12px}
 .container{padding:14px;max-width:1100px;margin:auto}
 .grid{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:12px;
+  display:grid;grid-template-columns:repeat(2,1fr);gap:12px;
 }
 .card{
-  background:#172338;
-  padding:16px;
-  border-radius:12px;
+  background:#172338;padding:16px;border-radius:12px;
   border:1px solid #293a55;
 }
 .card h3{margin:0 0 10px;color:#a9bad3;font-size:14px}
@@ -40,42 +32,30 @@ header p{color:#9aabc3;font-size:12px}
 .red{color:#ff5268}
 .yellow{color:#ffc857}
 .index-list{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:10px;
-  margin-top:15px;
+  display:grid;grid-template-columns:repeat(2,1fr);
+  gap:10px;margin-top:15px;
 }
 .index{
-  background:#172338;
-  padding:13px;
-  border-radius:10px;
-  border:1px solid #293a55;
+  background:#172338;padding:13px;border-radius:10px;
+  border:1px solid #293a55;overflow-wrap:anywhere;
 }
-.index small{color:#9aabc3}
+.index small{color:#9aabc3;display:block;margin-top:5px}
 .status{font-size:12px;margin-top:7px}
 button{
-  border:0;
-  padding:13px 18px;
-  border-radius:8px;
-  font-weight:bold;
-  cursor:pointer;
-  margin:5px 3px;
+  border:0;padding:13px 18px;border-radius:8px;
+  font-weight:bold;cursor:pointer;margin:5px 3px;
 }
+button:disabled{opacity:.5;cursor:not-allowed}
 .scan{background:#00d99a;color:#001b14}
 .refresh{background:#344965;color:white}
 h3.section{margin-top:25px;color:#00e5a0}
 .signal{
-  background:#172338;
-  border-radius:12px;
-  padding:15px;
-  margin:12px 0;
-  border-left:4px solid #00e5a0;
+  background:#172338;border-radius:12px;padding:15px;
+  margin:12px 0;border-left:4px solid #00e5a0;
 }
 .signal.sell{border-left-color:#ff5268}
 .signal p{font-size:13px;color:#c5d1e2}
 .signal strong{font-size:16px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-td,th{padding:10px;border-bottom:1px solid #293a55;text-align:left}
 .error{color:#ff5268}
 footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
 @media(max-width:380px){
@@ -96,7 +76,6 @@ footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
 <div class="container">
 
 <div class="grid">
-
 <div class="card">
 <h3>NSE F&O STOCKS</h3>
 <div class="number green" id="stocks">0</div>
@@ -116,33 +95,15 @@ footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
 <h3>TOTAL SIGNALS</h3>
 <div class="number" id="totalSignals">0</div>
 </div>
-
 </div>
 
 <h3 class="section">INDEX MARKET</h3>
 
 <div class="index-list" id="indexList">
-
-<div class="index">
-<strong>NIFTY 50</strong>
-<div class="status yellow">Checking...</div>
-</div>
-
-<div class="index">
-<strong>BANKNIFTY</strong>
-<div class="status yellow">Checking...</div>
-</div>
-
-<div class="index">
-<strong>FINNIFTY</strong>
-<div class="status yellow">Checking...</div>
-</div>
-
-<div class="index">
-<strong>SENSEX</strong>
-<div class="status yellow">Checking...</div>
-</div>
-
+<div class="index"><strong>NIFTY 50</strong><div class="status yellow">Checking...</div></div>
+<div class="index"><strong>BANKNIFTY</strong><div class="status yellow">Checking...</div></div>
+<div class="index"><strong>FINNIFTY</strong><div class="status yellow">Checking...</div></div>
+<div class="index"><strong>SENSEX</strong><div class="status yellow">Checking...</div></div>
 </div>
 
 <h3 class="section">SCANNER CONTROL</h3>
@@ -152,6 +113,7 @@ footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
 <br>
 <button class="scan" onclick="runScan()">START SCAN</button>
 <button class="refresh" onclick="loadDashboard()">REFRESH</button>
+
 <p style="font-size:12px;color:#9aabc3">
 Timeframe: 5 Minutes | EMA 9 / 15 Cross<br>
 RSI BUY: 65 | RSI SELL: 35<br>
@@ -160,14 +122,10 @@ Volume: 1.5x | All 7 Conditions Required
 </div>
 
 <h3 class="section">VERY STRONG BUY</h3>
-<div id="buySignals">
-No BUY signals
-</div>
+<div id="buySignals">No BUY signals</div>
 
 <h3 class="section">VERY STRONG SELL</h3>
-<div id="sellSignals">
-No SELL signals
-</div>
+<div id="sellSignals">No SELL signals</div>
 
 <h3 class="section">BACKEND ERRORS</h3>
 <div class="card" id="errors">No errors</div>
@@ -181,7 +139,6 @@ SMART TRADE INDIA V11 PRO<br>
 
 <script>
 
-// YOUR EXISTING RENDER BACKEND
 const API = "https://smart-trade-backend-ig6l.onrender.com";
 
 async function getAPI(path){
@@ -194,45 +151,97 @@ async function getAPI(path){
 
 function escapeHTML(value){
   return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;",
-    '"':"&quot;","'":"&#39;"
+    "&":"&amp;",
+    "<":"&lt;",
+    ">":"&gt;",
+    '"':"&quot;",
+    "'":"&#39;"
   })[c]);
 }
 
-const indexNames = [
-  {label:"NIFTY 50", aliases:["NIFTY 50"]},
-  {label:"BANKNIFTY", aliases:["NIFTY BANK"]},
-  {label:"FINNIFTY", aliases:["NIFTY FIN SERVICE"]},
-  {label:"SENSEX", aliases:["SENSEX"]}
-];
+// INDEX NAME NORMALIZATION
+
+function normalizeIndexName(value){
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g,"");
+}
+
+// INDEX MARKET DISPLAY
 
 function renderIndexes(data){
-  const indexes = data.indexes || [];
+
+  const indexes = Array.isArray(data.indexes)
+    ? data.indexes : [];
 
   document.getElementById("indexes").textContent =
     indexes.length;
 
+  const indexNames = [
+    {
+      label:"NIFTY 50",
+      aliases:["NIFTY50"]
+    },
+    {
+      label:"BANKNIFTY",
+      aliases:["BANKNIFTY","NIFTYBANK"]
+    },
+    {
+      label:"FINNIFTY",
+      aliases:[
+        "FINNIFTY",
+        "NIFTYFINSERVICE",
+        "NIFTYFINANCIALSERVICES"
+      ]
+    },
+    {
+      label:"SENSEX",
+      aliases:["SENSEX"]
+    }
+  ];
+
   document.getElementById("indexList").innerHTML =
     indexNames.map(item => {
-      const found = indexes.find(x =>
-        item.aliases.includes(x.symbol)
-      );
+
+      const found = indexes.find(x => {
+
+        const name = normalizeIndexName(
+          x.trading_symbol ||
+          x.symbol ||
+          x.name
+        );
+
+        return item.aliases.includes(name);
+      });
+
+      const key = found
+        ? (found.instrument_key || found.key)
+        : "";
 
       return `
       <div class="index">
         <strong>${item.label}</strong>
-        <div class="status ${found ? "green":"red"}">
-          ${found ? "INDEX LOADED" : "NOT LOADED"}
+
+        <div class="status ${found && key ? "green":"red"}">
+          ${found && key ? "INDEX LOADED":"NOT LOADED"}
         </div>
-        <small>${found
-          ? escapeHTML(found.key)
-          : "Instrument key unavailable"}
+
+        <small>
+          ${found && key
+            ? escapeHTML(key)
+            : "Instrument key unavailable"}
         </small>
       </div>`;
+
     }).join("");
 }
 
+// SIGNAL DISPLAY
+
 function renderSignals(signals){
+
+  signals = Array.isArray(signals) ? signals : [];
+
   const buys = signals.filter(
     x => x.signal === "VERY_STRONG_BUY"
   );
@@ -245,21 +254,31 @@ function renderSignals(signals){
     signals.length;
 
   document.getElementById("buySignals").innerHTML =
-    buys.length ? buys.map(x => signalCard(x,false)).join("")
-    : "No VERY STRONG BUY signals";
+    buys.length
+      ? buys.map(x => signalCard(x,false)).join("")
+      : "No VERY STRONG BUY signals";
 
   document.getElementById("sellSignals").innerHTML =
-    sells.length ? sells.map(x => signalCard(x,true)).join("")
-    : "No VERY STRONG SELL signals";
+    sells.length
+      ? sells.map(x => signalCard(x,true)).join("")
+      : "No VERY STRONG SELL signals";
 }
 
 function signalCard(x,isSell){
+
   const option = x.option || {};
   const risk = x.optionRisk || {};
 
+  const num = value =>
+    Number.isFinite(Number(value))
+      ? Number(value).toFixed(2)
+      : "N/A";
+
   return `
   <div class="signal ${isSell ? "sell":""}">
+
     <strong>${escapeHTML(x.symbol)}</strong>
+
     <span class="${isSell ? "red":"green"}">
       ${escapeHTML(x.signal)}
     </span>
@@ -267,33 +286,47 @@ function signalCard(x,isSell){
     <p>Market: ${escapeHTML(x.marketType)}</p>
     <p>EMA Cross: ${escapeHTML(x.cross)}</p>
     <p>Confirmation: ${escapeHTML(x.confirmation)}</p>
-    <p>Entry: ${Number(x.entry).toFixed(2)}</p>
-    <p>Stop Loss: ${Number(x.stopLoss).toFixed(2)}</p>
-    <p>Target 1: ${Number(x.target1).toFixed(2)}</p>
-    <p>Target 2: ${Number(x.target2).toFixed(2)}</p>
+    <p>Entry: ${num(x.entry)}</p>
+    <p>Stop Loss: ${num(x.stopLoss)}</p>
+    <p>Target 1: ${num(x.target1)}</p>
+    <p>Target 2: ${num(x.target2)}</p>
 
     <hr>
+
     <p>Option: ${escapeHTML(option.symbol || "N/A")}</p>
-    <p>Option Entry: ${risk.optionEntry ?? "N/A"}</p>
-    <p>Option SL: ${risk.optionSL ?? "N/A"}</p>
-    <p>Option Target 1: ${risk.optionTarget1 ?? "N/A"}</p>
-    <p>Option Target 2: ${risk.optionTarget2 ?? "N/A"}</p>
-    <p>RSI: ${Number(x.rsi).toFixed(2)}</p>
-    <p>VWAP: ${Number(x.vwap).toFixed(2)}</p>
-    <p>Volume Ratio: ${Number(x.volumeRatio).toFixed(2)}x</p>
-    <p>OI Change: ${x.oiChange == null
-      ? "N/A" : Number(x.oiChange).toFixed(2)+"%"}</p>
+    <p>Option Entry: ${escapeHTML(risk.optionEntry ?? "N/A")}</p>
+    <p>Option SL: ${escapeHTML(risk.optionSL ?? "N/A")}</p>
+    <p>Option Target 1: ${escapeHTML(risk.optionTarget1 ?? "N/A")}</p>
+    <p>Option Target 2: ${escapeHTML(risk.optionTarget2 ?? "N/A")}</p>
+
+    <p>RSI: ${num(x.rsi)}</p>
+    <p>VWAP: ${num(x.vwap)}</p>
+    <p>Volume Ratio: ${num(x.volumeRatio)}x</p>
+
+    <p>OI Change: ${
+      x.oiChange == null
+        ? "N/A"
+        : num(x.oiChange)+"%"
+    }</p>
+
     <p>Signal Time: ${escapeHTML(x.candleTime)}</p>
+
   </div>`;
 }
 
+// LOAD DASHBOARD
+
 async function loadDashboard(){
+
   try{
+
     const [status,instruments,signalData] =
       await Promise.all([
+
         getAPI("/api/market/status"),
         getAPI("/api/market/instruments"),
         getAPI("/api/market/signals")
+
       ]);
 
     document.getElementById("connection").textContent =
@@ -303,27 +336,32 @@ async function loadDashboard(){
       "green";
 
     document.getElementById("stocks").textContent =
-      instruments.stocks;
+      instruments.stocks ?? 0;
 
     document.getElementById("options").textContent =
-      instruments.options;
+      instruments.options ?? 0;
 
     renderIndexes(instruments);
+
     renderSignals(signalData.signals || []);
 
     document.getElementById("scanStatus").textContent =
-      status.running ? "SCANNER RUNNING" :
-      "SCANNER READY | " + (status.lastScan || "Not scanned");
+      status.running
+        ? "SCANNER RUNNING"
+        : "SCANNER READY | " + (status.lastScan || "Not scanned");
 
     document.getElementById("errors").innerHTML =
       (status.errors || []).length
-      ? status.errors.map(e =>
-        `<p class="error">${escapeHTML(e.symbol)}:
-        ${escapeHTML(e.message)}</p>`
-      ).join("")
-      : "No errors";
+        ? status.errors.map(e =>
+          `<p class="error">
+            ${escapeHTML(e.symbol)}:
+            ${escapeHTML(e.message)}
+          </p>`
+        ).join("")
+        : "No errors";
 
   }catch(error){
+
     document.getElementById("connection").textContent =
       "BACKEND CONNECTION ERROR";
 
@@ -332,44 +370,60 @@ async function loadDashboard(){
 
     document.getElementById("errors").textContent =
       error.message;
+
   }
 }
 
+// START SCANNER
+
 async function runScan(){
+
   const button = document.querySelector(".scan");
+
   button.disabled = true;
 
   document.getElementById("scanStatus").textContent =
     "SCANNING... PLEASE WAIT";
 
   try{
+
     const result = await getAPI("/api/market/scan");
 
     if(result.status === "SUCCESS"){
+
       document.getElementById("scanStatus").textContent =
         "SCAN COMPLETED";
 
       await loadDashboard();
+
     }else{
+
       document.getElementById("scanStatus").textContent =
         result.status || "SCAN FAILED";
+
     }
 
   }catch(error){
+
     document.getElementById("scanStatus").textContent =
       "SCAN ERROR: " + error.message;
+
   }finally{
+
     button.disabled = false;
+
   }
 }
 
-// Refresh dashboard every 10 seconds.
-// This does not start a new market scan.
+// INITIAL LOAD
+
 loadDashboard();
+
+// AUTO REFRESH EVERY 10 SECONDS
+
 setInterval(loadDashboard,10000);
 
 </script>
 
 </body>
-  </html>
-  
+</html>
