@@ -106,7 +106,21 @@ async function loadInstruments() {
   );
 
   state.instruments = records;
-
+console.log(
+  '[DEBUG] ALL INDEX RECORDS:',
+  records
+    .filter(x =>
+      String(x.segment || '').includes('INDEX') ||
+      x.instrument_type === 'FUT'
+    )
+    .map(x => ({
+      name: x.trading_symbol,
+      segment: x.segment,
+      type: x.instrument_type,
+      underlying: x.underlying_symbol,
+      key: x.instrument_key
+    }))
+);
   // NSE F&O equity futures only
   const futures = records.filter(x =>
     x.segment === 'NSE_FO' &&
