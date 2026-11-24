@@ -43,6 +43,7 @@ const state = {
   signals: [],
   errors: [],
   lastAlerts: new Map(),
+  lastIndexOi: new Map(),
   lastScan: null,
   running: false
 };
@@ -657,6 +658,79 @@ function calculateOptionRisk(option) {
     optionTarget2: entry + risk * 2.5
   };
 }
+
+// ---------- INDEX OPTIONS OI CONFIRMATION ----------
+
+async function getIndexOptionOIChange(item) {
+  const contracts = state.options.filter(x =>
+    x.underlying_key === item.underlyingKey &&
+    expiryOf(x.expiry) >= istDate()
+  );
+
+  if (!contracts.length) return null;
+
+  const expiry = [...new Set(
+    contracts.map(x => expiryOf(x.expiry))
+  )].sort()[0];
+
+  const response = await api(
+    `/v2/option/chain?instrument_key=${encodeURIComponent(item.underlyingKey)}&expiry_date=${expiry}`
+  );
+
+  const rows = response.data || [];
+
+  let ceOi = 0;
+  let peOi = 0;
+
+  for (const row of rows) {
+    ceOi += Number(
+      row.call_options?.market_data?.oi || 0
+    );
+
+    peOi += Number(
+      row.put_options?.market_data?.oi || 0
+    );
+  }
+
+  if (ceOi <= 0 || peOi <= 0) return null;
+
+  const key = `${item.underlyingKey}_${expiry}`;
+  const now = Date.now();
+  const previous = state.lastIndexOi.get(key);
+
+  if (!previous) {
+    state.lastIndexOi.set(key, {
+      ceOi,
+      peOi,
+      time: now
+    });
+    return null;
+  }
+
+  const ceOiChangePct = previous.ceOi > 0
+    ? ((ceOi - previous.ceOi) / previous.ceOi) * 100
+    : null;
+
+  const peOiChangePct = previous.peOi > 0
+    ? ((peOi - previous.peOi) / previous.peOi) * 100
+    : null;
+
+  // Update baseline only after 5 minutes
+  if (now - previous.time >= 300000) {
+    state.lastIndexOi.set(key, {
+      ceOi,
+      peOi,
+      time: now
+    });
+  }
+
+  return {
+    ceOi,
+    peOi,
+    ceOiChangePct,
+    peOiChangePct
+  };
+    }
 
 // ---------- DUPLICATE PROTECTION ----------
 
