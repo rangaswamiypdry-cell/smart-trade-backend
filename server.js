@@ -792,7 +792,32 @@ async function scanAll() {
           const result = analyseInstrument(item, candles);
 
           if (!result) continue;
+// INDEX OPTIONS OI CONFIRMATION
+if (item.marketType === 'INDEX') {
+    const indexOI = await getIndexOptionOIChange(item);
 
+    if (!indexOI) continue;
+
+    result.indexOI = indexOI;
+
+    const bullishOI =
+        indexOI.peOiChangePct > 0 &&
+        indexOI.ceOiChangePct < 0;
+
+    const bearishOI =
+        indexOI.ceOiChangePct > 0 &&
+        indexOI.peOiChangePct < 0;
+
+    if (
+        result.signal === 'VERY_STRONG_BUY' &&
+        !bullishOI
+    ) continue;
+
+    if (
+        result.signal === 'VERY_STRONG_SELL' &&
+        !bearishOI
+    ) continue;
+      }
           const option = await selectStrike(result);
 
           if (!option) {
