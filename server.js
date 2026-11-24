@@ -476,7 +476,10 @@ function analyseInstrument(item, candles) {
     volumeIncrease:
       volumeRatio >= CONFIG.VOLUME_MULTIPLIER,
     oiIncrease:
-      oiChange !== null && oiChange > 0,
+      oiIncrease:
+  item.marketType === 'INDEX'
+    ? true
+    : oiChange !== null && oiChange > 0,
     bullishCandle: last.close > last.open
   };
 
@@ -491,7 +494,10 @@ function analyseInstrument(item, candles) {
     volumeIncrease:
       volumeRatio >= CONFIG.VOLUME_MULTIPLIER,
     oiIncrease:
-      oiChange !== null && oiChange > 0,
+      oiIncrease:
+  item.marketType === 'INDEX'
+    ? true
+    : oiChange !== null && oiChange > 0,
     bearishCandle: last.close < last.open
   };
 
