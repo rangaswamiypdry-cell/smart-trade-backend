@@ -904,7 +904,9 @@ async function getIndexSpotPrices() {
 }
 
 // ---------- DASHBOARD API ----------
-
+const DASHBOARD_ORIGIN = (
+  process.env.DASHBOARD_ORIGIN || ''
+).trim().replace(/\/+$/, '');
 const server = http.createServer(async (req, res) => {
  const origin = req.headers.origin;
 
