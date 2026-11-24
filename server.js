@@ -778,6 +778,28 @@ async function scanAll() {
   }
 }
 
+// ---------- INDEX LIVE SPOT PRICES ----------
+
+async function getIndexSpotPrices() {
+  const keys = state.indexes
+    .map(x => x.instrument_key)
+    .filter(Boolean);
+
+  if (!keys.length) return [];
+
+  const response = await api(
+    `/v3/market-quote/ltp?instrument_key=${
+      encodeURIComponent(keys.join(','))
+    }`
+  );
+
+  return Object.values(response.data || {}).map(q => ({
+    instrumentKey: q.instrument_token,
+    lastPrice: Number(q.last_price),
+    change: Number(q.last_price) - Number(q.cp || 0)
+  }));
+}
+
 // ---------- DASHBOARD API ----------
 
 const server = http.createServer(async (req, res) => {
