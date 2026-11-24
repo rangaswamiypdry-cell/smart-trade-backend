@@ -833,11 +833,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/market/instruments') {
-      return send(200, {
-        stocks: state.stocks.length,
-        indexes: state.indexes,
-        options: state.options.length
-      });
+  let spotPrices = [];
+
+  try {
+    spotPrices = await getIndexSpotPrices();
+  } catch (e) {
+    console.error('SPOT PRICE ERROR:', e.message);
+  }
+
+  return send(200, {
+    stocks: state.stocks.length,
+    indexes: state.indexes,
+    options: state.options.length,
+    spotPrices
+  });
     }
 
     if (url.pathname === '/api/market/scan') {
