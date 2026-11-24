@@ -1,4 +1,4 @@
-
+ 
 'use strict';
 
 const http = require('http');
@@ -476,7 +476,6 @@ function analyseInstrument(item, candles) {
     volumeIncrease:
       volumeRatio >= CONFIG.VOLUME_MULTIPLIER,
     oiIncrease:
-      oiIncrease:
   item.marketType === 'INDEX'
     ? true
     : oiChange !== null && oiChange > 0,
@@ -494,7 +493,6 @@ function analyseInstrument(item, candles) {
     volumeIncrease:
       volumeRatio >= CONFIG.VOLUME_MULTIPLIER,
     oiIncrease:
-      oiIncrease:
   item.marketType === 'INDEX'
     ? true
     : oiChange !== null && oiChange > 0,
