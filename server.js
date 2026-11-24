@@ -217,15 +217,15 @@ console.log(
   }))
 );
 
-
-  // Options contracts
+  // OPTIONS CONTRACTS - NSE + BSE
   state.options = records.filter(x =>
-    x.segment === 'NSE_FO' &&
+    ['NSE_FO', 'BSE_FO'].includes(x.segment) &&
     ['CE', 'PE'].includes(x.instrument_type) &&
     x.underlying_key &&
     x.instrument_key &&
     x.expiry
   );
+  
 
   return {
     stockFutures: state.stocks.length,
