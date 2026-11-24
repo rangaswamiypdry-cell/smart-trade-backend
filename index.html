@@ -217,7 +217,9 @@ function renderIndexes(data){
       const key = found
         ? (found.instrument_key || found.key)
         : "";
-
+      const spot = (data.spotPrices || []).find(
+  q => q.instrumentKey === key
+);
       return `
       <div class="index">
         <strong>${item.label}</strong>
@@ -231,6 +233,20 @@ function renderIndexes(data){
             ? escapeHTML(key)
             : "Instrument key unavailable"}
         </small>
+        <div class="number green" style="margin-top:10px">
+  ${spot && spot.lastPrice != null
+    ? "₹" + Number(spot.lastPrice).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
+    : "Price unavailable"}
+</div>
+
+<small>
+  ${spot && spot.change != null
+    ? "Change: ₹" + Number(spot.change).toFixed(2)
+    : ""}
+</small>
       </div>`;
 
     }).join("");
