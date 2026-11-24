@@ -906,8 +906,25 @@ async function getIndexSpotPrices() {
 // ---------- DASHBOARD API ----------
 
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+ const origin = req.headers.origin;
+
+res.setHeader('Vary', 'Origin');
+
+if (origin) {
+  if (!DASHBOARD_ORIGIN || origin !== DASHBOARD_ORIGIN) {
+    res.writeHead(403, {
+      'Content-Type': 'application/json'
+    });
+    return res.end(JSON.stringify({
+      error: 'CORS blocked: Origin not allowed'
+    }));
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', DASHBOARD_ORIGIN);
+}
+
+res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
