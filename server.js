@@ -987,7 +987,57 @@ const server = http.createServer(async (req, res) => {
     return send(500, { error: error.message });
   }
 });
+let lastScheduledScanSlot = '';
 
+function startAutoScanner() {
+  setInterval(() => {
+    const now = new Date();
+
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).formatToParts(now);
+
+    const p = Object.fromEntries(
+      parts.map(x => [x.type, x.value])
+    );
+
+    const weekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+      .includes(p.weekday);
+
+    const hour = Number(p.hour);
+    const minute = Number(p.minute);
+
+    const marketTime =
+      (hour * 60 + minute) >= 560 &&
+      (hour * 60 + minute) <= 930;
+
+    if (
+      !weekday ||
+      !marketTime ||
+      minute % 5 !== 0 ||
+      state.running
+    ) return;
+
+    const slot = `${p.weekday}_${hour}_${minute}`;
+
+    if (slot === lastScheduledScanSlot) return;
+
+    lastScheduledScanSlot = slot;
+
+    scanAll().then(result => {
+      console.log('[AUTO SCAN]', result.status);
+    }).catch(err => {
+      console.error('[AUTO SCAN ERROR]', err.message);
+    });
+
+  }, 15000);
+
+  console.log('AUTO 5 MIN SCANNER STARTED');
+}
 // ---------- START ----------
 
 async function start() {
@@ -1011,6 +1061,7 @@ async function start() {
     console.log('VWAP CROSS');
     console.log('OI + VOLUME + PRICE');
     console.log('ALL 7 CONDITIONS REQUIRED');
+    startAutoScanner();
   });
 }
 
