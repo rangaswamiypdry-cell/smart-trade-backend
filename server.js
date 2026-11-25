@@ -1033,17 +1033,17 @@ function startAutoScanner() {
 
     const hour = Number(p.hour);
     const minute = Number(p.minute);
-
-    const marketTime =
-     const marketTime =
+const marketTime =
   (hour * 60 + minute) >= 555 &&
   (hour * 60 + minute) <= 930;
-    if (na 
-      !weekday ||
-      !marketTime ||
-      minute % 5 !== 0 ||
-      state.running
-    ) return;
+
+if (
+  !weekday ||
+  !marketTime ||
+  minute % 5 !== 0 ||
+  state.running
+) return;
+   
 
     const slot = `${p.weekday}_${hour}_${minute}`;
 
