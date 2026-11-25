@@ -528,19 +528,44 @@ function analyseInstrument(item, candles, dailyCandles = []) {
 
   // EXACT EMA CROSS
 
-  const cross = detectEMACross(closes);
 
-  if (cross === 'NONE') return null;
+const isStock = item.marketType === 'STOCK';
 
-  const ema9 = EMA(
-    closes,
-    CONFIG.EMA_FAST
-  );
+if (isStock) {
+  if (dailyCandles.length < 30) return null;
 
-  const ema15 = EMA(
-    closes,
-    CONFIG.EMA_SLOW
-  );
+  const previousSession = candles
+    .filter(c =>
+      istDate(new Date(c.time)) < istDate()
+    ).at(-1);
+
+  if (
+    !previousSession ||
+    istDate(new Date(dailyCandles.at(-1).time)) !==
+    istDate(new Date(previousSession.time))
+  ) {
+    return null;
+  }
+}
+
+const emaCloses = isStock
+  ? dailyCandles.map(c => c.close)
+  : closes;
+
+const cross = detectEMACross(emaCloses);
+
+if (cross === 'NONE') return null;
+
+const ema9 = EMA(
+  emaCloses,
+  CONFIG.EMA_FAST
+);
+
+const ema15 = EMA(
+  emaCloses,
+  CONFIG.EMA_SLOW
+);
+  
 
   const atr = ATR(
     candles,
