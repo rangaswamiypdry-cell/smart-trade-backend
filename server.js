@@ -268,7 +268,23 @@ function normalizeCandles(rows) {
       new Date(a.time) - new Date(b.time)
     );
 }
+function getIndexFutureKey(item) {
+  const futures = state.instruments.filter(x =>
+    ['NSE_FO', 'BSE_FO'].includes(x.segment) &&
+    x.instrument_type === 'FUT' &&
+    x.underlying_key === item.underlyingKey &&
+    x.instrument_key &&
+    expiryOf(x.expiry) >= istDate()
+  );
 
+  futures.sort((a, b) =>
+    expiryOf(a.expiry).localeCompare(
+      expiryOf(b.expiry)
+    )
+  );
+
+  return futures[0]?.instrument_key || null;
+}
 async function getCandles(instrumentKey) {
   const key = encodeURIComponent(instrumentKey);
 
