@@ -925,12 +925,17 @@ async function getIndexSpotPrices() {
     }`
   );
 
-  return Object.values(response.data || {}).map(q => ({
-    instrumentKey: q.instrument_token,
+  
+return Object.entries(response.data || {}).map(
+  ([key, q]) => ({
+    instrumentKey: q.instrument_token || key,
     lastPrice: Number(q.last_price),
-    change: Number(q.last_price) - Number(q.cp || 0)
-  }));
-}
+    change: q.cp != null
+      ? Number(q.last_price) - Number(q.cp)
+      : null
+  })
+);
+ 
 
 // ---------- DASHBOARD API ----------
 const DASHBOARD_ORIGIN = (
