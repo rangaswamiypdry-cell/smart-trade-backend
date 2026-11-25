@@ -812,45 +812,89 @@ async function scanAll() {
         const item = universe[cursor++];
 
         try {
-          const candles = await getCandles(
-            item.instrumentKey
-          );
+          
+          let indexOI = null;
+          let candleKey = item.instrumentKey;
+
+          if (item.marketType === 'INDEX') {
+
+            indexOI = await getIndexOptionOIChange(item);
+
+            const futures = state.instruments.filter(x =>
+              ['NSE_FO', 'BSE_FO'].includes(x.segment) &&
+              x.instrument_type === 'FUT' &&
+              x.underlying_key === item.underlyingKey &&
+              x.instrument_key &&
+              x.expiry &&
+              expiryOf(x.expiry) >= istDate()
+            ).sort((a, b) =>
+              expiryOf(a.expiry).localeCompare(
+                expiryOf(b.expiry)
+              )
+            );
+
+            if (!futures.length) {
+              state.errors.push({
+                symbol: item.symbol,
+                message: 'INDEX FUTURES NOT AVAILABLE'
+              });
+              continue;
+            }
+
+            candleKey = futures[0].instrument_key;
+          }
+
+          const candles = await getCandles(candleKey);
+
+          const last = candles.at(-1);
+
+          if (!last ||
+              Date.now() - new Date(last.time).getTime()
+              > 600000) {
+            state.errors.push({
+              symbol: item.symbol,
+              message: 'STALE CANDLE DATA'
+            });
+            continue;
+          }
 
           const result = analyseInstrument(item, candles);
 
           if (!result) continue;
-// INDEX OPTIONS OI CONFIRMATION
-if (item.marketType === 'INDEX') {
-    const indexOI = await getIndexOptionOIChange(item);
 
-    if (!indexOI) {
-  state.errors.push({
-    symbol: item.symbol,
-    message: 'INDEX OI DATA NOT AVAILABLE'
-  });
-  continue;
-    }
+          result.analysisInstrumentKey = candleKey;
 
-    result.indexOI = indexOI;
+          if (item.marketType === 'INDEX') {
 
-    const bullishOI =
-        indexOI.peOiChangePct > 0 &&
-        indexOI.ceOiChangePct < 0;
+            if (!indexOI) {
+              state.errors.push({
+                symbol: item.symbol,
+                message: 'WAITING FOR INDEX OI BASELINE'
+              });
+              continue;
+            }
 
-    const bearishOI =
-        indexOI.ceOiChangePct > 0 &&
-        indexOI.peOiChangePct < 0;
+            result.indexOI = indexOI;
 
-    if (
-        result.signal === 'VERY_STRONG_BUY' &&
-        !bullishOI
-    ) continue;
+            const bullishOI =
+              indexOI.peOiChangePct > 0 &&
+              indexOI.ceOiChangePct < 0;
 
-    if (
-        result.signal === 'VERY_STRONG_SELL' &&
-        !bearishOI
-    ) continue;
-      }
+            const bearishOI =
+              indexOI.ceOiChangePct > 0 &&
+              indexOI.peOiChangePct < 0;
+
+            if (
+              result.signal === 'VERY_STRONG_BUY' &&
+              !bullishOI
+            ) continue;
+
+            if (
+              result.signal === 'VERY_STRONG_SELL' &&
+              !bearishOI
+            ) continue;
+          }
+         
           const option = await selectStrike(result);
 
           if (!option) {
