@@ -46,26 +46,81 @@ const state = {
 
 // ---------- API ----------
 
+const sleep = ms =>
+  new Promise(resolve => setTimeout(resolve, ms));
+
+let apiQueue = Promise.resolve();
+let nextApiTime = 0;
+
+async function waitForApiSlot() {
+  const slot = apiQueue.then(async () => {
+    const wait = Math.max(
+      0, nextApiTime - Date.now()
+    );
+
+    if (wait > 0) await sleep(wait);
+
+    nextApiTime = Date.now() + 200;
+  });
+
+  apiQueue = slot.catch(() => {});
+  await slot;
+}
+
 async function api(path) {
   if (!TOKEN) {
     throw new Error('UPSTOX_ACCESS_TOKEN missing');
   }
 
-  const response = await fetch(BASE + path, {
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      Accept: 'application/json'
-    },
-    signal: AbortSignal.timeout(20000)
-  });
+  for (let attempt = 0; attempt < 3; attempt++) {
 
-  const data = await response.json();
+    await waitForApiSlot();
 
-  if (!response.ok || data.status === 'error') {
-    throw new Error(JSON.stringify(data));
+    const response = await fetch(BASE + path, {
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        Accept: 'application/json'
+      },
+      signal: AbortSignal.timeout(20000)
+    });
+
+    if (response.status === 429) {
+      const retryAfter =
+        response.headers.get('retry-after');
+
+      const seconds = Number(retryAfter);
+
+      const delay = retryAfter === null
+        ? 2000 * (attempt + 1)
+        : Number.isFinite(seconds)
+          ? seconds * 1000
+          : Date.parse(retryAfter) - Date.now();
+
+      const wait = Math.max(
+        2000,
+        Number.isFinite(delay) ? delay : 2000
+      );
+
+      nextApiTime = Math.max(
+        nextApiTime,
+        Date.now() + wait
+      );
+
+      console.log('[API RATE LIMIT] RETRY');
+
+      continue;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok || data.status === 'error') {
+      throw new Error(JSON.stringify(data));
+    }
+
+    return data;
   }
 
-  return data;
+  throw new Error('API RATE LIMIT RETRY FAILED');
 }
 
 // ---------- DATE ----------
