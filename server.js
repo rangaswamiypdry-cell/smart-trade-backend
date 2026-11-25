@@ -727,22 +727,29 @@ async function getIndexOptionOIChange(item) {
     return null;
   }
 
-  const ceOiChangePct = previous.ceOi > 0
+  // 5 MINUTE OI COMPARISON
+
+const elapsed = now - previous.time;
+
+if (elapsed < 300000) {
+  return null;
+}
+
+const ceOiChangePct =
+  previous.ceOi > 0
     ? ((ceOi - previous.ceOi) / previous.ceOi) * 100
     : null;
 
-  const peOiChangePct = previous.peOi > 0
+const peOiChangePct =
+  previous.peOi > 0
     ? ((peOi - previous.peOi) / previous.peOi) * 100
     : null;
 
-  // Update baseline only after 5 minutes
-  if (now - previous.time >= 300000) {
-    state.lastIndexOi.set(key, {
-      ceOi,
-      peOi,
-      time: now
-    });
-  }
+state.lastIndexOi.set(key, {
+  ceOi,
+  peOi,
+  time: now
+});
 
   return {
     ceOi,
