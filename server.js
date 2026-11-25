@@ -1035,10 +1035,10 @@ function startAutoScanner() {
     const minute = Number(p.minute);
 
     const marketTime =
-      (hour * 60 + minute) >= 560 &&
-      (hour * 60 + minute) <= 930;
-
-    if (
+     const marketTime =
+  (hour * 60 + minute) >= 555 &&
+  (hour * 60 + minute) <= 930;
+    if (na 
       !weekday ||
       !marketTime ||
       minute % 5 !== 0 ||
