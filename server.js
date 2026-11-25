@@ -298,6 +298,38 @@ async function getCandles(instrumentKey) {
   ]).slice(-250);
 }
 
+// ---------- DAILY CANDLE DATA ----------
+
+async function getDailyCandles(instrumentKey) {
+  const key = encodeURIComponent(instrumentKey);
+
+  const from = istDate(
+    new Date(Date.now() - 150 * 86400000)
+  );
+
+  const yesterday = istDate(
+    new Date(Date.now() - 86400000)
+  );
+
+  const response = await api(
+    `/v3/historical-candle/${key}/days/1/${yesterday}/${from}`
+  );
+
+  return (response.data?.candles || [])
+    .map(c => ({
+      time: c[0],
+      close: Number(c[4])
+    }))
+    .filter(c =>
+      Number.isFinite(c.close) &&
+      c.close > 0 &&
+      istDate(new Date(c.time)) < istDate()
+    )
+    .sort((a, b) =>
+      new Date(a.time) - new Date(b.time)
+    );
+}
+
 
 // ---------- PART 2 START ----------
 
