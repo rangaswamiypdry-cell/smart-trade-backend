@@ -1073,10 +1073,16 @@ async function scanAll() {
 
           // EMA + OI + VOLUME + PRICE
 
-          const result = analyseInstrument(
-            item,
-            candles
-          );
+          const dailyCandles =
+  item.marketType === 'STOCK'
+    ? await getDailyCandles(item.underlyingKey)
+    : [];
+
+const result = analyseInstrument(
+  item,
+  candles,
+  dailyCandles
+);
 
           if (!result) continue;
 
