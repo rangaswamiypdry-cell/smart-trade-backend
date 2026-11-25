@@ -485,7 +485,9 @@ function detectEMACross(closes) {
 
 // ---------- SIGNAL ENGINE ----------
 
-function analyseInstrument(item, candles) {
+
+function analyseInstrument(item, candles, dailyCandles = []) {
+  
   if (!candles || candles.length < 30) {
     return null;
   }
