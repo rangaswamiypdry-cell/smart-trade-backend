@@ -1003,20 +1003,25 @@ function calculateOptionRisk(option) {
 
 // ---------- DUPLICATE PROTECTION ----------
 
+function getSignalTime(signal) {
+  return signal.marketType === 'STOCK'
+    ? istDate(new Date(signal.candleTime))
+    : signal.candleTime;
+}
+
 function isNewSignal(signal) {
   const key =
     `${signal.symbol}_${signal.signal}`;
 
+  const signalTime = getSignalTime(signal);
+
   const old = state.lastAlerts.get(key);
 
-  if (old === signal.candleTime) {
+  if (old === signalTime) {
     return false;
   }
 
-  state.lastAlerts.set(
-    key,
-    signal.candleTime
-  );
+  state.lastAlerts.set(key, signalTime);
 
   return true;
 }
@@ -1171,11 +1176,11 @@ const result = analyseInstrument(
             `${result.symbol}_${result.signal}`;
 
           if (
-            state.lastAlerts.get(alertKey) ===
-            result.candleTime
-          ) {
-            continue;
-          }
+  state.lastAlerts.get(alertKey) ===
+  getSignalTime(result)
+) {
+  continue;
+            }
 
           // AUTOMATIC CE / PE STRIKE
 
