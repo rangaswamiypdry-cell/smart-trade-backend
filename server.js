@@ -638,10 +638,26 @@ async function selectStrike(signal) {
     };
   }).filter(Boolean);
 
-  choices.sort((a, b) =>
-    (b.volume - a.volume) ||
-    (a.spread - b.spread)
-  );
+  const maxVolume = Math.max(
+  ...choices.map(x => x.volume), 1
+);
+
+const maxOI = Math.max(
+  ...choices.map(x => x.oi), 1
+);
+
+choices.sort((a, b) => {
+  const score = x =>
+    (x.volume / maxVolume) * 40 +
+    (x.oi / maxOI) * 30 +
+    (1 - Math.min(
+      Math.abs(Math.abs(x.delta) - 0.65) / 0.15,
+      1
+    )) * 20 +
+    (1 - Math.min(x.spread / 8, 1)) * 10;
+
+  return score(b) - score(a);
+});
 
   return choices[0] || null;
 }
