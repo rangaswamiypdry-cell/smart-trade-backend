@@ -756,7 +756,8 @@ const ema15 = EMA(
       : 'STOCK_FUTURES',
 
     candleTime: last.time,
-    timeframe: '5min',
+    timeframe: isStock ? '1D' : '5min',
+confirmationTimeframe: '5min',
     dataSource: 'UPSTOX',
     candleClosed: true
   };
@@ -999,7 +1000,8 @@ function createLiveAlert(result) {
 
     riskPerLot: risk.riskPerLot,
 
-    timeframe: '5min',
+    timeframe: result.timeframe,
+confirmationTimeframe: '5min',
 
     candleTime: result.candleTime,
 
@@ -1531,7 +1533,9 @@ const server = http.createServer(
 
             confirmation: '5/5',
 
-            timeframe: '5min',
+           indexTimeframe: '5min',
+stockTimeframe: '1D',
+confirmationTimeframe: '5min',
 
             rsiEnabled: false,
 
