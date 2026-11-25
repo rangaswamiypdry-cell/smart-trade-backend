@@ -355,7 +355,18 @@ async function getCandles(instrumentKey) {
 
 // ---------- DAILY CANDLE DATA ----------
 
+const dailyCandleCache = new Map();
+
 async function getDailyCandles(instrumentKey) {
+
+  const today = istDate();
+
+  const cached = dailyCandleCache.get(instrumentKey);
+
+  if (cached && cached.date === today) {
+    return cached.candles;
+  }
+
   const key = encodeURIComponent(instrumentKey);
 
   const from = istDate(
@@ -370,7 +381,7 @@ async function getDailyCandles(instrumentKey) {
     `/v3/historical-candle/${key}/days/1/${yesterday}/${from}`
   );
 
-  return (response.data?.candles || [])
+  const candles = (response.data?.candles || [])
     .map(c => ({
       time: c[0],
       close: Number(c[4])
@@ -378,11 +389,22 @@ async function getDailyCandles(instrumentKey) {
     .filter(c =>
       Number.isFinite(c.close) &&
       c.close > 0 &&
-      istDate(new Date(c.time)) < istDate()
+      istDate(new Date(c.time)) < today
     )
     .sort((a, b) =>
       new Date(a.time) - new Date(b.time)
     );
+
+  if (candles.length >= 30) {
+
+    dailyCandleCache.set(instrumentKey, {
+      date: today,
+      candles
+    });
+
+  }
+
+  return candles;
 }
 
 
