@@ -816,7 +816,13 @@ async function scanAll() {
 if (item.marketType === 'INDEX') {
     const indexOI = await getIndexOptionOIChange(item);
 
-    if (!indexOI) continue;
+    if (!indexOI) {
+  state.errors.push({
+    symbol: item.symbol,
+    message: 'INDEX OI DATA NOT AVAILABLE'
+  });
+  continue;
+    }
 
     result.indexOI = indexOI;
 
