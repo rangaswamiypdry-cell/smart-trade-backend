@@ -1168,7 +1168,34 @@ const result = analyseInstrument(
   dailyCandles
 );
 
-          if (!result) continue;
+         
+if (!result) {
+  if (item.marketType === 'INDEX') {
+    const last = candles.at(-1);
+    const prev = candles.at(-2);
+
+    console.log('[INDEX DEBUG]', JSON.stringify({
+      symbol: item.symbol,
+      futureKey: getIndexFutureKey(item),
+      candleCount: candles.length,
+      emaCross: detectEMACross(
+        candles.map(c => c.close)
+      ),
+      price: last?.close,
+      previousPrice: prev?.close,
+      volume: last?.volume,
+      previousVolume: prev?.volume,
+      volumeRatio: last?.volume /
+        average(candles.slice(-21, -1)
+          .map(c => c.volume)),
+      oi: last?.oi,
+      previousOI: prev?.oi,
+      candleTime: last?.time
+    }));
+  }
+  continue;
+}
+          
 
           // DUPLICATE CHECK
 
