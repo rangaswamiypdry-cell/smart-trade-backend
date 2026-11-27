@@ -1088,7 +1088,7 @@ const buy = {
 
   emaCross:
   isIndex
-    ? bullishTrend
+    ? cross === 'UP' && bullishTrend
     : cross === 'UP' && ema9 > ema15,
 
   priceIncrease:
@@ -1111,7 +1111,7 @@ const sell = {
 
   emaCross:
   isIndex
-    ? bearishTrend
+    ? cross === 'DOWN' && bearishTrend
     : cross === 'DOWN' && ema9 < ema15,
 
   priceDecrease:
