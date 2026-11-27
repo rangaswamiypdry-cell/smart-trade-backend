@@ -1822,15 +1822,16 @@ function startAutoScanner() {
       !TOKEN ||
       !weekday ||
       !marketTime ||
-      minute % 5 !== 0 ||
       second < 10 ||
       state.running
     ) {
       return;
     }
 
-    const slot =
-      `${istDate(now)}_${hour}_${minute}`;
+    
+const slot =
+  `${istDate(now)}_${hour}_${Math.floor(minute / 5) * 5}`;
+    
 
     if (
       slot === lastScheduledScanSlot
