@@ -1069,47 +1069,65 @@ function analyseInstrument(
 
       : null;
 
-  // ---------- BULLISH CONDITIONS ----------
+  
+// ---------- INDEX TREND FILTER ----------
 
-  const buy = {
+const bullishTrend =
+  ema9 > ema15 &&
+  last.close > ema9 &&
+  last.close > ema15;
 
-    emaCross:
-      cross === 'UP' && ema9 > ema15,
+const bearishTrend =
+  ema9 < ema15 &&
+  last.close < ema9 &&
+  last.close < ema15;
 
-    priceIncrease:
-      priceChange > 0,
+// ---------- BULLISH CONDITIONS ----------
 
-    volumeIncrease:
-      volumeIncrease,
+const buy = {
 
-    oiIncrease:
-      oiIncrease,
+  emaCross:
+    cross === 'UP' &&
+    ema9 > ema15 &&
+    (!isIndex || bullishTrend),
 
-    bullishCandle:
-      last.close > last.open
+  priceIncrease:
+    priceChange > 0,
 
-  };
+  volumeIncrease:
+    volumeIncrease,
 
-  // ---------- BEARISH CONDITIONS ----------
+  oiIncrease:
+    oiIncrease,
 
-  const sell = {
+  bullishCandle:
+    last.close > last.open
 
-    emaCross:
-      cross === 'DOWN' && ema9 < ema15,
+};
 
-    priceDecrease:
-      priceChange < 0,
+// ---------- BEARISH CONDITIONS ----------
 
-    volumeIncrease:
-      volumeIncrease,
+const sell = {
 
-    oiIncrease:
-      oiIncrease,
+  emaCross:
+    cross === 'DOWN' &&
+    ema9 < ema15 &&
+    (!isIndex || bearishTrend),
 
-    bearishCandle:
-      last.close < last.open
+  priceDecrease:
+    priceChange < 0,
 
-  };
+  volumeIncrease:
+    volumeIncrease,
+
+  oiIncrease:
+    oiIncrease,
+
+  bearishCandle:
+    last.close < last.open
+
+};
+  
 
   const buyCount =
     Object.values(buy)
