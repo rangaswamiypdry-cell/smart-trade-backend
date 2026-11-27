@@ -1700,31 +1700,33 @@ function calculateOptionRisk(option, marketType) {
 
     : entry - risk;
 
-  return {
+  const round2 = value =>
+  Math.round((value + 1e-9) * 100) / 100;
 
-    optionEntry: entry,
+return {
 
-    optionSL: sl,
+  optionEntry: round2(entry),
 
-    optionTarget1: isSell
+  optionSL: round2(sl),
 
+  optionTarget1: round2(
+    isSell
       ? entry - risk * CONFIG.TARGET1_RR
+      : entry + risk * CONFIG.TARGET1_RR
+  ),
 
-      : entry + risk * CONFIG.TARGET1_RR,
-
-    optionTarget2: isSell
-
+  optionTarget2: round2(
+    isSell
       ? entry - risk * CONFIG.TARGET2_RR
+      : entry + risk * CONFIG.TARGET2_RR
+  ),
 
-      : entry + risk * CONFIG.TARGET2_RR,
+  riskPerUnit: risk,
 
-    riskPerUnit: risk,
+  riskPerLot:
+    risk * Number(option.lotSize || 0)
 
-    riskPerLot:
-
-      risk * Number(option.lotSize || 0)
-
-  };
+};
 }
 
 // ---------- DUPLICATE SIGNAL PROTECTION ----------
