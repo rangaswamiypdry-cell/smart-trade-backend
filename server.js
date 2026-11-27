@@ -1087,9 +1087,9 @@ const bearishTrend =
 const buy = {
 
   emaCross:
-    cross === 'UP' &&
-    ema9 > ema15 &&
-    (!isIndex || bullishTrend),
+  isIndex
+    ? bullishTrend
+    : cross === 'UP' && ema9 > ema15,
 
   priceIncrease:
     priceChange > 0,
@@ -1110,9 +1110,9 @@ const buy = {
 const sell = {
 
   emaCross:
-    cross === 'DOWN' &&
-    ema9 < ema15 &&
-    (!isIndex || bearishTrend),
+  isIndex
+    ? bearishTrend
+    : cross === 'DOWN' && ema9 < ema15,
 
   priceDecrease:
     priceChange < 0,
@@ -1196,19 +1196,20 @@ const sell = {
 
   let signal = 'WAIT';
 
-  if (buyCount === CONFIG.MIN_CONDITIONS) {
+if (
+  isIndex
+    ? buyCount === 5 && bullishTrend
+    : buyCount === CONFIG.MIN_CONDITIONS
+) {
+  signal = 'VERY_STRONG_BUY';
 
-    signal = 'VERY_STRONG_BUY';
-
-  } else if (
-
-    sellCount === CONFIG.MIN_CONDITIONS
-
-  ) {
-
-    signal = 'VERY_STRONG_SELL';
-
-  }
+} else if (
+  isIndex
+    ? sellCount === 5 && bearishTrend
+    : sellCount === CONFIG.MIN_CONDITIONS
+) {
+  signal = 'VERY_STRONG_SELL';
+          }
 
   if (signal === 'WAIT') {
 
@@ -1239,11 +1240,9 @@ const sell = {
   const isBuy =
     signal === 'VERY_STRONG_BUY';
 
-  const action = isIndex
-
-    ? (isBuy ? 'SELL PE' : 'SELL CE')
-
-    : (isBuy ? 'BUY CE' : 'BUY PE');
+ const action = isBuy
+  ? 'BUY CE'
+  : 'BUY PE'; 
 
   // ---------- ENTRY / SL / TARGET ----------
 
