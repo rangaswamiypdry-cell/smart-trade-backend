@@ -671,10 +671,6 @@ const emaCloses = isStock
   ? dailyCandles.map(c => c.close)
   : closes;
 
-const cross = detectEMACross(emaCloses);
-
-if (cross === 'NONE') return null;
-
 const ema9 = EMA(
   emaCloses,
   CONFIG.EMA_FAST
@@ -684,6 +680,29 @@ const ema15 = EMA(
   emaCloses,
   CONFIG.EMA_SLOW
 );
+
+if (
+  !Number.isFinite(ema9) ||
+  !Number.isFinite(ema15)
+) {
+  return null;
+}
+
+const exactCross = detectEMACross(emaCloses);
+
+let cross = exactCross;
+
+if (!isStock && cross === 'NONE') {
+  if (ema9 > ema15 && last.close > ema9) {
+    cross = 'UP';
+  } else if (
+    ema9 < ema15 && last.close < ema9
+  ) {
+    cross = 'DOWN';
+  }
+}
+
+if (cross === 'NONE') return null;
   
 
   const atr = ATR(
@@ -890,10 +909,13 @@ confirmationTimeframe: '5min',
 // ---------- OPTION STRIKE SELECTION ----------
 
 async function selectStrike(signal) {
-  const side =
-    signal.signal === 'VERY_STRONG_BUY'
-      ? 'CE'
-      : 'PE';
+  const isIndex = signal.marketType === 'INDEX';
+
+const side = isIndex
+  ? (signal.signal === 'VERY_STRONG_BUY'
+      ? 'PE' : 'CE')
+  : (signal.signal === 'VERY_STRONG_BUY'
+      ? 'CE' : 'PE');
 
   const contracts = state.options.filter(x =>
     x.underlying_key === signal.underlyingKey &&
@@ -1025,30 +1047,36 @@ async function selectStrike(signal) {
 
 // ---------- OPTION ENTRY / SL / TARGET ----------
 
-function calculateOptionRisk(option) {
+function calculateOptionRisk(option, marketType) {
   if (
     !option ||
     !Number.isFinite(option.ltp) ||
-    option.ltp <= 0
+    option.ltp <= 0 ||
+    !['INDEX', 'STOCK'].includes(marketType)
   ) {
     return null;
   }
 
+  const isSell = marketType === 'INDEX';
+
   const entry = option.ltp;
+  const risk = entry * 0.20;
 
-  const sl = entry * 0.80;
-
-  const risk = entry - sl;
+  const sl = isSell
+    ? entry + risk
+    : entry - risk;
 
   return {
     optionEntry: entry,
     optionSL: sl,
 
-    optionTarget1:
-      entry + risk * CONFIG.TARGET1_RR,
+    optionTarget1: isSell
+      ? entry - risk * CONFIG.TARGET1_RR
+      : entry + risk * CONFIG.TARGET1_RR,
 
-    optionTarget2:
-      entry + risk * CONFIG.TARGET2_RR,
+    optionTarget2: isSell
+      ? entry - risk * CONFIG.TARGET2_RR
+      : entry + risk * CONFIG.TARGET2_RR,
 
     riskPerUnit: risk,
 
@@ -1097,9 +1125,13 @@ function createLiveAlert(result) {
 
     signal: result.signal,
 
-    action: option.side === 'CE'
+   action: result.marketType === 'INDEX'
+  ? (option.side === 'CE'
+      ? 'SELL CE'
+      : 'SELL PE')
+  : (option.side === 'CE'
       ? 'BUY CE'
-      : 'BUY PE',
+      : 'BUY PE'), 
 
     confirmation: result.confirmation,
 
