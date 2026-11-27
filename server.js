@@ -451,7 +451,25 @@ async function getIndexCandles(item) {
       c
     ])
   );
+  const lastSpot = spotCandles.at(-1);
+  const lastFuture = futureCandles.at(-1);
 
+  console.log('[INDEX DATA CHECK]', JSON.stringify({
+    symbol: item.symbol,
+    futureKey,
+    spotCount: spotCandles.length,
+    futureCount: futureCandles.length,
+    spotTime: lastSpot?.time,
+    futureTime: lastFuture?.time,
+    volume: lastFuture?.volume,
+    oi: lastFuture?.oi,
+    matched: lastSpot
+      ? futureMap.has(
+          new Date(lastSpot.time).getTime()
+        )
+      : false
+  }));
+  
   return spotCandles.map(c => {
     const future = futureMap.get(
       new Date(c.time).getTime()
