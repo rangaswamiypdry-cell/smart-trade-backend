@@ -1240,9 +1240,9 @@ if (
   const isBuy =
     signal === 'VERY_STRONG_BUY';
 
- const action = isBuy
-  ? 'BUY CE'
-  : 'BUY PE'; 
+ const action = isIndex
+  ? (isBuy ? 'SELL PE' : 'SELL CE')
+  : (isBuy ? 'BUY CE' : 'BUY PE');
 
   // ---------- ENTRY / SL / TARGET ----------
 
