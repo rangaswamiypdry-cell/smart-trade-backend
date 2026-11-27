@@ -690,17 +690,7 @@ if (
 
 const exactCross = detectEMACross(emaCloses);
 
-let cross = exactCross;
-
-if (!isStock && cross === 'NONE') {
-  if (ema9 > ema15 && last.close > ema9) {
-    cross = 'UP';
-  } else if (
-    ema9 < ema15 && last.close < ema9
-  ) {
-    cross = 'DOWN';
-  }
-}
+const cross = exactCross;
 
 if (cross === 'NONE') return null;
   
@@ -975,9 +965,14 @@ const side = isIndex
     const spread =
       ((ask - bid) / bid) * 100;
 
-    const deltaPass = side === 'CE'
-      ? delta >= 0.50 && delta <= 0.80
-      : delta <= -0.50 && delta >= -0.80;
+    
+const minDelta = isIndex ? 0.30 : 0.50;
+const maxDelta = isIndex ? 0.40 : 0.80;
+
+const deltaPass = side === 'CE'
+  ? delta >= minDelta && delta <= maxDelta
+  : delta <= -minDelta && delta >= -maxDelta;
+    
 
        if (!deltaPass || spread > 2) { 
       console.log('[OPTION REJECT]', JSON.stringify({
@@ -1030,8 +1025,11 @@ const side = isIndex
       (x.volume / maxVolume) * 40 +
       (x.oi / maxOI) * 30 +
       (1 - Math.min(
-        Math.abs(Math.abs(x.delta) - 0.65)
-        / 0.15,
+        
+Math.abs(
+  Math.abs(x.delta) - (isIndex ? 0.35 : 0.65)
+) / (isIndex ? 0.05 : 0.15),
+        
         1
       )) * 20 +
       (1 - Math.min(
