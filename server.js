@@ -470,15 +470,39 @@ async function getIndexCandles(item) {
       : false
   }));
   
-  return spotCandles.map(c => {
-    const future = futureMap.get(
-      new Date(c.time).getTime()
-    );
+    return spotCandles.map(c => {
+    const time = new Date(c.time).getTime();
+    const future = futureMap.get(time);
+
+    const validOI =
+      future &&
+      Number.isFinite(future.oi) &&
+      future.oi > 0;
+
+    const validVolume =
+      future &&
+      Number.isFinite(future.volume) &&
+      future.volume >= 0;
+
+    if (c === lastSpot) {
+      console.log('[INDEX OI CHECK]', {
+        symbol: item.symbol,
+        futureKey,
+        candleTime: c.time,
+        matched: Boolean(future),
+        oi: validOI ? future.oi : null,
+        volume: validVolume
+          ? future.volume : null,
+        oiAvailable: Boolean(validOI)
+      });
+    }
 
     return {
       ...c,
-      volume: future ? future.volume : null,
-      oi: future ? future.oi : null
+      volume: validVolume
+        ? future.volume : null,
+      oi: validOI
+        ? future.oi : null
     };
   });
 }
