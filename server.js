@@ -2098,6 +2098,40 @@ async function scanAll() {
             continue;
 
           }
+          // ---------- CAPITAL RISK MANAGEMENT ----------
+
+const CAPITAL = 120000;
+const MAX_TRADE_RISK = CAPITAL * 0.01;
+
+const riskPerLot = Number(
+  result.optionRisk.riskPerLot
+);
+
+if (
+  !Number.isFinite(riskPerLot) ||
+  riskPerLot <= 0 ||
+  riskPerLot > MAX_TRADE_RISK
+) {
+  console.log('[RISK REJECT]', {
+    symbol: item.symbol,
+    riskPerLot,
+    maxRisk: MAX_TRADE_RISK
+  });
+
+  continue;
+}
+
+const maxLots = Math.floor(
+  MAX_TRADE_RISK / riskPerLot
+);
+
+result.riskManagement = {
+  capital: CAPITAL,
+  maxTradeRisk: MAX_TRADE_RISK,
+  riskPerLot,
+  maxLots,
+  maxQuantity: maxLots * option.lotSize
+};
 
           // ---------- SIGNAL FRESHNESS ----------
 
