@@ -931,9 +931,21 @@ async function selectStrike(signal) {
       ? delta >= 0.50 && delta <= 0.80
       : delta <= -0.50 && delta >= -0.80;
 
-    if (!deltaPass || spread > 8) {
+        if (!deltaPass || spread > 8) {
+      console.log('[OPTION REJECT]', JSON.stringify({
+        symbol: signal.symbol,
+        strike: contract.strike_price,
+        side,
+        delta,
+        spread,
+        deltaPass,
+        reason: !deltaPass
+          ? 'DELTA FILTER FAILED'
+          : 'SPREAD TOO HIGH'
+      }));
+
       return null;
-    }
+        }
 
     return {
       symbol: contract.trading_symbol,
