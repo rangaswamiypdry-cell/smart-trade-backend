@@ -726,8 +726,10 @@ const ema15 = EMA(
     last.volume / volumeAverage;
 
   const volumeIncrease =
-    last.volume > prev.volume &&
-    volumeRatio >= CONFIG.VOLUME_MULTIPLIER;
+  item.marketType === 'INDEX'
+    ? volumeRatio >= CONFIG.VOLUME_MULTIPLIER
+    : last.volume > prev.volume &&
+      volumeRatio >= CONFIG.VOLUME_MULTIPLIER;
 
   // REAL OI CHANGE
 
