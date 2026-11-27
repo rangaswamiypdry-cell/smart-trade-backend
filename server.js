@@ -1315,8 +1315,13 @@ if (!result) {
 
           result.option = option;
 
-          result.optionRisk =
-            calculateOptionRisk(option);
+          
+result.optionRisk =
+  calculateOptionRisk(
+    option,
+    result.marketType
+  );
+          
 
           if (!result.optionRisk) {
             continue;
