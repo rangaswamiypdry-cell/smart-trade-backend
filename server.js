@@ -2358,7 +2358,27 @@ const DASHBOARD_ORIGIN = (
   process.env.DASHBOARD_ORIGIN || ''
 
 ).trim().replace(/\/+$/, '');
+const SCANNER_API_KEY =
+  (process.env.SCANNER_API_KEY || '').trim();
 
+const crypto = require('crypto');
+
+function isAuthorized(req) {
+  const provided = req.headers['x-api-key'];
+
+  if (
+    !SCANNER_API_KEY ||
+    typeof provided !== 'string'
+  ) {
+    return false;
+  }
+
+  const expected = Buffer.from(SCANNER_API_KEY);
+  const received = Buffer.from(provided);
+
+  return expected.length === received.length &&
+    crypto.timingSafeEqual(expected, received);
+}
 // ---------- HTTP SERVER ----------
 
 const server = http.createServer(
@@ -2416,7 +2436,7 @@ const server = http.createServer(
 
       'Access-Control-Allow-Headers',
 
-      'Content-Type, Accept'
+      'Content-Type, Accept, X-API-Key'
 
     );
 
@@ -2457,7 +2477,30 @@ const server = http.createServer(
     }
 
     try {
+// ---------- API AUTHENTICATION ----------
 
+if (url.pathname.startsWith('/api/')) {
+
+  if (!SCANNER_API_KEY) {
+    return send(503, {
+      status: 'ERROR',
+      message: 'API security not configured'
+    });
+  }
+
+  if (!isAuthorized(req)) {
+    return send(401, {
+      status: 'UNAUTHORIZED',
+      message: 'Invalid or missing API key'
+    });
+  }
+
+  if (req.method !== 'GET') {
+    return send(405, {
+      status: 'METHOD_NOT_ALLOWED'
+    });
+  }
+}
       // ---------- HOME ----------
 
       if (url.pathname === '/') {
