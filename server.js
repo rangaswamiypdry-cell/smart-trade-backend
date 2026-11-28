@@ -815,11 +815,14 @@ function detectEMACross(closes) {
 
 // ---------- SIGNAL ENGINE ----------
 
+
 function analyseInstrument(
   item,
   candles,
-  dailyCandles = []
+  dailyCandles = [],
+  spotCandles = []
 ) {
+  
 
   if (!candles || candles.length < 30) {
 
@@ -925,11 +928,31 @@ function analyseInstrument(
 
   // ---------- INDEX 5 MIN / STOCK DAILY ----------
 
-  const emaCloses = isStock
+  
 
-    ? dailyCandles.map(c => c.close)
+let emaCloses = closes;
 
-    : closes;
+if (isStock) {
+
+  const spotLast = spotCandles.at(-1);
+
+  if (
+    !spotLast ||
+    !Number.isFinite(spotLast.close) ||
+    spotLast.close <= 0 ||
+    new Date(spotLast.time).getTime() !==
+    new Date(last.time).getTime()
+  ) {
+    return null;
+  }
+
+  emaCloses = [
+    ...dailyCandles.map(c => c.close),
+    spotLast.close
+  ];
+}
+  
+  
 
   const ema9 =
     EMA(emaCloses, CONFIG.EMA_FAST);
@@ -1962,6 +1985,12 @@ async function scanAll() {
               : await getCandles(
                   item.instrumentKey
                 );
+          
+const spotCandles =
+  item.marketType === 'STOCK'
+    ? await getCandles(item.underlyingKey)
+    : [];
+          
 
           // ---------- STOCK DAILY EMA ----------
 
@@ -1976,15 +2005,14 @@ async function scanAll() {
 
           // ---------- SIGNAL ANALYSIS ----------
 
-          const result = analyseInstrument(
-
-            item,
-
-            candles,
-
-            dailyCandles
-
-          );
+        
+const result = analyseInstrument(
+  item,
+  candles,
+  dailyCandles,
+  spotCandles
+);
+          
 
           if (!result) {
 
