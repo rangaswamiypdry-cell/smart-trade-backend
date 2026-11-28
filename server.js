@@ -2852,7 +2852,10 @@ if (url.pathname.startsWith('/api/')) {
 
 // ---------- AUTO 5 MINUTE SCANNER ----------
 
-let lastScheduledScanSlot = '';
+const lastScanSlots = {
+  INDEX: '',
+  STOCK: ''
+};
 
 function startAutoScanner() {
 
@@ -2861,156 +2864,90 @@ function startAutoScanner() {
     const now = new Date();
 
     const parts = new Intl.DateTimeFormat(
-
-      'en-GB',
-
-      {
-
+      'en-GB', {
         timeZone: 'Asia/Kolkata',
-
         weekday: 'short',
-
         hour: '2-digit',
-
         minute: '2-digit',
-
         second: '2-digit',
-
         hourCycle: 'h23'
-
       }
-
     ).formatToParts(now);
 
     const p = Object.fromEntries(
-
-      parts.map(x => [
-
-        x.type,
-
-        x.value
-
-      ])
-
+      parts.map(x => [x.type, x.value])
     );
 
     const weekday = [
-
-      'Mon',
-
-      'Tue',
-
-      'Wed',
-
-      'Thu',
-
-      'Fri'
-
+      'Mon', 'Tue', 'Wed', 'Thu', 'Fri'
     ].includes(p.weekday);
 
     const hour = Number(p.hour);
-
     const minute = Number(p.minute);
-
     const second = Number(p.second);
 
-    const totalMinutes =
-      hour * 60 + minute;
-
-    // 09:20 AM TO 03:30 PM
-
-    const marketTime =
-
-      totalMinutes >= 560 &&
-
-      totalMinutes <= 930;
+    const totalMinutes = hour * 60 + minute;
 
     if (
-
       !TOKEN ||
-
       !weekday ||
-
-      !marketTime ||
-
-      second < 10 ||
-
-      state.running
-
-    ) {
-
-      return;
-
-    }
+      totalMinutes < 560 ||
+      totalMinutes > 930 ||
+      second < 10
+    ) return;
 
     const slot =
-
       `${istDate(now)}_${hour}_${Math.floor(minute / 5) * 5}`;
 
-    if (
+    for (const mode of ['INDEX', 'STOCK']) {
 
-      slot === lastScheduledScanSlot
+      const locks = state.scanLocks || {};
 
-    ) {
+      if (
+        locks.ALL ||
+        locks[mode] ||
+        lastScanSlots[mode] === slot
+      ) continue;
 
-      return;
-
-    }
-
-    lastScheduledScanSlot = slot;
-
-    console.log(
-
-      '[AUTO SCAN START]',
-
-      slot
-
-    );
-
-    scanAll().then(result => {
+      lastScanSlots[mode] = slot;
 
       console.log(
-
-        '[AUTO SCAN RESULT]',
-
-        JSON.stringify({
-
-          status: result.status,
-
-          scanned: result.scanned,
-
-          buy: result.buy?.length || 0,
-
-          sell: result.sell?.length || 0,
-
-          alerts: result.alerts?.length || 0
-
-        })
-
+        '[AUTO SCAN START]', mode, slot
       );
 
-    }).catch(error => {
+      scanAll(mode).then(result => {
 
-      console.error(
+        console.log(
+          '[AUTO SCAN RESULT]',
+          JSON.stringify({
+            mode,
+            status: result.status,
+            scanned: result.scanned,
+            buy: result.buy?.length || 0,
+            sell: result.sell?.length || 0,
+            alerts: result.alerts?.length || 0
+          })
+        );
 
-        '[AUTO SCAN ERROR]',
+      }).catch(error => {
 
-        error.message
+        console.error(
+          '[AUTO SCAN ERROR]',
+          mode,
+          error.message
+        );
 
-      );
+      });
 
-    });
+    }
 
   }, 10000);
 
   console.log(
-
-    'AUTO 5 MIN SCANNER STARTED'
-
+    'SEPARATE INDEX AND STOCK SCANNER STARTED'
   );
 
 }
-
 // ---------- SERVER START ----------
 
 async function start() {
