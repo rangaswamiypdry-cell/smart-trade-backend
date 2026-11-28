@@ -1731,40 +1731,40 @@ return {
 
 // ---------- DUPLICATE SIGNAL PROTECTION ----------
 
+
 function getSignalTime(signal) {
-
   return signal.marketType === 'STOCK'
-
     ? istDate(new Date(signal.candleTime))
+    : new Date(signal.candleTime).toISOString();
+}
 
-    : signal.candleTime;
-
+function getSignalKey(signal) {
+  return [
+    signal.marketType,
+    signal.symbol,
+    signal.signal,
+    getSignalTime(signal)
+  ].join('_');
 }
 
 function isNewSignal(signal) {
+  const key = getSignalKey(signal);
 
-  const key =
-    `${signal.symbol}_${signal.signal}`;
-
-  const signalTime =
-    getSignalTime(signal);
-
-  const old =
-    state.lastAlerts.get(key);
-
-  if (old === signalTime) {
+  if (state.lastAlerts.has(key)) {
+    console.log('[DUPLICATE SIGNAL BLOCKED]', {
+      symbol: signal.symbol,
+      signal: signal.signal,
+      candleTime: signal.candleTime
+    });
 
     return false;
-
   }
 
-  state.lastAlerts.set(
-    key,
-    signalTime
-  );
+  state.lastAlerts.set(key, Date.now());
 
   return true;
 }
+
 
 // ---------- LIVE ALERT ----------
 
@@ -2037,20 +2037,19 @@ async function scanAll() {
 
           // ---------- DUPLICATE CHECK ----------
 
-          const alertKey =
-            `${result.symbol}_${result.signal}`;
+          
+const alertKey = getSignalKey(result);
 
-          if (
+if (state.lastAlerts.has(alertKey)) {
+  console.log(
+    '[DUPLICATE SIGNAL BLOCKED]',
+    result.symbol,
+    result.signal
+  );
 
-            state.lastAlerts.get(alertKey) ===
-
-            getSignalTime(result)
-
-          ) {
-
-            continue;
-
-          }
+  continue;
+}
+          
 
           // ---------- AUTOMATIC STRIKE ----------
 
