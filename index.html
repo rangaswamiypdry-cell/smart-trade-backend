@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMART TRADE INDIA V11 PRO</title>
+<title>SMART TRADE INDIA V12 PRO</title>
 
 <style>
 *{box-sizing:border-box}
@@ -48,6 +48,8 @@ button{
 button:disabled{opacity:.5;cursor:not-allowed}
 .scan{background:#00d99a;color:#001b14}
 .refresh{background:#344965;color:white}
+.login{background:#ffc857;color:#151515}
+.logout{background:#ff5268;color:white}
 h3.section{margin-top:25px;color:#00e5a0}
 .signal{
   background:#172338;border-radius:12px;padding:15px;
@@ -58,6 +60,17 @@ h3.section{margin-top:25px;color:#00e5a0}
 .signal strong{font-size:16px}
 .error{color:#ff5268}
 footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
+
+input{
+  width:100%;
+  padding:14px;
+  margin:10px 0;
+  border:1px solid #344965;
+  border-radius:8px;
+  background:#0b1220;
+  color:white;
+  font-size:16px;
+}
 @media(max-width:380px){
  .number{font-size:20px}
  .index-list{grid-template-columns:1fr}
@@ -68,14 +81,43 @@ footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
 <body>
 
 <header>
-<h2>SMART TRADE INDIA V11 PRO</h2>
+<h2>SMART TRADE INDIA V12 PRO</h2>
 <p>LIVE NSE F&O + INDEX OPTIONS SCANNER</p>
-<div id="connection" class="yellow">Connecting Backend...</div>
+<div id="connection" class="yellow">
+SECURE LOGIN REQUIRED
+</div>
 </header>
 
 <div class="container">
 
+<!-- SECURE LOGIN -->
+
+<div class="card" id="loginCard">
+
+<h3>🔒 SECURE API LOGIN</h3>
+
+<input
+  type="password"
+  id="apiKeyInput"
+  placeholder="Enter Scanner API Key"
+  autocomplete="off"
+  spellcheck="false"
+>
+
+<button class="login" onclick="setScannerKey()">
+SECURE LOGIN
+</button>
+
+<p id="loginStatus" class="yellow">
+Enter your private Scanner API Key
+</p>
+
+</div>
+
+<div id="dashboard" hidden>
+
 <div class="grid">
+
 <div class="card">
 <h3>NSE F&O STOCKS</h3>
 <div class="number green" id="stocks">0</div>
@@ -95,30 +137,74 @@ footer{text-align:center;padding:25px;color:#8394ad;font-size:12px}
 <h3>TOTAL SIGNALS</h3>
 <div class="number" id="totalSignals">0</div>
 </div>
+
 </div>
 
 <h3 class="section">INDEX MARKET</h3>
 
 <div class="index-list" id="indexList">
-<div class="index"><strong>NIFTY 50</strong><div class="status yellow">Checking...</div></div>
-<div class="index"><strong>BANKNIFTY</strong><div class="status yellow">Checking...</div></div>
-<div class="index"><strong>FINNIFTY</strong><div class="status yellow">Checking...</div></div>
-<div class="index"><strong>SENSEX</strong><div class="status yellow">Checking...</div></div>
+
+<div class="index">
+<strong>NIFTY 50</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+<div class="index">
+<strong>BANKNIFTY</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+<div class="index">
+<strong>FINNIFTY</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
+<div class="index">
+<strong>SENSEX</strong>
+<div class="status yellow">Checking...</div>
+</div>
+
 </div>
 
 <h3 class="section">SCANNER CONTROL</h3>
 
 <div class="card">
-<div id="scanStatus" class="yellow">Scanner Ready</div>
+
+<div id="scanStatus" class="yellow">
+Scanner Ready
+</div>
+
 <br>
-<button class="scan" onclick="runScan()">START SCAN</button>
-<button class="refresh" onclick="loadDashboard()">REFRESH</button>
+
+<button class="scan" onclick="runScan()">
+START SCAN
+</button>
+
+<button class="refresh" onclick="loadDashboard()">
+REFRESH
+</button>
+
+<button class="logout" onclick="logout()">
+LOGOUT
+</button>
 
 <p style="font-size:12px;color:#9aabc3">
-Timeframe: 5 Minutes | EMA 9 / 15 Cross<br>
-RSI BUY: 65 | RSI SELL: 35<br>
-Volume: 1.5x | All 7 Conditions Required
+
+Index: 5 Minute EMA 9/15 Cross<br>
+Stock: Live Daily EMA 9/15 Cross<br>
+Confirmation: 5 Minute Closed Candle<br>
+OI Increase + Change in OI<br>
+Volume Increase: 1.5x<br>
+Price Increase / Decrease<br>
+All 5/5 Conditions Required<br>
+Index: CE SELL / PE SELL<br>
+Stock: CE BUY / PE BUY<br>
+Index Delta: 0.30 - 0.40<br>
+Maximum Spread: 2%<br>
+RSI: Disabled | VWAP: Disabled
+
 </p>
+
 </div>
 
 <h3 class="section">VERY STRONG BUY</h3>
@@ -132,60 +218,241 @@ Volume: 1.5x | All 7 Conditions Required
 
 </div>
 
+</div>
+
 <footer>
-SMART TRADE INDIA V11 PRO<br>
-5 MIN CLOSED CANDLE SIGNALS
+SMART TRADE INDIA V12 PRO<br>
+SECURE LIVE UPSTOX SCANNER<br>
+5 MIN CLOSED CANDLE CONFIRMATION
 </footer>
 
 <script>
 
-const API = "https://smart-trade-backend-ig6l.onrender.com";
+const API =
+  "https://smart-trade-backend-ig6l.onrender.com";
+
+// ---------- API SECURITY ----------
+
+let scannerApiKey = "";
+let sessionVersion = 0;
+let dashboardLoading = false;
+let loginRunning = false;
+
+// ---------- SECURE LOGIN ----------
+
+async function setScannerKey(){
+
+  if(loginRunning) return;
+
+  const input =
+    document.getElementById("apiKeyInput");
+
+  const key = input.value.trim();
+
+  if(!key){
+
+    document.getElementById("loginStatus")
+      .textContent = "Please enter API Key";
+
+    return;
+  }
+
+  loginRunning = true;
+  scannerApiKey = key;
+  sessionVersion++;
+
+  const session = sessionVersion;
+
+  input.value = "";
+
+  document.getElementById("loginStatus")
+    .textContent = "Verifying API Key...";
+
+  try{
+
+    await getAPI("/api/market/status");
+
+    if(session !== sessionVersion) return;
+
+    document.getElementById("loginCard")
+      .hidden = true;
+
+    document.getElementById("dashboard")
+      .hidden = false;
+
+    await loadDashboard();
+
+  }catch(error){
+
+    if(session === sessionVersion){
+      logout(error.message);
+    }
+
+  }finally{
+
+    loginRunning = false;
+
+  }
+
+}
+
+// ---------- SECURE LOGOUT ----------
+
+function logout(message = "Logged out successfully"){
+
+  scannerApiKey = "";
+  sessionVersion++;
+
+  document.getElementById("apiKeyInput")
+    .value = "";
+
+  document.getElementById("dashboard")
+    .hidden = true;
+
+  document.getElementById("loginCard")
+    .hidden = false;
+
+  document.getElementById("connection")
+    .textContent = "SECURE LOGIN REQUIRED";
+
+  document.getElementById("connection")
+    .className = "yellow";
+
+  document.getElementById("loginStatus")
+    .textContent = message;
+
+  ["stocks","indexes","options","totalSignals"]
+    .forEach(id => {
+      document.getElementById(id).textContent = "0";
+    });
+
+  document.getElementById("buySignals")
+    .textContent = "No BUY signals";
+
+  document.getElementById("sellSignals")
+    .textContent = "No SELL signals";
+
+  document.getElementById("errors")
+    .textContent = "No errors";
+
+  document.getElementById("scanStatus")
+    .textContent = "Scanner Ready";
+
+  document.getElementById("indexList")
+    .textContent = "Login to load index prices";
+
+}
+
+// ---------- AUTHENTICATED API ----------
 
 async function getAPI(path){
-  const response = await fetch(API + path);
-  if(!response.ok){
-    throw new Error("HTTP " + response.status);
+
+  if(!scannerApiKey){
+
+    throw new Error("Secure Login Required");
+
   }
+
+  const session = sessionVersion;
+
+  const response = await fetch(API + path, {
+
+    method: "GET",
+
+    headers: {
+
+      "Accept": "application/json",
+
+      "X-API-Key": scannerApiKey
+
+    },
+
+    cache: "no-store"
+
+  });
+
+  if(session !== sessionVersion){
+
+    throw new Error("Session changed");
+
+  }
+
+  if(response.status === 401){
+
+    logout("Invalid API Key. Login again.");
+
+    throw new Error("Invalid API Key");
+
+  }
+
+  if(response.status === 503){
+
+    throw new Error(
+      "Server API Security Not Configured"
+    );
+
+  }
+
+  if(!response.ok){
+
+    throw new Error("HTTP " + response.status);
+
+  }
+
   return response.json();
+
 }
+
+// ---------- HTML SECURITY ----------
 
 function escapeHTML(value){
-  return String(value ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    '"':"&quot;",
-    "'":"&#39;"
-  })[c]);
+
+  return String(value ?? "").replace(
+    /[&<>"']/g, c => ({
+
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+
+    })[c]
+  );
+
 }
 
-// INDEX NAME NORMALIZATION
+// ---------- INDEX NAME ----------
 
 function normalizeIndexName(value){
+
   return String(value || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g,"");
+
 }
 
-// INDEX MARKET DISPLAY
+// ---------- INDEX MARKET DISPLAY ----------
 
 function renderIndexes(data){
 
   const indexes = Array.isArray(data.indexes)
     ? data.indexes : [];
 
-  document.getElementById("indexes").textContent =
-    indexes.length;
+  document.getElementById("indexes")
+    .textContent = indexes.length;
 
   const indexNames = [
+
     {
       label:"NIFTY 50",
       aliases:["NIFTY","NIFTY50"]
     },
+
     {
       label:"BANKNIFTY",
       aliases:["BANKNIFTY","NIFTYBANK"]
     },
+
     {
       label:"FINNIFTY",
       aliases:[
@@ -194,252 +461,484 @@ function renderIndexes(data){
         "NIFTYFINANCIALSERVICES"
       ]
     },
+
     {
       label:"SENSEX",
       aliases:["SENSEX"]
     }
+
   ];
 
-  document.getElementById("indexList").innerHTML =
-    indexNames.map(item => {
+  document.getElementById("indexList")
+    .innerHTML = indexNames.map(item => {
 
       const found = indexes.find(x => {
 
         const name = normalizeIndexName(
+
           x.trading_symbol ||
           x.symbol ||
           x.name
+
         );
 
         return item.aliases.includes(name);
+
       });
 
       const key = found
+
         ? (found.instrument_key || found.key)
+
         : "";
+
       const spot = (data.spotPrices || []).find(
-  q => q.instrumentKey === key
-);
+
+        q => q.instrumentKey === key
+
+      );
+
+      const validPrice =
+
+        spot &&
+        spot.lastPrice != null &&
+        Number.isFinite(Number(spot.lastPrice));
+
       return `
+
       <div class="index">
+
         <strong>${item.label}</strong>
 
-        <div class="status ${found && key ? "green":"red"}">
-          ${found && key ? "INDEX LOADED":"NOT LOADED"}
+        <div class="status ${
+          found && key ? "green":"red"
+        }">
+
+          ${found && key
+            ? "INDEX LOADED"
+            : "NOT LOADED"}
+
         </div>
 
         <small>
+
           ${found && key
             ? escapeHTML(key)
             : "Instrument key unavailable"}
-        </small>
-        <div class="number green" style="margin-top:10px">
-  ${spot && spot.lastPrice != null
-    ? "₹" + Number(spot.lastPrice).toLocaleString("en-IN", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-    : "Price unavailable"}
-</div>
 
-<small>
-  ${spot && spot.change != null
-    ? "Change: ₹" + Number(spot.change).toFixed(2)
-    : ""}
-</small>
+        </small>
+
+        <div class="number green"
+             style="margin-top:10px">
+
+          ${validPrice
+
+            ? "₹" + Number(spot.lastPrice)
+                .toLocaleString("en-IN",{
+
+                  minimumFractionDigits:2,
+                  maximumFractionDigits:2
+
+                })
+
+            : "Price unavailable"}
+
+        </div>
+
+        <small>
+
+          ${spot &&
+            spot.change != null &&
+            Number.isFinite(Number(spot.change))
+
+            ? "Change: ₹" +
+              Number(spot.change).toFixed(2)
+
+            : ""}
+
+        </small>
+
       </div>`;
 
     }).join("");
+
 }
 
-// SIGNAL DISPLAY
+// ---------- SIGNAL DISPLAY ----------
 
 function renderSignals(signals){
 
-  signals = Array.isArray(signals) ? signals : [];
+  signals = Array.isArray(signals)
+    ? signals : [];
 
   const buys = signals.filter(
+
     x => x.signal === "VERY_STRONG_BUY"
+
   );
 
   const sells = signals.filter(
+
     x => x.signal === "VERY_STRONG_SELL"
+
   );
 
-  document.getElementById("totalSignals").textContent =
-    signals.length;
+  document.getElementById("totalSignals")
+    .textContent = signals.length;
 
-  document.getElementById("buySignals").innerHTML =
-    buys.length
-      ? buys.map(x => signalCard(x,false)).join("")
+  document.getElementById("buySignals")
+    .innerHTML = buys.length
+
+      ? buys.map(x =>
+          signalCard(x,false)
+        ).join("")
+
       : "No VERY STRONG BUY signals";
 
-  document.getElementById("sellSignals").innerHTML =
-    sells.length
-      ? sells.map(x => signalCard(x,true)).join("")
+  document.getElementById("sellSignals")
+    .innerHTML = sells.length
+
+      ? sells.map(x =>
+          signalCard(x,true)
+        ).join("")
+
       : "No VERY STRONG SELL signals";
+
 }
+
+// ---------- SIGNAL CARD ----------
 
 function signalCard(x,isSell){
 
   const option = x.option || {};
+
   const risk = x.optionRisk || {};
 
+  const management = x.riskManagement || {};
+
   const num = value =>
+
+    value != null &&
+    value !== "" &&
     Number.isFinite(Number(value))
+
       ? Number(value).toFixed(2)
+
       : "N/A";
 
   return `
+
   <div class="signal ${isSell ? "sell":""}">
 
     <strong>${escapeHTML(x.symbol)}</strong>
 
     <span class="${isSell ? "red":"green"}">
+
       ${escapeHTML(x.signal)}
+
     </span>
 
     <p>Market: ${escapeHTML(x.marketType)}</p>
+
+    <p>Action:
+      <strong class="yellow">
+        ${escapeHTML(x.action || "N/A")}
+      </strong>
+    </p>
+
     <p>EMA Cross: ${escapeHTML(x.cross)}</p>
-    <p>Confirmation: ${escapeHTML(x.confirmation)}</p>
-    <p>Entry: ${num(x.entry)}</p>
-    <p>Stop Loss: ${num(x.stopLoss)}</p>
-    <p>Target 1: ${num(x.target1)}</p>
-    <p>Target 2: ${num(x.target2)}</p>
+
+    <p>Timeframe: ${escapeHTML(x.timeframe)}</p>
+
+    <p>Confirmation:
+      ${escapeHTML(x.confirmation)}
+    </p>
+
+    <p>EMA 9: ${num(x.ema9)}</p>
+
+    <p>EMA 15: ${num(x.ema15)}</p>
+
+    <p>Underlying Entry: ${num(x.entry)}</p>
+
+    <p>Underlying SL: ${num(x.stopLoss)}</p>
+
+    <p>Underlying Target 1: ${num(x.target1)}</p>
+
+    <p>Underlying Target 2: ${num(x.target2)}</p>
 
     <hr>
 
-    <p>Option: ${escapeHTML(option.symbol || "N/A")}</p>
-    <p>Option Entry: ${escapeHTML(risk.optionEntry ?? "N/A")}</p>
-    <p>Option SL: ${escapeHTML(risk.optionSL ?? "N/A")}</p>
-    <p>Option Target 1: ${escapeHTML(risk.optionTarget1 ?? "N/A")}</p>
-    <p>Option Target 2: ${escapeHTML(risk.optionTarget2 ?? "N/A")}</p>
+    <p>Option:
+      ${escapeHTML(option.symbol || "N/A")}
+    </p>
 
-    <p>RSI: ${num(x.rsi)}</p>
-    <p>VWAP: ${num(x.vwap)}</p>
+    <p>Strike: ${num(option.strike)}</p>
+
+    <p>Option Side:
+      ${escapeHTML(option.side || "N/A")}
+    </p>
+
+    <p>Expiry:
+      ${escapeHTML(option.expiry || "N/A")}
+    </p>
+
+    <p>Option Entry:
+      ${num(risk.optionEntry)}
+    </p>
+
+    <p class="red">Option SL:
+      ${num(risk.optionSL)}
+    </p>
+
+    <p class="green">Option Target 1:
+      ${num(risk.optionTarget1)}
+    </p>
+
+    <p class="green">Option Target 2:
+      ${num(risk.optionTarget2)}
+    </p>
+
+    <p>Delta: ${num(option.delta)}</p>
+
+    <p>Bid: ${num(option.bid)}</p>
+
+    <p>Ask: ${num(option.ask)}</p>
+
+    <p>Spread: ${num(option.spread)}%</p>
+
     <p>Volume Ratio: ${num(x.volumeRatio)}x</p>
 
-    <p>OI Change: ${
-      x.oiChange == null
-        ? "N/A"
-        : num(x.oiChange)+"%"
-    }</p>
+    <p>Volume: ${num(x.volume)}</p>
 
-    <p>Signal Time: ${escapeHTML(x.candleTime)}</p>
+    <p>Previous Volume:
+      ${num(x.previousVolume)}
+    </p>
+
+    <p>Volume Change:
+      ${num(x.volumeChange)}
+    </p>
+
+    <p>OI: ${num(x.oi)}</p>
+
+    <p>Previous OI: ${num(x.previousOI)}</p>
+
+    <p>OI Change:
+      ${x.oiChange == null
+        ? "N/A"
+        : num(x.oiChange)+"%"}
+    </p>
+
+    <p>Change in OI:
+      ${num(x.oiChangeValue)}
+    </p>
+
+    <p>Price Change:
+      ${num(x.priceChange)}
+    </p>
+
+    <hr>
+
+    <p>Lot Size: ${num(option.lotSize)}</p>
+
+    <p>Estimated SL Risk Per Lot:
+      ₹${num(risk.riskPerLot)}
+    </p>
+
+    <p>Maximum Lots by SL Risk:
+      ${num(management.maxLots)}
+    </p>
+
+    <p>Maximum Quantity by SL Risk:
+      ${num(management.maxQuantity)}
+    </p>
+
+    <p>Signal Time:
+      ${escapeHTML(x.candleTime)}
+    </p>
 
   </div>`;
+
 }
 
-// LOAD DASHBOARD
+// ---------- LOAD DASHBOARD ----------
 
 async function loadDashboard(){
+
+  if(!scannerApiKey || dashboardLoading){
+
+    return;
+
+  }
+
+  dashboardLoading = true;
+
+  const session = sessionVersion;
 
   try{
 
     const [status,instruments,signalData] =
+
       await Promise.all([
 
         getAPI("/api/market/status"),
+
         getAPI("/api/market/instruments"),
+
         getAPI("/api/market/signals")
 
       ]);
 
-    document.getElementById("connection").textContent =
-      "BACKEND CONNECTED";
+    if(session !== sessionVersion) return;
 
-    document.getElementById("connection").className =
-      "green";
+    document.getElementById("connection")
+      .textContent = "SECURE BACKEND CONNECTED";
 
-    document.getElementById("stocks").textContent =
-      instruments.stocks ?? 0;
+    document.getElementById("connection")
+      .className = "green";
 
-    document.getElementById("options").textContent =
-      instruments.options ?? 0;
+    document.getElementById("stocks")
+      .textContent = instruments.stocks ?? 0;
+
+    document.getElementById("options")
+      .textContent = instruments.options ?? 0;
 
     renderIndexes(instruments);
 
     renderSignals(signalData.signals || []);
 
-    document.getElementById("scanStatus").textContent =
-      status.running
-        ? "SCANNER RUNNING"
-        : "SCANNER READY | " + (status.lastScan || "Not scanned");
+    document.getElementById("scanStatus")
+      .textContent = status.running
 
-    document.getElementById("errors").innerHTML =
-      (status.errors || []).length
+        ? "SCANNER RUNNING"
+
+        : "SCANNER READY | " +
+          (status.lastScan || "Not scanned");
+
+    document.getElementById("errors")
+      .innerHTML = (status.errors || []).length
+
         ? status.errors.map(e =>
+
           `<p class="error">
+
             ${escapeHTML(e.symbol)}:
+
             ${escapeHTML(e.message)}
+
           </p>`
+
         ).join("")
+
         : "No errors";
 
   }catch(error){
 
-    document.getElementById("connection").textContent =
-      "BACKEND CONNECTION ERROR";
+    if(session !== sessionVersion) return;
 
-    document.getElementById("connection").className =
-      "error";
+    document.getElementById("connection")
+      .textContent = "BACKEND CONNECTION ERROR";
 
-    document.getElementById("errors").textContent =
-      error.message;
+    document.getElementById("connection")
+      .className = "error";
+
+    document.getElementById("errors")
+      .textContent = error.message;
+
+  }finally{
+
+    dashboardLoading = false;
 
   }
+
 }
 
-// START SCANNER
+// ---------- START SCANNER ----------
 
 async function runScan(){
 
-  const button = document.querySelector(".scan");
+  if(!scannerApiKey){
+
+    logout("Secure Login Required");
+
+    return;
+
+  }
+
+  const session = sessionVersion;
+
+  const button =
+    document.querySelector(".scan");
 
   button.disabled = true;
 
-  document.getElementById("scanStatus").textContent =
-    "SCANNING... PLEASE WAIT";
+  document.getElementById("scanStatus")
+    .textContent = "SCANNING... PLEASE WAIT";
 
   try{
 
-    const result = await getAPI("/api/market/scan");
+    const result =
+      await getAPI("/api/market/scan");
+
+    if(session !== sessionVersion) return;
 
     if(result.status === "SUCCESS"){
 
-      document.getElementById("scanStatus").textContent =
-        "SCAN COMPLETED";
+      document.getElementById("scanStatus")
+        .textContent = "SCAN COMPLETED";
 
       await loadDashboard();
 
     }else{
 
-      document.getElementById("scanStatus").textContent =
-        result.status || "SCAN FAILED";
+      document.getElementById("scanStatus")
+        .textContent =
+          result.status || "SCAN FAILED";
 
     }
 
   }catch(error){
 
-    document.getElementById("scanStatus").textContent =
-      "SCAN ERROR: " + error.message;
+    if(session !== sessionVersion) return;
+
+    document.getElementById("scanStatus")
+      .textContent =
+        "SCAN ERROR: " + error.message;
 
   }finally{
 
     button.disabled = false;
 
   }
+
 }
 
-// INITIAL LOAD
+// ---------- LOGIN ENTER KEY ----------
 
-loadDashboard();
+document.getElementById("apiKeyInput")
+  .addEventListener("keydown",event => {
 
-// AUTO REFRESH EVERY 10 SECONDS
+    if(event.key === "Enter"){
 
-setInterval(loadDashboard,10000);
+      setScannerKey();
+
+    }
+
+  });
+
+// ---------- AUTO REFRESH ----------
+
+setInterval(() => {
+
+  if(scannerApiKey){
+
+    loadDashboard();
+
+  }
+
+},10000);
 
 </script>
 
 </body>
-</html>
+  </html>
+  
