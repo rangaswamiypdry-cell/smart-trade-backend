@@ -1972,7 +1972,11 @@ async function scanAll() {
       while (cursor < universe.length) {
 
         const item = universe[cursor++];
-
+console.log(
+  '[SCAN PROGRESS]',
+  cursor + '/' + universe.length,
+  item.symbol
+);
         try {
 
           // ---------- LIVE CANDLES ----------
