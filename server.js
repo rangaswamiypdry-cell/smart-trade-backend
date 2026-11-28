@@ -1905,18 +1905,31 @@ function createLiveAlert(result) {
 
 // ---------- MAIN LIVE SCANNER ----------
 
-async function scanAll() {
+async function scanAll(mode = 'ALL') {
 
-  if (state.running) {
+  state.scanLocks ??= {
+  INDEX: false,
+  STOCK: false,
+  ALL: false
+};
 
-    return {
-      status: 'SCAN_ALREADY_RUNNING'
-    };
+const locks = state.scanLocks;
 
-  }
+if (
+  locks.ALL ||
+  locks[mode] ||
+  (mode === 'ALL' &&
+    (locks.INDEX || locks.STOCK))
+) {
+  return {
+    status: 'SCAN_ALREADY_RUNNING'
+  };
+}
 
-  state.running = true;
-  state.errors = [];
+locks[mode] = true;
+state.running = true;
+
+const scanErrors = [];
 
   try {
 
@@ -1961,7 +1974,10 @@ async function scanAll() {
 
       }))
 
-    ];
+   ].filter(item =>
+  mode === 'ALL' ||
+  item.marketType === mode
+);
 
     const output = [];
 
@@ -2090,7 +2106,7 @@ if (state.lastAlerts.has(alertKey)) {
 
           if (!option) {
 
-            state.errors.push({
+            scanErrors.push({
 
               symbol: item.symbol,
 
@@ -2209,7 +2225,7 @@ result.riskManagement = {
 
         } catch (error) {
 
-          state.errors.push({
+          scanErrors.push({
 
             symbol: item.symbol,
 
@@ -2282,7 +2298,7 @@ result.riskManagement = {
 
       'SELL:', sell.length,
 
-      'Errors:', state.errors.length
+      'Errors:', scanErrors.length
 
     );
 
@@ -2300,17 +2316,25 @@ result.riskManagement = {
 
       alerts: output.map(x => x.alert),
 
-      errors: state.errors.slice(0, 30),
+      errors: scanErrors.slice(0, 30),
 
       lastScan: state.lastScan
 
     };
 
   } finally {
+state.errors = [
+  ...scanErrors,
+  ...state.errors
+].slice(0, 100);
+  locks[mode] = false;
 
-    state.running = false;
+  state.running =
+    locks.INDEX ||
+    locks.STOCK ||
+    locks.ALL;
 
-  }
+}
 
 }
 
